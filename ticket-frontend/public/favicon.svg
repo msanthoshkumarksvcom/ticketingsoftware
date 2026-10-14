@@ -1,0 +1,12 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(50, 50)">
+    <!-- Top face (White) -->
+    <path d="M 0 -40 L 34 -20 L 0 0 L -34 -20 Z" fill="#ffffff" />
+    <!-- Top face light blue highlight -->
+    <path d="M -34 -20 L -10 -6 L -17 -30 Z" fill="#d1f0ff" />
+    <!-- Left face (Vibrant Blue) -->
+    <path d="M -34 -20 L 0 0 L 0 40 L -34 20 Z" fill="#296df2" />
+    <!-- Right face (Dark Navy) -->
+    <path d="M 0 0 L 34 -20 L 34 20 L 0 40 Z" fill="#1b2a59" />
+  </g>
+</svg>

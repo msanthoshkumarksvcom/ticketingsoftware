@@ -1,0 +1,69 @@
+/* Tickets Management Styles */
+.ticket-type-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.type-bug {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.type-incident {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.type-feature {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+.type-task {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.ticket-status-open {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.ticket-status-in-progress {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.ticket-status-resolved {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.ticket-status-closed {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.ticket-title-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.ticket-title-text {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.ticket-desc-sub {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 2px;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
