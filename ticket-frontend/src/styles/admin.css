@@ -978,6 +978,7 @@
   .main-content {
     height: auto;
     margin-left: 0;
+    margin-top: 55px;
     min-height: calc(100vh - 55px);
     overflow: visible;
   }

@@ -10,6 +10,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Protected inbuilt system emails that cannot be edited or deleted
+const PROTECTED_SYSTEM_EMAILS = ['manager@gmail.com', 'qalead@gmail.com'];
+const DEFAULT_USER_PASSWORD = 'Welcome@123';
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -52,11 +56,18 @@ app.post('/api/login', async (req, res) => {
       { expiresIn: '24h' }                    // Token expires in 24 hours
     );
 
-    // 4. Send the token back to React
+    // 4. Send the token and user details back to React
     res.json({ 
       message: 'Login successful', 
       token: token,
-      user: { id: user.id, email: user.email }
+      user: { 
+        id: user.id, 
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        emp_id: user.emp_id,
+        department: user.department
+      }
     });
 
   } catch (error) {
@@ -124,9 +135,9 @@ app.get('/api/admin/users', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, emp_id, full_name, email, department, role, phone, status, created_at 
+      `SELECT id, emp_id, full_name, email, department, role, phone, status, avatar, created_at 
        FROM users 
-       ORDER BY id DESC`
+       ORDER BY emp_id ASC NULLS LAST, id ASC`
     );
     res.json(result.rows);
   } catch (error) {
@@ -148,22 +159,27 @@ app.post('/api/admin/users', async (req, res) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const { emp_id, full_name, email, password, department, role, phone, status } = req.body;
+  const { emp_id, full_name, email, password, department, role, phone, status, avatar } = req.body;
 
   if (!email || !full_name) {
     return res.status(400).json({ error: 'Full name and email are required fields.' });
   }
 
+  // Block creating users with protected emails
+  if (PROTECTED_SYSTEM_EMAILS.includes(email.toLowerCase().trim())) {
+    return res.status(400).json({ error: 'This email is reserved for an inbuilt system account.' });
+  }
+
   try {
     // Check for existing email or employee ID
     const existingCheck = await pool.query(
-      `SELECT * FROM users WHERE email = $1 OR (emp_id IS NOT NULL AND emp_id = $2)`,
-      [email, emp_id || '']
+      `SELECT * FROM users WHERE LOWER(email) = LOWER($1) OR (emp_id IS NOT NULL AND emp_id = $2)`,
+      [email.trim(), emp_id || '']
     );
 
     if (existingCheck.rows.length > 0) {
       const match = existingCheck.rows[0];
-      if (match.email.toLowerCase() === email.toLowerCase()) {
+      if (match.email.toLowerCase() === email.toLowerCase().trim()) {
         return res.status(400).json({ error: 'A user with this email address already exists.' });
       }
       if (emp_id && match.emp_id === emp_id) {
@@ -171,24 +187,24 @@ app.post('/api/admin/users', async (req, res) => {
       }
     }
 
-    // Default password if not provided
-    const userPassword = password || 'Welcome@123';
     const salt = await bcrypt.genSalt(10);
+    const userPassword = password || DEFAULT_USER_PASSWORD;
     const hashedPassword = await bcrypt.hash(userPassword, salt);
 
     const result = await pool.query(
-      `INSERT INTO users (emp_id, full_name, email, password, department, role, phone, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, emp_id, full_name, email, department, role, phone, status, created_at`,
+      `INSERT INTO users (emp_id, full_name, email, password, department, role, phone, status, avatar)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, emp_id, full_name, email, department, role, phone, status, avatar, created_at`,
       [
         emp_id || null,
-        full_name,
-        email,
+        full_name.trim(),
+        email.toLowerCase().trim(),
         hashedPassword,
-        department || 'General',
-        role || 'Member',
+        department || 'Quality Assurance',
+        role || 'QA Member',
         phone || null,
-        status || 'Active'
+        status || 'Active',
+        avatar || null
       ]
     );
 
@@ -199,6 +215,125 @@ app.post('/api/admin/users', async (req, res) => {
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ error: 'Failed to create user in database.' });
+  }
+});
+
+// Admin Users: Update user (Protected accounts cannot be edited)
+app.put('/api/admin/users/:id', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+  const { emp_id, full_name, email, department, role, phone, status, avatar } = req.body;
+
+  try {
+    const userCheck = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const existingUser = userCheck.rows[0];
+
+    // Enforce that manager@gmail.com and qalead@gmail.com cannot be edited
+    if (PROTECTED_SYSTEM_EMAILS.includes(existingUser.email.toLowerCase())) {
+      return res.status(403).json({
+        error: `Inbuilt system user (${existingUser.email}) is protected and cannot be edited or modified.`
+      });
+    }
+
+    // Ensure they don't change another account's email to a protected email
+    if (email && email.toLowerCase().trim() !== existingUser.email.toLowerCase()) {
+      if (PROTECTED_SYSTEM_EMAILS.includes(email.toLowerCase().trim())) {
+        return res.status(400).json({ error: 'Cannot assign a reserved inbuilt system email address.' });
+      }
+      const conflict = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2', [email.trim(), id]);
+      if (conflict.rows.length > 0) {
+        return res.status(400).json({ error: 'A user with this email address already exists.' });
+      }
+    }
+
+    const updated = await pool.query(
+      `UPDATE users
+       SET emp_id = COALESCE($1, emp_id),
+           full_name = COALESCE($2, full_name),
+           email = COALESCE($3, email),
+           department = COALESCE($4, department),
+           role = COALESCE($5, role),
+           phone = COALESCE($6, phone),
+           status = COALESCE($7, status),
+           avatar = COALESCE($8, avatar)
+       WHERE id = $9
+       RETURNING id, emp_id, full_name, email, department, role, phone, status, avatar, created_at`,
+      [
+        emp_id !== undefined ? emp_id : existingUser.emp_id,
+        full_name ? full_name.trim() : existingUser.full_name,
+        email ? email.toLowerCase().trim() : existingUser.email,
+        department || existingUser.department,
+        role || existingUser.role,
+        phone !== undefined ? phone : existingUser.phone,
+        status || existingUser.status,
+        avatar !== undefined ? avatar : existingUser.avatar,
+        id
+      ]
+    );
+
+    res.json({
+      message: 'User updated successfully',
+      user: updated.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Failed to update user in database.' });
+  }
+});
+
+// Admin Users: Delete user (Protected accounts cannot be deleted)
+app.delete('/api/admin/users/:id', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+
+  try {
+    const userCheck = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUser = userCheck.rows[0];
+
+    // Enforce that manager@gmail.com and qalead@gmail.com cannot be deleted
+    if (PROTECTED_SYSTEM_EMAILS.includes(targetUser.email.toLowerCase())) {
+      return res.status(403).json({
+        error: `Inbuilt system user (${targetUser.email}) is protected and cannot be deleted.`
+      });
+    }
+
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+
+    res.json({
+      message: 'User deleted successfully',
+      deletedId: id
+    });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user from database.' });
   }
 });
 
