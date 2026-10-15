@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from './db.js';
+import { sendWelcomeEmail, generateTemporaryPassword } from './services/emailService.js';
 
 dotenv.config();
 
@@ -187,9 +188,9 @@ app.post('/api/admin/users', async (req, res) => {
       }
     }
 
+    const generatedPlainPassword = password || generateTemporaryPassword();
     const salt = await bcrypt.genSalt(10);
-    const userPassword = password || DEFAULT_USER_PASSWORD;
-    const hashedPassword = await bcrypt.hash(userPassword, salt);
+    const hashedPassword = await bcrypt.hash(generatedPlainPassword, salt);
 
     const result = await pool.query(
       `INSERT INTO users (emp_id, full_name, email, password, department, role, phone, status, avatar)
@@ -208,9 +209,23 @@ app.post('/api/admin/users', async (req, res) => {
       ]
     );
 
+    const newUser = result.rows[0];
+
+    // Trigger welcome email with role, department, and generated password via Nodemailer
+    sendWelcomeEmail({
+      to: newUser.email,
+      fullName: newUser.full_name,
+      empId: newUser.emp_id,
+      role: newUser.role,
+      department: newUser.department,
+      password: generatedPlainPassword
+    }).catch((emailErr) => {
+      console.error('Welcome email dispatch error:', emailErr);
+    });
+
     res.status(201).json({
-      message: 'User created successfully',
-      user: result.rows[0]
+      message: 'User created successfully and welcome email sent',
+      user: newUser
     });
   } catch (error) {
     console.error('Error creating user:', error);

@@ -1016,22 +1016,56 @@
   background: #ef4444;
 }
 
-/* Password Delivery Notice Banner */
+.dot-unselected {
+  background: #cbd5e1;
+}
+
+/* Inline Field Validation Error Styles */
+.um-input-box.um-input-error {
+  border-color: #ef4444 !important;
+  background: #fffafa !important;
+}
+
+.um-input-box.um-input-error:focus-within {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
+}
+
+.um-field-error {
+  font-size: 0.74rem;
+  color: #dc2626;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.um-select-placeholder {
+  color: #94a3b8 !important;
+}
+
+.um-select-placeholder option {
+  color: #0f172a !important;
+}
+
+/* Password Delivery Notice Banner - Compact & Modern Redesign */
 .um-password-notice-banner {
   display: flex;
   align-items: center;
-  gap: 11px;
-  background: #eff6ff;
-  border: 1.2px solid #bfdbfe;
-  border-radius: 10px;
-  padding: 10px 14px;
-  color: #1e40af;
+  gap: 10px;
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  padding: 8px 12px;
+  transition: all 0.15s ease;
 }
 
 .um-notice-icon-box {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   background: #dbeafe;
   color: #2563eb;
   display: flex;
@@ -1040,18 +1074,28 @@
   flex-shrink: 0;
 }
 
-.um-notice-text strong {
-  display: block;
-  font-size: 0.84rem;
-  color: #1e3a8a;
-  margin-bottom: 2px;
+.um-notice-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
+.um-notice-title,
+.um-notice-text strong {
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: #1e3a8a;
+  line-height: 1.25;
+  margin-bottom: 0;
+}
+
+.um-notice-desc,
 .um-notice-text p {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   color: #3b82f6;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 /* Modal Footer */

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowUpDown,
   Bell,
@@ -56,14 +57,15 @@ const AVAILABLE_DEPARTMENTS = [
   'Management'
 ];
 
+// No default selections - must be selected by the user
 const initialFormData = {
   emp_id: '',
   full_name: '',
   email: '',
-  department: 'Quality Assurance',
-  role: 'QA Member',
+  department: '',
+  role: '',
   phone: '',
-  status: 'Active',
+  status: '',
   avatar: ''
 };
 
@@ -86,9 +88,11 @@ function AdminUsers() {
   const [userToDelete, setUserToDelete] = useState(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Form states
+  // Form states & validation errors
   const [formData, setFormData] = useState(initialFormData);
   const [editFormData, setEditFormData] = useState(null);
+  const [createFieldErrors, setCreateFieldErrors] = useState({});
+  const [editFieldErrors, setEditFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -147,27 +151,248 @@ function AdminUsers() {
     return `EMP-${String(maxNum + 1).padStart(3, '0')}`;
   }, [users]);
 
-  // Open Create Modal with auto-generated ID & blank user-selected avatar
+  // Validation helpers
+  const validateFullName = (value, isSubmitting = false) => {
+    if (!value || !value.trim()) {
+      return 'Full Name is required.';
+    }
+    const trimmed = value.trim();
+    if (trimmed.length < 3) {
+      return 'Minimum 3 characters required.';
+    }
+    if (value.length > 50) {
+      return 'Maximum 50 characters allowed.';
+    }
+    // Only letters and spaces (no numbers or special symbols)
+    if (!/^[a-zA-Z ]+$/.test(value)) {
+      return 'Only letters and spaces allowed (no numbers or symbols).';
+    }
+    if (isSubmitting && !/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(trimmed)) {
+      return 'Please enter a valid name using letters and single spaces.';
+    }
+    return '';
+  };
+
+  const validateEmail = (value) => {
+    if (!value || !value.trim()) {
+      return 'Email Address is required.';
+    }
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(value.trim())) {
+      return 'Enter a valid email address (e.g. name@company.com).';
+    }
+    if (isProtectedUser(value.trim())) {
+      return 'This email is reserved for a protected system account.';
+    }
+    return '';
+  };
+
+  const validatePhone = (value) => {
+    if (!value || !value.trim()) {
+      return 'Mobile number is required.';
+    }
+    const digits = value.replace(/\D/g, '');
+    if (!/^[6-9]/.test(digits)) {
+      return 'Indian mobile number must start with 6, 7, 8, or 9.';
+    }
+    if (digits.length !== 10) {
+      return `Must be exactly 10 digits (${digits.length}/10 entered).`;
+    }
+    return '';
+  };
+
+  const validateDepartment = (value) => {
+    if (!value || !value.trim()) {
+      return 'Please select a department.';
+    }
+    return '';
+  };
+
+  const validateRole = (value) => {
+    if (!value || !value.trim()) {
+      return 'Please select a role.';
+    }
+    return '';
+  };
+
+  const validateStatus = (value) => {
+    if (!value || !value.trim()) {
+      return 'Please select account status.';
+    }
+    return '';
+  };
+
+  // Allow space while typing letters, but disallow leading space or double spaces
+  const handleNameKeyDown = (e) => {
+    if (e.key === ' ' || e.code === 'Space') {
+      const val = e.target.value;
+      if (!val || val.length === 0 || val.endsWith(' ')) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  // Open Create Modal with auto-generated ID & unselected dropdowns
   const handleOpenCreateModal = () => {
     setFormError('');
+    setCreateFieldErrors({});
     const autoId = getNextEmpId();
     setFormData({
       ...initialFormData,
       emp_id: autoId,
-      avatar: '' // NOT pre-selected: must be chosen by user
+      department: '',
+      role: '',
+      status: '',
+      avatar: ''
     });
     setIsCreateModalOpen(true);
   };
 
-  // Form Input Change Handlers
+  // Form Input Change Handlers with On-Field Validation
   const handleCreateInputChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'full_name') {
+      // Allow letters and spaces; block numbers and special symbols; max 50 chars
+      let sanitized = value.replace(/[^a-zA-Z ]/g, '');
+      sanitized = sanitized.replace(/^\s+/, ''); // no leading space
+      sanitized = sanitized.replace(/\s{2,}/g, ' '); // collapse double spaces
+      sanitized = sanitized.slice(0, 50);
+
+      setFormData((prev) => ({ ...prev, full_name: sanitized }));
+      setCreateFieldErrors((prev) => ({
+        ...prev,
+        full_name: validateFullName(sanitized, false)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'email') {
+      setFormData((prev) => ({ ...prev, email: value }));
+      setCreateFieldErrors((prev) => ({
+        ...prev,
+        email: validateEmail(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'phone') {
+      // Allow only digits, max 10
+      const digits = value.replace(/\D/g, '').slice(0, 10);
+      setFormData((prev) => ({ ...prev, phone: digits }));
+      setCreateFieldErrors((prev) => ({
+        ...prev,
+        phone: validatePhone(digits)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'department') {
+      setFormData((prev) => ({ ...prev, department: value }));
+      setCreateFieldErrors((prev) => ({
+        ...prev,
+        department: validateDepartment(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'role') {
+      setFormData((prev) => ({ ...prev, role: value }));
+      setCreateFieldErrors((prev) => ({
+        ...prev,
+        role: validateRole(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'status') {
+      setFormData((prev) => ({ ...prev, status: value }));
+      setCreateFieldErrors((prev) => ({
+        ...prev,
+        status: validateStatus(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formError) setFormError('');
   };
 
   const handleEditInputChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'full_name') {
+      let sanitized = value.replace(/[^a-zA-Z ]/g, '');
+      sanitized = sanitized.replace(/^\s+/, '');
+      sanitized = sanitized.replace(/\s{2,}/g, ' ');
+      sanitized = sanitized.slice(0, 50);
+
+      setEditFormData((prev) => ({ ...prev, full_name: sanitized }));
+      setEditFieldErrors((prev) => ({
+        ...prev,
+        full_name: validateFullName(sanitized, false)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'email') {
+      setEditFormData((prev) => ({ ...prev, email: value }));
+      setEditFieldErrors((prev) => ({
+        ...prev,
+        email: validateEmail(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'phone') {
+      const digits = value.replace(/\D/g, '').slice(0, 10);
+      setEditFormData((prev) => ({ ...prev, phone: digits }));
+      setEditFieldErrors((prev) => ({
+        ...prev,
+        phone: validatePhone(digits)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'department') {
+      setEditFormData((prev) => ({ ...prev, department: value }));
+      setEditFieldErrors((prev) => ({
+        ...prev,
+        department: validateDepartment(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'role') {
+      setEditFormData((prev) => ({ ...prev, role: value }));
+      setEditFieldErrors((prev) => ({
+        ...prev,
+        role: validateRole(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
+    if (name === 'status') {
+      setEditFormData((prev) => ({ ...prev, status: value }));
+      setEditFieldErrors((prev) => ({
+        ...prev,
+        status: validateStatus(value)
+      }));
+      if (formError) setFormError('');
+      return;
+    }
+
     setEditFormData((prev) => ({ ...prev, [name]: value }));
     if (formError) setFormError('');
   };
@@ -215,14 +440,17 @@ function AdminUsers() {
   const openEditModal = (user) => {
     if (isProtectedUser(user.email)) return;
     setFormError('');
+    setEditFieldErrors({});
+    let rawPhone = user.phone || '';
+    rawPhone = rawPhone.replace(/^\+91\s*/, '').replace(/\D/g, '').slice(0, 10);
     setEditFormData({
       id: user.id,
       emp_id: user.emp_id || '',
       full_name: user.full_name || '',
       email: user.email || '',
-      department: user.department || 'Quality Assurance',
-      role: user.role || 'QA Member',
-      phone: user.phone || '',
+      department: user.department || '',
+      role: user.role || '',
+      phone: rawPhone,
       status: user.status || 'Active',
       avatar: user.avatar || ''
     });
@@ -234,18 +462,26 @@ function AdminUsers() {
     e.preventDefault();
     setFormError('');
 
-    if (!formData.full_name.trim()) {
-      setFormError('Please enter the user full name.');
-      return;
-    }
+    const nameErr = validateFullName(formData.full_name, true);
+    const emailErr = validateEmail(formData.email);
+    const phoneErr = validatePhone(formData.phone);
+    const deptErr = validateDepartment(formData.department);
+    const roleErr = validateRole(formData.role);
+    const statusErr = validateStatus(formData.status);
 
-    if (!formData.email.trim()) {
-      setFormError('Please enter a valid email address.');
-      return;
-    }
+    const errors = {
+      full_name: nameErr,
+      email: emailErr,
+      phone: phoneErr,
+      department: deptErr,
+      role: roleErr,
+      status: statusErr
+    };
 
-    if (isProtectedUser(formData.email)) {
-      setFormError('This email is reserved for a protected system account.');
+    setCreateFieldErrors(errors);
+
+    if (nameErr || emailErr || phoneErr || deptErr || roleErr || statusErr) {
+      setFormError('Please resolve all validation errors before submitting.');
       return;
     }
 
@@ -253,7 +489,6 @@ function AdminUsers() {
     setSubmitting(true);
 
     try {
-      // Format phone with +91 if 10-digit entered
       let formattedPhone = formData.phone.trim();
       if (formattedPhone && !formattedPhone.startsWith('+')) {
         formattedPhone = `+91 ${formattedPhone}`;
@@ -288,18 +523,26 @@ function AdminUsers() {
     e.preventDefault();
     setFormError('');
 
-    if (!editFormData.full_name.trim()) {
-      setFormError('Please enter the user full name.');
-      return;
-    }
+    const nameErr = validateFullName(editFormData.full_name, true);
+    const emailErr = validateEmail(editFormData.email);
+    const phoneErr = validatePhone(editFormData.phone);
+    const deptErr = validateDepartment(editFormData.department);
+    const roleErr = validateRole(editFormData.role);
+    const statusErr = validateStatus(editFormData.status);
 
-    if (!editFormData.email.trim()) {
-      setFormError('Please enter a valid email address.');
-      return;
-    }
+    const errors = {
+      full_name: nameErr,
+      email: emailErr,
+      phone: phoneErr,
+      department: deptErr,
+      role: roleErr,
+      status: statusErr
+    };
 
-    if (isProtectedUser(editFormData.email)) {
-      setFormError('Cannot assign a reserved inbuilt system email address.');
+    setEditFieldErrors(errors);
+
+    if (nameErr || emailErr || phoneErr || deptErr || roleErr || statusErr) {
+      setFormError('Please resolve all validation errors before submitting.');
       return;
     }
 
@@ -934,7 +1177,7 @@ function AdminUsers() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="um-modal-form">
+            <form onSubmit={handleCreateUser} className="um-modal-form" noValidate>
               <div className="um-modal-body">
                 {formError && <div className="um-error-banner">{formError}</div>}
 
@@ -1005,18 +1248,30 @@ function AdminUsers() {
                     <label htmlFor="create-full-name">
                       Full Name <span className="req-star">*</span>
                     </label>
-                    <div className="um-input-box">
+                    <div className={`um-input-box ${createFieldErrors.full_name ? 'um-input-error' : ''}`}>
                       <UserRound size={17} className="um-field-icon" />
                       <input
                         id="create-full-name"
                         type="text"
                         name="full_name"
                         placeholder="e.g. Rahul Sharma"
-                        required
+                        maxLength={50}
                         value={formData.full_name}
                         onChange={handleCreateInputChange}
+                        onKeyDown={handleNameKeyDown}
+                        onBlur={() =>
+                          setCreateFieldErrors((prev) => ({
+                            ...prev,
+                            full_name: validateFullName(formData.full_name, true)
+                          }))
+                        }
                       />
                     </div>
+                    {createFieldErrors.full_name && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {createFieldErrors.full_name}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1026,50 +1281,82 @@ function AdminUsers() {
                     <label htmlFor="create-email">
                       Email Address <span className="req-star">*</span>
                     </label>
-                    <div className="um-input-box">
+                    <div className={`um-input-box ${createFieldErrors.email ? 'um-input-error' : ''}`}>
                       <Mail size={17} className="um-field-icon" />
                       <input
                         id="create-email"
                         type="email"
                         name="email"
                         placeholder="e.g. rahul.sharma@company.com"
-                        required
                         value={formData.email}
                         onChange={handleCreateInputChange}
+                        onBlur={() =>
+                          setCreateFieldErrors((prev) => ({
+                            ...prev,
+                            email: validateEmail(formData.email)
+                          }))
+                        }
                       />
                     </div>
+                    {createFieldErrors.email && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {createFieldErrors.email}
+                      </span>
+                    )}
                   </div>
 
                   <div className="um-form-group">
                     <label htmlFor="create-phone">
-                      Mobile Number <span className="opt-text">(Optional)</span>
+                      Mobile Number <span className="req-star">*</span>
                     </label>
-                    <div className="um-input-box">
+                    <div className={`um-input-box ${createFieldErrors.phone ? 'um-input-error' : ''}`}>
                       <span className="um-country-prefix">🇮🇳 +91</span>
                       <input
                         id="create-phone"
                         type="tel"
                         name="phone"
                         placeholder="98765 43210"
+                        maxLength={10}
                         value={formData.phone}
                         onChange={handleCreateInputChange}
+                        onBlur={() =>
+                          setCreateFieldErrors((prev) => ({
+                            ...prev,
+                            phone: validatePhone(formData.phone)
+                          }))
+                        }
                       />
                     </div>
+                    {createFieldErrors.phone && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {createFieldErrors.phone}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* 4. Work Info: Department, Role & Account Status in 3-column layout */}
                 <div className="um-form-grid-3">
                   <div className="um-form-group">
-                    <label htmlFor="create-department">Department</label>
-                    <div className="um-input-box um-select-box">
+                    <label htmlFor="create-department">
+                      Department <span className="req-star">*</span>
+                    </label>
+                    <div className={`um-input-box um-select-box ${createFieldErrors.department ? 'um-input-error' : ''}`}>
                       <Building2 size={16} className="um-field-icon" />
                       <select
                         id="create-department"
                         name="department"
                         value={formData.department}
+                        className={!formData.department ? 'um-select-placeholder' : ''}
                         onChange={handleCreateInputChange}
+                        onBlur={() =>
+                          setCreateFieldErrors((prev) => ({
+                            ...prev,
+                            department: validateDepartment(formData.department)
+                          }))
+                        }
                       >
+                        <option value="" disabled>Select Department</option>
                         {AVAILABLE_DEPARTMENTS.map((dept) => (
                           <option key={dept} value={dept}>
                             {dept}
@@ -1078,18 +1365,33 @@ function AdminUsers() {
                       </select>
                       <ChevronDown size={14} className="um-box-chevron" />
                     </div>
+                    {createFieldErrors.department && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {createFieldErrors.department}
+                      </span>
+                    )}
                   </div>
 
                   <div className="um-form-group">
-                    <label htmlFor="create-role">Role</label>
-                    <div className="um-input-box um-select-box">
+                    <label htmlFor="create-role">
+                      Role <span className="req-star">*</span>
+                    </label>
+                    <div className={`um-input-box um-select-box ${createFieldErrors.role ? 'um-input-error' : ''}`}>
                       <ShieldCheck size={16} className="um-field-icon" />
                       <select
                         id="create-role"
                         name="role"
                         value={formData.role}
+                        className={!formData.role ? 'um-select-placeholder' : ''}
                         onChange={handleCreateInputChange}
+                        onBlur={() =>
+                          setCreateFieldErrors((prev) => ({
+                            ...prev,
+                            role: validateRole(formData.role)
+                          }))
+                        }
                       >
+                        <option value="" disabled>Select Role</option>
                         {AVAILABLE_ROLES.map((r) => (
                           <option key={r} value={r}>
                             {r}
@@ -1098,40 +1400,64 @@ function AdminUsers() {
                       </select>
                       <ChevronDown size={14} className="um-box-chevron" />
                     </div>
+                    {createFieldErrors.role && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {createFieldErrors.role}
+                      </span>
+                    )}
                   </div>
 
                   <div className="um-form-group">
-                    <label htmlFor="create-status">Account Status</label>
-                    <div className="um-input-box um-select-box">
+                    <label htmlFor="create-status">
+                      Account Status <span className="req-star">*</span>
+                    </label>
+                    <div className={`um-input-box um-select-box ${createFieldErrors.status ? 'um-input-error' : ''}`}>
                       <span
                         className={`um-status-dot-sm ${
-                          formData.status === 'Inactive' ? 'dot-inactive' : 'dot-active'
+                          formData.status === 'Active'
+                            ? 'dot-active'
+                            : formData.status === 'Inactive'
+                            ? 'dot-inactive'
+                            : 'dot-unselected'
                         }`}
                       />
                       <select
                         id="create-status"
                         name="status"
                         value={formData.status}
+                        className={!formData.status ? 'um-select-placeholder' : ''}
                         onChange={handleCreateInputChange}
+                        onBlur={() =>
+                          setCreateFieldErrors((prev) => ({
+                            ...prev,
+                            status: validateStatus(formData.status)
+                          }))
+                        }
                       >
+                        <option value="" disabled>Select Status</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
                       </select>
                       <ChevronDown size={14} className="um-box-chevron" />
                     </div>
+                    {createFieldErrors.status && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {createFieldErrors.status}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* 6. Password Delivery Notice Note */}
                 <div className="um-password-notice-banner">
                   <div className="um-notice-icon-box">
-                    <MailCheck size={19} />
+                    <MailCheck size={14} />
                   </div>
                   <div className="um-notice-text">
-                    <strong>Password will be sent through email</strong>
-                    <p>
+                    <span className="um-notice-title">Password will be sent through email</span>
+                    <span className="um-notice-desc">
                       A secure login password will be automatically generated and delivered to the user's registered email address upon account creation.
-                    </p>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1181,7 +1507,7 @@ function AdminUsers() {
               </button>
             </div>
 
-            <form onSubmit={handleUpdateUser} className="um-modal-form">
+            <form onSubmit={handleUpdateUser} className="um-modal-form" noValidate>
               <div className="um-modal-body">
                 {formError && <div className="um-error-banner">{formError}</div>}
 
@@ -1251,17 +1577,30 @@ function AdminUsers() {
                     <label htmlFor="edit-full-name">
                       Full Name <span className="req-star">*</span>
                     </label>
-                    <div className="um-input-box">
+                    <div className={`um-input-box ${editFieldErrors.full_name ? 'um-input-error' : ''}`}>
                       <UserRound size={17} className="um-field-icon" />
                       <input
                         id="edit-full-name"
                         type="text"
                         name="full_name"
-                        required
+                        placeholder="e.g. Rahul Sharma"
+                        maxLength={50}
                         value={editFormData.full_name}
                         onChange={handleEditInputChange}
+                        onKeyDown={handleNameKeyDown}
+                        onBlur={() =>
+                          setEditFieldErrors((prev) => ({
+                            ...prev,
+                            full_name: validateFullName(editFormData.full_name, true)
+                          }))
+                        }
                       />
                     </div>
+                    {editFieldErrors.full_name && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {editFieldErrors.full_name}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1270,51 +1609,81 @@ function AdminUsers() {
                     <label htmlFor="edit-email">
                       Email Address <span className="req-star">*</span>
                     </label>
-                    <div className="um-input-box">
+                    <div className={`um-input-box ${editFieldErrors.email ? 'um-input-error' : ''}`}>
                       <Mail size={17} className="um-field-icon" />
                       <input
                         id="edit-email"
                         type="email"
                         name="email"
-                        required
                         value={editFormData.email}
                         onChange={handleEditInputChange}
+                        onBlur={() =>
+                          setEditFieldErrors((prev) => ({
+                            ...prev,
+                            email: validateEmail(editFormData.email)
+                          }))
+                        }
                       />
                     </div>
+                    {editFieldErrors.email && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {editFieldErrors.email}
+                      </span>
+                    )}
                   </div>
 
                   <div className="um-form-group">
                     <label htmlFor="edit-phone">
-                      Mobile Number <span className="opt-text">(Optional)</span>
+                      Mobile Number <span className="req-star">*</span>
                     </label>
-                    <div className="um-input-box">
+                    <div className={`um-input-box ${editFieldErrors.phone ? 'um-input-error' : ''}`}>
                       <span className="um-country-prefix">🇮🇳 +91</span>
                       <input
                         id="edit-phone"
                         type="tel"
                         name="phone"
                         placeholder="98765 43210"
-                        value={editFormData.phone.replace(/^\+91\s*/, '')}
-                        onChange={(e) =>
-                          setEditFormData((prev) => ({ ...prev, phone: e.target.value }))
+                        maxLength={10}
+                        value={editFormData.phone}
+                        onChange={handleEditInputChange}
+                        onBlur={() =>
+                          setEditFieldErrors((prev) => ({
+                            ...prev,
+                            phone: validatePhone(editFormData.phone)
+                          }))
                         }
                       />
                     </div>
+                    {editFieldErrors.phone && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {editFieldErrors.phone}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Work Info: Department, Role & Status in 3-column layout */}
                 <div className="um-form-grid-3">
                   <div className="um-form-group">
-                    <label htmlFor="edit-department">Department</label>
-                    <div className="um-input-box um-select-box">
+                    <label htmlFor="edit-department">
+                      Department <span className="req-star">*</span>
+                    </label>
+                    <div className={`um-input-box um-select-box ${editFieldErrors.department ? 'um-input-error' : ''}`}>
                       <Building2 size={16} className="um-field-icon" />
                       <select
                         id="edit-department"
                         name="department"
                         value={editFormData.department}
+                        className={!editFormData.department ? 'um-select-placeholder' : ''}
                         onChange={handleEditInputChange}
+                        onBlur={() =>
+                          setEditFieldErrors((prev) => ({
+                            ...prev,
+                            department: validateDepartment(editFormData.department)
+                          }))
+                        }
                       >
+                        <option value="" disabled>Select Department</option>
                         {AVAILABLE_DEPARTMENTS.map((dept) => (
                           <option key={dept} value={dept}>
                             {dept}
@@ -1323,18 +1692,33 @@ function AdminUsers() {
                       </select>
                       <ChevronDown size={14} className="um-box-chevron" />
                     </div>
+                    {editFieldErrors.department && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {editFieldErrors.department}
+                      </span>
+                    )}
                   </div>
 
                   <div className="um-form-group">
-                    <label htmlFor="edit-role">Role</label>
-                    <div className="um-input-box um-select-box">
+                    <label htmlFor="edit-role">
+                      Role <span className="req-star">*</span>
+                    </label>
+                    <div className={`um-input-box um-select-box ${editFieldErrors.role ? 'um-input-error' : ''}`}>
                       <ShieldCheck size={16} className="um-field-icon" />
                       <select
                         id="edit-role"
                         name="role"
                         value={editFormData.role}
+                        className={!editFormData.role ? 'um-select-placeholder' : ''}
                         onChange={handleEditInputChange}
+                        onBlur={() =>
+                          setEditFieldErrors((prev) => ({
+                            ...prev,
+                            role: validateRole(editFormData.role)
+                          }))
+                        }
                       >
+                        <option value="" disabled>Select Role</option>
                         {AVAILABLE_ROLES.map((r) => (
                           <option key={r} value={r}>
                             {r}
@@ -1343,27 +1727,51 @@ function AdminUsers() {
                       </select>
                       <ChevronDown size={14} className="um-box-chevron" />
                     </div>
+                    {editFieldErrors.role && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {editFieldErrors.role}
+                      </span>
+                    )}
                   </div>
 
                   <div className="um-form-group">
-                    <label htmlFor="edit-status">Status</label>
-                    <div className="um-input-box um-select-box">
+                    <label htmlFor="edit-status">
+                      Account Status <span className="req-star">*</span>
+                    </label>
+                    <div className={`um-input-box um-select-box ${editFieldErrors.status ? 'um-input-error' : ''}`}>
                       <span
                         className={`um-status-dot-sm ${
-                          editFormData.status === 'Inactive' ? 'dot-inactive' : 'dot-active'
+                          editFormData.status === 'Active'
+                            ? 'dot-active'
+                            : editFormData.status === 'Inactive'
+                            ? 'dot-inactive'
+                            : 'dot-unselected'
                         }`}
                       />
                       <select
                         id="edit-status"
                         name="status"
                         value={editFormData.status}
+                        className={!editFormData.status ? 'um-select-placeholder' : ''}
                         onChange={handleEditInputChange}
+                        onBlur={() =>
+                          setEditFieldErrors((prev) => ({
+                            ...prev,
+                            status: validateStatus(editFormData.status)
+                          }))
+                        }
                       >
+                        <option value="" disabled>Select Status</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
                       </select>
                       <ChevronDown size={14} className="um-box-chevron" />
                     </div>
+                    {editFieldErrors.status && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {editFieldErrors.status}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
