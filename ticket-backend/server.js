@@ -77,6 +77,30 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Authenticated User Profile Endpoint
+app.get('/api/auth/me', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    const decoded = jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    const userQuery = await pool.query(
+      'SELECT id, email, full_name, emp_id, department, role, status, avatar FROM users WHERE id = $1',
+      [decoded.userId]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: userQuery.rows[0] });
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+
 // Admin Dashboard Stats Endpoint
 app.get('/api/admin/dashboard-stats', async (req, res) => {
   const authorization = req.headers.authorization;

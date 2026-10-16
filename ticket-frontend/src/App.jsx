@@ -2,6 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import Login from './pages/Login/Login';
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
+import DeveloperDashboard from './pages/DeveloperDashboard/DeveloperDashboard';
+import ProjectLeadDashboard from './pages/ProjectLeadDashboard/ProjectLeadDashboard';
+import QAMemberDashboard from './pages/QAMemberDashboard/QAMemberDashboard';
 import AdminUsers from './pages/AdminUsers/AdminUsers';
 import AdminProjects from './pages/AdminProjects/AdminProjects';
 import AdminRoles from './pages/AdminRoles/AdminRoles';
@@ -16,6 +19,12 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+        {/* Role-Specific Dedicated Dashboards */}
+        <Route path="/developer" element={<DeveloperDashboard />} />
+        <Route path="/project-lead" element={<ProjectLeadDashboard />} />
+        <Route path="/qa-member" element={<QAMemberDashboard />} />
+
+        {/* Admin Console Routes */}
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/projects" element={<AdminProjects />} />

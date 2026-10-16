@@ -20,6 +20,22 @@ const CubeLogo = () => (
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+// Helper to route each role to its dedicated dashboard
+export const getRoleHomeRoute = (role) => {
+  switch (role) {
+    case 'Developer':
+      return '/developer';
+    case 'Project Lead':
+      return '/project-lead';
+    case 'QA Member':
+      return '/qa-member';
+    case 'Manager':
+    case 'QA Lead':
+    default:
+      return '/admin';
+  }
+};
+
 function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -35,12 +51,12 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Check if already logged in
+  // Check if already logged in and redirect to their specific dashboard
   React.useEffect(() => {
-    // 1. Check if user is already logged in
     const token = localStorage.getItem('token');
+    const role = localStorage.getItem('userRole');
     if (token) {
-      navigate('/admin');
+      navigate(getRoleHomeRoute(role), { replace: true });
     }
   }, [navigate]);
 
@@ -84,10 +100,15 @@ function Login() {
       setPassword('');
 
       localStorage.setItem('token', response.data.token);
-      if (response.data.user?.email) {
-        localStorage.setItem('userEmail', response.data.user.email);
+      if (response.data.user) {
+        localStorage.setItem('userEmail', response.data.user.email || '');
+        localStorage.setItem('userName', response.data.user.full_name || '');
+        localStorage.setItem('userRole', response.data.user.role || 'QA Member');
+        localStorage.setItem('userDepartment', response.data.user.department || '');
       }
-      navigate('/admin');
+
+      const userRole = response.data.user?.role;
+      navigate(getRoleHomeRoute(userRole), { replace: true });
     } catch (err) {
       setServerError(err.response?.data?.error || 'Invalid email or password');
     } finally {
