@@ -1,0 +1,281 @@
+/* Custom Select Component Styles */
+
+.c-select-container {
+  position: relative;
+  display: inline-block;
+  user-select: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.c-select-container.is-open {
+  z-index: 1060;
+}
+
+/* =========================================
+   VARIANT: FILTER (For Filter Toolbar)
+   ========================================= */
+.c-select-filter {
+  min-width: 140px;
+}
+
+.c-select-filter .c-select-trigger {
+  width: 100%;
+  height: 42px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.c-select-filter .c-select-trigger:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.c-select-filter.is-open .c-select-trigger {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  color: #0f172a;
+}
+
+/* =========================================
+   VARIANT: FORM (For Modals & Forms)
+   ========================================= */
+.c-select-form {
+  width: 100%;
+  display: block;
+}
+
+.c-select-form .c-select-trigger {
+  width: 100%;
+  height: 44px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #0f172a;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.c-select-form .c-select-trigger:hover {
+  border-color: #94a3b8;
+  background: #fafafa;
+}
+
+.c-select-form.is-open .c-select-trigger {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.c-select-form.has-error .c-select-trigger {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* =========================================
+   TRIGGER INTERNALS
+   ========================================= */
+.c-select-trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-select-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.c-select-container.is-open .c-select-icon {
+  color: #2563eb;
+}
+
+.c-select-value {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.c-select-value.is-placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.c-select-chevron {
+  color: #64748b;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
+}
+
+.c-select-chevron.rotate-180 {
+  transform: rotate(180deg);
+  color: #2563eb;
+}
+
+/* Status Indicator Dot */
+.c-select-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+/* =========================================
+   FLOATING MENU POPOVER
+   ========================================= */
+.c-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  min-width: 180px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.06);
+  z-index: 1050;
+  overflow: hidden;
+  animation: dropdownSlideIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dropdownSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.c-select-menu-inner {
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+/* Slim Custom Scrollbar */
+.c-select-menu-inner::-webkit-scrollbar {
+  width: 5px;
+}
+
+.c-select-menu-inner::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.c-select-menu-inner::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.c-select-menu-inner::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* =========================================
+   MENU ITEMS
+   ========================================= */
+.c-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  gap: 8px;
+}
+
+.c-select-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.c-select-item.is-selected {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.c-select-item-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-select-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.c-select-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-select-item-badge {
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  color: #475569;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.c-select-check {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+/* Disabled State */
+.c-select-container.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}

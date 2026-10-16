@@ -140,13 +140,15 @@ function Login() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} noValidate>
+          <form onSubmit={handleLogin} noValidate autoComplete="off">
             <div className="form-group">
               <label className="form-label">Email Address</label>
               <div className={`input-container ${emailError ? 'error-state' : ''}`} style={{ border: emailError ? '1px solid #ef4444' : '', borderRadius: '8px', transition: 'all 0.2s' }}>
                 <Mail className="input-icon" style={{ color: emailError ? '#ef4444' : '#64748b', transition: 'all 0.2s' }} />
                 <input 
                   type="email" 
+                  name="login_email"
+                  autoComplete="off"
                   className="input-field" 
                   placeholder="Enter your email" 
                   value={email}
@@ -171,6 +173,8 @@ function Login() {
                 <Lock className="input-icon" style={{ color: passwordError ? '#ef4444' : '#64748b', transition: 'all 0.2s' }} />
                 <input 
                   type={showPassword ? "text" : "password"} 
+                  name="login_password"
+                  autoComplete="new-password"
                   className="input-field" 
                   placeholder="Enter your password" 
                   value={password}
