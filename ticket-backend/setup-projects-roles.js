@@ -13,10 +13,16 @@ const setupTables = async () => {
         department VARCHAR(100) DEFAULT 'Quality Assurance',
         status VARCHAR(50) DEFAULT 'In Progress',
         priority VARCHAR(30) DEFAULT 'Medium',
+        progress INT DEFAULT 0,
         start_date DATE DEFAULT CURRENT_DATE,
         end_date DATE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Ensure progress column exists
+    await pool.query(`
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS progress INT DEFAULT 0;
     `);
 
     // 2. Roles & Permissions Table
@@ -30,17 +36,20 @@ const setupTables = async () => {
       );
     `);
 
-    // Seed initial projects if empty
+    // Seed initial projects if empty or replace with exact mock projects
     const projCount = await pool.query('SELECT COUNT(*) FROM projects');
-    if (parseInt(projCount.rows[0].count, 10) === 0) {
+    if (parseInt(projCount.rows[0].count, 10) <= 3) {
+      await pool.query('TRUNCATE TABLE projects RESTART IDENTITY CASCADE');
       await pool.query(`
-        INSERT INTO projects (project_code, name, description, lead_name, department, status, priority)
+        INSERT INTO projects (project_code, name, department, lead_name, priority, status, progress, start_date, end_date)
         VALUES 
-          ('PRJ-QA-01', 'Automation Test Suite V2', 'E2E regression suite automation using Cypress and Playwright', 'Admin User', 'Quality Assurance', 'In Progress', 'High'),
-          ('PRJ-CORE-02', 'Ticketing API Service', 'Core REST API gateway for ticket submission and routing', 'Super Admin', 'Engineering', 'Active', 'Critical'),
-          ('PRJ-PORTAL-03', 'Customer Support Portal', 'Self-service bug reporting interface for client onboarding', 'Admin User', 'Operations', 'Planning', 'Medium');
+          ('PRJ-QA-04', 'Mobile App Regression', 'Quality Assurance', 'Manager', 'High', 'In Progress', 60, '2026-10-16', '2026-10-30'),
+          ('PRJ-QA-03', 'Website Redesign Testing', 'Quality Assurance', 'Sathish', 'Medium', 'In Progress', 40, '2026-10-10', '2026-10-25'),
+          ('PRJ-QA-02', 'E-Commerce Platform', 'Development', 'Pavithra', 'High', 'Not Started', 0, '2026-10-20', '2026-11-15'),
+          ('PRJ-QA-01', 'CRM Module Testing', 'Quality Assurance', 'Ramesh', 'Medium', 'Completed', 100, '2026-10-01', '2026-10-10'),
+          ('PRJ-QA-05', 'API Integration Testing', 'Backend Team', 'Karthik', 'Low', 'Not Started', 0, '2026-10-22', '2026-11-05');
       `);
-      console.log('Seeded initial projects.');
+      console.log('Seeded projects matching mockup.');
     }
 
     // Seed initial roles if empty

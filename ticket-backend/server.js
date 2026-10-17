@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from './db.js';
 import { sendWelcomeEmail, generateTemporaryPassword } from './services/emailService.js';
+import { initDatabase } from './init-db.js';
 
 dotenv.config();
 
@@ -391,7 +392,7 @@ app.get('/api/admin/projects', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, project_code, name, description, lead_name, department, status, priority, start_date, end_date, created_at 
+      `SELECT id, project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date, created_at 
        FROM projects 
        ORDER BY id DESC`
     );
@@ -415,32 +416,49 @@ app.post('/api/admin/projects', async (req, res) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const { project_code, name, description, lead_name, department, status, priority, start_date, end_date } = req.body;
+  const { project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date } = req.body;
 
   if (!project_code || !name) {
     return res.status(400).json({ error: 'Project Code and Project Name are required.' });
   }
 
   try {
-    const existing = await pool.query('SELECT * FROM projects WHERE project_code = $1', [project_code]);
+    const existing = await pool.query('SELECT * FROM projects WHERE project_code = $1', [project_code.trim()]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'A project with this Project Code already exists.' });
     }
 
+    // Default progress based on status if not explicitly passed
+    let calcProgress = progress !== undefined && progress !== null ? parseInt(progress, 10) : NaN;
+    if (isNaN(calcProgress)) {
+      if (status === 'Completed') calcProgress = 100;
+      else if (status === 'In Progress') calcProgress = 30;
+      else calcProgress = 0;
+    }
+
+    const cleanStartDate = start_date && start_date.toString().trim() !== ''
+      ? start_date.toString().trim()
+      : new Date().toISOString().split('T')[0];
+
+    const cleanEndDate = end_date && end_date.toString().trim() !== ''
+      ? end_date.toString().trim()
+      : null;
+
     const result = await pool.query(
-      `INSERT INTO projects (project_code, name, description, lead_name, department, status, priority, start_date, end_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO projects (project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
-        project_code,
-        name,
+        project_code.trim(),
+        name.trim(),
         description || '',
         lead_name || 'Admin User',
         department || 'Quality Assurance',
         status || 'In Progress',
         priority || 'Medium',
-        start_date || new Date().toISOString().split('T')[0],
-        end_date || null
+        calcProgress,
+        cleanStartDate,
+        cleanEndDate
       ]
     );
 
@@ -450,7 +468,40 @@ app.post('/api/admin/projects', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating project:', error);
-    res.status(500).json({ error: 'Failed to create project in database.' });
+    res.status(500).json({ error: error.message || 'Failed to create project in database.' });
+  }
+});
+
+// Admin Projects: Delete project
+app.delete('/api/admin/projects/:id', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+
+  try {
+    const projCheck = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+    if (projCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    await pool.query('DELETE FROM projects WHERE id = $1', [id]);
+
+    res.json({
+      message: 'Project deleted successfully',
+      deletedId: id
+    });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: 'Failed to delete project from database.' });
   }
 });
 
@@ -787,6 +838,7 @@ app.get('/api/admin/reports-summary', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await initDatabase();
   console.log(`Server is running on http://localhost:${PORT}`);
 });
