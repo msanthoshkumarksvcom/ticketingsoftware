@@ -1,0 +1,108 @@
+import pool from './db.js';
+
+export const initDatabase = async () => {
+  try {
+    // 1. Users
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        emp_id VARCHAR(50) UNIQUE,
+        full_name VARCHAR(150),
+        department VARCHAR(100),
+        role VARCHAR(50) DEFAULT 'QA Member',
+        phone VARCHAR(30),
+        status VARCHAR(20) DEFAULT 'Active',
+        avatar TEXT
+      );
+    `);
+
+    // 2. Projects
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id SERIAL PRIMARY KEY,
+        project_code VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(150) NOT NULL,
+        description TEXT,
+        lead_name VARCHAR(150),
+        department VARCHAR(100) DEFAULT 'Quality Assurance',
+        status VARCHAR(50) DEFAULT 'In Progress',
+        priority VARCHAR(30) DEFAULT 'Medium',
+        progress INT DEFAULT 0,
+        start_date DATE DEFAULT CURRENT_DATE,
+        end_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Ensure progress column exists if table was created previously without it
+    await pool.query(`
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS progress INT DEFAULT 0;
+    `);
+
+    // 3. Roles
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS roles (
+        id SERIAL PRIMARY KEY,
+        role_name VARCHAR(100) UNIQUE NOT NULL,
+        description TEXT,
+        permissions TEXT[] DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 4. Tickets
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tickets (
+        id SERIAL PRIMARY KEY,
+        ticket_code VARCHAR(50) UNIQUE NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        project_code VARCHAR(50),
+        assigned_to VARCHAR(150),
+        priority VARCHAR(30) DEFAULT 'Medium',
+        type VARCHAR(50) DEFAULT 'Bug',
+        status VARCHAR(50) DEFAULT 'Open',
+        reporter VARCHAR(150) DEFAULT 'Admin User',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 5. Approvals
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS approvals (
+        id SERIAL PRIMARY KEY,
+        req_code VARCHAR(50) UNIQUE NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        category VARCHAR(100) DEFAULT 'Access Request',
+        requested_by VARCHAR(150) NOT NULL,
+        priority VARCHAR(30) DEFAULT 'Medium',
+        status VARCHAR(50) DEFAULT 'Pending',
+        details TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 6. Deployments
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS deployments (
+        id SERIAL PRIMARY KEY,
+        deploy_code VARCHAR(50) UNIQUE NOT NULL,
+        service_name VARCHAR(150) NOT NULL,
+        environment VARCHAR(50) DEFAULT 'Staging',
+        version VARCHAR(50) NOT NULL,
+        requested_by VARCHAR(150) NOT NULL,
+        status VARCHAR(50) DEFAULT 'Pending Review',
+        release_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log('Database tables verified and initialized successfully.');
+  } catch (error) {
+    console.error('Database initialization warning:', error.message);
+  }
+};
+
