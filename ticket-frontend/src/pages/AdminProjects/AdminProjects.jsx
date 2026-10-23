@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock,
   Edit2,
+  FileSpreadsheet,
   FileText,
   Filter,
   Folder,
@@ -27,6 +28,7 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import FolderEmblem from './FolderEmblem';
+import ProjectSpreadsheetView from './ProjectSpreadsheetView';
 import '../../styles/admin.css';
 import './AdminProjects.css';
 
@@ -433,6 +435,72 @@ function AdminProjects() {
     setActiveMenuId(null);
   };
 
+  const handleUpdateProjectCell = async (id, field, value) => {
+    setProjects((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          return { ...p, [field]: value };
+        }
+        return p;
+      })
+    );
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        await axios.put(
+          `http://localhost:5000/api/admin/projects/${id}`,
+          { [field]: value },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (err) {
+        console.warn('Could not sync cell update to backend:', err.message);
+      }
+    }
+  };
+
+  const handleAddSheetRow = async () => {
+    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const newCode = `PRJ-QA-${randomSuffix}`;
+    const newRow = {
+      project_code: newCode,
+      name: 'New QA Project',
+      description: 'Project created via spreadsheet sheet view',
+      lead_name: 'Lead Tester',
+      department: 'Quality Assurance',
+      status: 'Planning',
+      priority: 'Medium',
+      start_date: new Date().toISOString().split('T')[0],
+      team_members: 4,
+      test_cases: 0,
+      documents: 0,
+      tickets_count: 0,
+      folder_color: 'blue',
+      folder_icon: 'folder'
+    };
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const res = await axios.post('http://localhost:5000/api/admin/projects', newRow, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data) {
+          setProjects((prev) => [...prev, res.data]);
+          return;
+        }
+      } catch (err) {
+        console.warn('Backend create project failed, fallback local:', err.message);
+      }
+    }
+
+    const fallbackRow = {
+      ...newRow,
+      id: Date.now()
+    };
+    setProjects((prev) => [...prev, fallbackRow]);
+  };
+
   const confirmLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
@@ -564,6 +632,14 @@ function AdminProjects() {
                   aria-label="List view"
                 >
                   <List size={18} />
+                </button>
+                <button
+                  className={`pj-view-btn ${viewMode === 'sheet' ? 'active' : ''}`}
+                  onClick={() => setViewMode('sheet')}
+                  title="Sheet / Spreadsheet view"
+                  aria-label="Sheet view"
+                >
+                  <FileSpreadsheet size={18} />
                 </button>
               </div>
 
@@ -727,8 +803,19 @@ function AdminProjects() {
             </div>
           </section>
 
-          {/* 4. Projects Display: Grid View or List View */}
-          {viewMode === 'grid' ? (
+          {/* 4. Projects Display: Sheet View, Grid View or List View */}
+          {viewMode === 'sheet' ? (
+            <ProjectSpreadsheetView
+              projects={projects}
+              onUpdateProject={handleUpdateProjectCell}
+              onAddRow={handleAddSheetRow}
+              onDeleteRow={handleDeleteProject}
+              onOpenProjectSheet={(project) => navigate(`/admin/projects/${project.id}/sheet`)}
+              searchQuery={searchQuery || headerSearchQuery}
+              departmentFilter={departmentFilter}
+              statusFilter={statusFilter}
+            />
+          ) : viewMode === 'grid' ? (
             <section className="pj-cards-grid">
               {filteredProjects.map((project) => (
                 <article key={project.id || project.project_code} className="pj-card">
@@ -766,6 +853,13 @@ function AdminProjects() {
                             >
                               <Edit2 size={14} />
                               <span>Edit Details</span>
+                            </button>
+                            <button
+                              className="pj-dropdown-item"
+                              onClick={() => navigate(`/admin/projects/${project.id}/sheet`)}
+                            >
+                              <FileSpreadsheet size={14} />
+                              <span>Open Sheet Module</span>
                             </button>
                             <button
                               className="pj-dropdown-item"
@@ -903,6 +997,14 @@ function AdminProjects() {
                         <td style={{ fontWeight: 700, color: '#2563eb' }}>{project.documents ?? 0}</td>
                         <td style={{ fontWeight: 700, color: '#ea580c' }}>{project.tickets_count ?? 0}</td>
                         <td style={{ textAlign: 'right' }}>
+                          <button
+                            className="pj-btn-more"
+                            style={{ display: 'inline-flex', color: '#107c41', marginRight: '6px' }}
+                            onClick={() => navigate(`/admin/projects/${project.id}/sheet`)}
+                            title="Open Project Sheet Workspace"
+                          >
+                            <FileSpreadsheet size={15} />
+                          </button>
                           <button
                             className="pj-btn-more"
                             style={{ display: 'inline-flex' }}

@@ -112,6 +112,19 @@ export const initDatabase = async () => {
       );
     `);
 
+    // 7. Project Sheets (Spreadsheet Module)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_sheets (
+        id SERIAL PRIMARY KEY,
+        project_id INT REFERENCES projects(id) ON DELETE CASCADE,
+        sheet_name VARCHAR(150) NOT NULL,
+        columns JSONB NOT NULL DEFAULT '[]',
+        rows JSONB NOT NULL DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables verified and initialized successfully.');
   } catch (error) {
     console.error('Database initialization warning:', error.message);

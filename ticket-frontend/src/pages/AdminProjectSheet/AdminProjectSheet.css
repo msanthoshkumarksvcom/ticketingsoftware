@@ -1,0 +1,781 @@
+/* ==========================================================================
+   AdminProjectSheet.css - Dedicated Project Sheet Workspace
+   Full Google Sheets / Excel Application UI for QA Projects
+   ========================================================================== */
+
+.pjs-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #0f172a;
+}
+
+.pjs-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   1. Header Bar
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-header {
+  height: 64px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.pjs-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pjs-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pjs-back-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.pjs-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.pjs-breadcrumb-curr {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pjs-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pjs-proj-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.pjs-proj-code {
+  font-weight: 800;
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.pjs-proj-title {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 13px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   2. Google Sheets Menu & Ribbon Bar
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-ribbon-bar {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.pjs-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px 4px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12.5px;
+}
+
+.pjs-menu-items {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pjs-menu-item {
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #334155;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.pjs-menu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.pjs-cloud-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #059669;
+}
+
+.pjs-cloud-status.saving {
+  color: #d97706;
+}
+
+/* Tool buttons ribbon */
+.pjs-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: #f8fafc;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pjs-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pjs-tool-btn {
+  width: 32px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #475569;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pjs-tool-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.pjs-tool-btn.active {
+  background: #e0f2fe;
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+.pjs-tool-divider {
+  width: 1px;
+  height: 20px;
+  background: #cbd5e1;
+  margin: 0 4px;
+}
+
+.pjs-action-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pjs-action-pill-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.pjs-action-pill-btn.primary {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.pjs-action-pill-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.pjs-action-pill-btn.success {
+  background: #107c41;
+  border-color: #0e6b37;
+  color: #ffffff;
+}
+
+.pjs-action-pill-btn.success:hover {
+  background: #0e6b37;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3. Formula Bar (fx)
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-formula-bar {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 4px 16px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pjs-cell-ref-box {
+  width: 60px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1e293b;
+  font-family: monospace;
+}
+
+.pjs-fx-icon {
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 800;
+  color: #64748b;
+  user-select: none;
+  padding: 0 4px;
+}
+
+.pjs-formula-text {
+  flex: 1;
+  height: 28px;
+  border: 1px solid transparent;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  border-radius: 4px;
+  font-family: inherit;
+  background: #ffffff;
+}
+
+.pjs-formula-text:focus {
+  border-color: #2563eb;
+  background: #fafcff;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   4. Spreadsheet Grid
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-grid-viewport {
+  flex: 1;
+  overflow: auto;
+  background: #ffffff;
+  position: relative;
+}
+
+.pjs-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12.5px;
+}
+
+/* Column Letter Row (A, B, C...) */
+.pjs-col-letter-row th {
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  letter-spacing: 0.5px;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 12;
+}
+
+/* Column Name Row */
+.pjs-col-name-row th {
+  background: #f8fafc;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  position: sticky;
+  top: 26px;
+  z-index: 11;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.pjs-col-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.pjs-col-del-btn {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.pjs-col-name-row th:hover .pjs-col-del-btn {
+  opacity: 1;
+}
+
+.pjs-row-num-cell {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid #cbd5e1;
+  user-select: none;
+  cursor: pointer;
+}
+
+.pjs-row.selected .pjs-row-num-cell {
+  background: #bfdbfe;
+  color: #1e40af;
+}
+
+/* Grid Cells */
+.pjs-cell {
+  position: relative;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  height: 38px;
+  vertical-align: middle;
+  outline: none;
+}
+
+.pjs-row:hover .pjs-cell {
+  background: #f8fbff;
+}
+
+.pjs-cell.active {
+  outline: 2px solid #1a73e8 !important;
+  outline-offset: -2px;
+  z-index: 5;
+  background: #ffffff !important;
+}
+
+.pjs-cell.active::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 6px;
+  height: 6px;
+  background: #1a73e8;
+  border: 1px solid #ffffff;
+  cursor: crosshair;
+  z-index: 6;
+}
+
+.pjs-cell-content {
+  width: 100%;
+  height: 100%;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.pjs-cell-editor {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: #ffffff;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: #0f172a;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.pjs-cell-select {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: #ffffff;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: #0f172a;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Status Chips inside cell */
+.pjs-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pjs-status-chip.pass {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.pjs-status-chip.fail {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.pjs-status-chip.blocked {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.pjs-status-chip.inprogress {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.pjs-status-chip.untested {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Priority Chips */
+.pjs-priority-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pjs-priority-chip.critical {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+}
+
+.pjs-priority-chip.high {
+  background: #fff7ed;
+  color: #ea580c;
+  border: 1px solid #fed7aa;
+}
+
+.pjs-priority-chip.medium {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.pjs-priority-chip.low {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* Add Row at table bottom */
+.pjs-add-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 16px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pjs-add-row-btn:hover {
+  background: #f8fafc;
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   5. Bottom Tabs & QA Calculations Bar
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  border-top: 1px solid #cbd5e1;
+  padding: 0 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pjs-sheet-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  padding-top: 4px;
+}
+
+.pjs-sheet-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.pjs-sheet-tab:hover {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.pjs-sheet-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+  border-top: 2px solid #107c41;
+  font-weight: 700;
+  position: relative;
+  top: 1px;
+}
+
+.pjs-sheet-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.pjs-sheet-tab-close:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+.pjs-add-tab-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pjs-add-tab-btn:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+/* Real-Time QA Metrics Summary Bar */
+.pjs-calc-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.pjs-calc-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pjs-calc-stat.pass {
+  color: #15803d;
+}
+
+.pjs-calc-stat.fail {
+  color: #b91c1c;
+}
+
+.pjs-calc-stat.blocked {
+  color: #c2410c;
+}
+
+/* Visual Progress Bar */
+.pjs-progress-wrap {
+  width: 100px;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+
+.pjs-progress-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.pjs-progress-bar.pass {
+  background: #22c55e;
+}
+
+.pjs-progress-bar.fail {
+  background: #ef4444;
+}
+
+.pjs-progress-bar.blocked {
+  background: #f97316;
+}
+
+/* Column Add Modal */
+.pjs-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.pjs-modal-box {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+}
+
+.pjs-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.pjs-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pjs-modal-close {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.pjs-form-group {
+  margin-bottom: 14px;
+}
+
+.pjs-form-group label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.pjs-form-group input,
+.pjs-form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.pjs-form-group input:focus,
+.pjs-form-group select:focus {
+  border-color: #2563eb;
+}
+
+.pjs-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}

@@ -7,6 +7,7 @@ import ProjectLeadDashboard from './pages/ProjectLeadDashboard/ProjectLeadDashbo
 import QAMemberDashboard from './pages/QAMemberDashboard/QAMemberDashboard';
 import AdminUsers from './pages/AdminUsers/AdminUsers';
 import AdminProjects from './pages/AdminProjects/AdminProjects';
+import AdminProjectSheet from './pages/AdminProjectSheet/AdminProjectSheet';
 import AdminRoles from './pages/AdminRoles/AdminRoles';
 import AdminTickets from './pages/AdminTickets/AdminTickets';
 import AdminReports from './pages/AdminReports/AdminReports';
@@ -28,6 +29,7 @@ function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/projects" element={<AdminProjects />} />
+        <Route path="/admin/projects/:projectId/sheet" element={<AdminProjectSheet />} />
         <Route path="/admin/roles-permissions" element={<AdminRoles />} />
         <Route path="/admin/tickets" element={<AdminTickets />} />
         <Route path="/admin/reports" element={<AdminReports />} />

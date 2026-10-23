@@ -599,6 +599,354 @@ app.delete('/api/admin/projects/:id', async (req, res) => {
   }
 });
 
+// ==========================================
+// PROJECT SHEETS (Spreadsheet Module API)
+// ==========================================
+
+// Helper for default starter sheets
+const generateDefaultSheets = (project) => {
+  const projName = project?.name || 'QA Project';
+  const projCode = project?.project_code || 'PRJ';
+  return [
+    {
+      sheet_name: 'Test Execution Sheet',
+      columns: [
+        { id: 'col_id', label: 'TC ID', width: 110, type: 'text' },
+        { id: 'col_title', label: 'Test Case Title', width: 260, type: 'text' },
+        { id: 'col_module', label: 'Module', width: 140, type: 'text' },
+        { id: 'col_priority', label: 'Priority', width: 120, type: 'priority' },
+        { id: 'col_steps', label: 'Test Steps / Precondition', width: 280, type: 'text' },
+        { id: 'col_expected', label: 'Expected Result', width: 240, type: 'text' },
+        { id: 'col_status', label: 'Status', width: 130, type: 'status' },
+        { id: 'col_assigned', label: 'Assigned QA', width: 160, type: 'text' },
+        { id: 'col_date', label: 'Execution Date', width: 130, type: 'date' }
+      ],
+      rows: [
+        {
+          id: 'row-1',
+          col_id: `${projCode}-TC-01`,
+          col_title: 'Verify user authentication with valid credentials',
+          col_module: 'Authentication',
+          col_priority: 'High',
+          col_steps: '1. Enter email, 2. Enter valid password, 3. Click Login',
+          col_expected: 'User redirected to role workspace with active token',
+          col_status: 'Pass',
+          col_assigned: project?.lead_name || 'QA Team',
+          col_date: '2026-10-22'
+        },
+        {
+          id: 'row-2',
+          col_id: `${projCode}-TC-02`,
+          col_title: 'Sheet inline cell editing and live auto-save',
+          col_module: 'Sheet Module',
+          col_priority: 'Critical',
+          col_steps: '1. Double-click cell, 2. Enter value, 3. Press Enter',
+          col_expected: 'Cell updates instantly and syncs with database',
+          col_status: 'Pass',
+          col_assigned: 'Automation QA',
+          col_date: '2026-10-23'
+        },
+        {
+          id: 'row-3',
+          col_id: `${projCode}-TC-03`,
+          col_title: 'Filter test cases by status in spreadsheet table',
+          col_module: 'Spreadsheet Grid',
+          col_priority: 'Medium',
+          col_steps: '1. Click filter, 2. Choose status = Fail, 3. View table',
+          col_expected: 'Table displays only matching test case rows',
+          col_status: 'Pass',
+          col_assigned: 'Tester 1',
+          col_date: '2026-10-23'
+        },
+        {
+          id: 'row-4',
+          col_id: `${projCode}-TC-04`,
+          col_title: 'Export sheet data to CSV formatted spreadsheet',
+          col_module: 'Export / Import',
+          col_priority: 'High',
+          col_steps: '1. Click Export CSV button on sheet toolbar',
+          col_expected: 'CSV file generated with all headers and row entries',
+          col_status: 'In Progress',
+          col_assigned: project?.lead_name || 'QA Lead',
+          col_date: '2026-10-23'
+        },
+        {
+          id: 'row-5',
+          col_id: `${projCode}-TC-05`,
+          col_title: 'Formula calculation for pass percentage and totals',
+          col_module: 'Summary Bar',
+          col_priority: 'Medium',
+          col_steps: '1. Inspect bottom formula status bar',
+          col_expected: 'Displays accurate Pass Rate %, total test count',
+          col_status: 'Untested',
+          col_assigned: 'QA Engineer',
+          col_date: '2026-10-24'
+        }
+      ]
+    },
+    {
+      sheet_name: 'Requirements Matrix',
+      columns: [
+        { id: 'col_req_id', label: 'Req ID', width: 110, type: 'text' },
+        { id: 'col_feature', label: 'Feature Description', width: 280, type: 'text' },
+        { id: 'col_biz_priority', label: 'Business Priority', width: 140, type: 'priority' },
+        { id: 'col_qa_lead', label: 'QA Lead', width: 160, type: 'text' },
+        { id: 'col_dev_lead', label: 'Dev Lead', width: 160, type: 'text' },
+        { id: 'col_coverage', label: 'Coverage Status', width: 150, type: 'status' },
+        { id: 'col_signoff', label: 'Sign-Off Status', width: 140, type: 'status' }
+      ],
+      rows: [
+        {
+          id: 'row-1',
+          col_req_id: 'REQ-01',
+          col_feature: 'Spreadsheet-like Project Sheet View with inline edits',
+          col_biz_priority: 'Critical',
+          col_qa_lead: 'Santhosh',
+          col_dev_lead: 'Karthikeyan',
+          col_coverage: 'Pass',
+          col_signoff: 'Pass'
+        },
+        {
+          id: 'row-2',
+          col_req_id: 'REQ-02',
+          col_feature: 'Dedicated Project Sheets Module with custom columns & tabs',
+          col_biz_priority: 'High',
+          col_qa_lead: project?.lead_name || 'Manikandan',
+          col_dev_lead: 'Pavishek',
+          col_coverage: 'Pass',
+          col_signoff: 'In Progress'
+        },
+        {
+          id: 'row-3',
+          col_req_id: 'REQ-03',
+          col_feature: 'Formula bar and summary status calculations',
+          col_biz_priority: 'Medium',
+          col_qa_lead: 'Deepak Kumar',
+          col_dev_lead: 'Eng Team',
+          col_coverage: 'In Progress',
+          col_signoff: 'Untested'
+        }
+      ]
+    },
+    {
+      sheet_name: 'Defect Log',
+      columns: [
+        { id: 'col_bug_id', label: 'Defect ID', width: 110, type: 'text' },
+        { id: 'col_summary', label: 'Defect Summary', width: 300, type: 'text' },
+        { id: 'col_severity', label: 'Severity', width: 130, type: 'priority' },
+        { id: 'col_repro', label: 'Reproducibility', width: 140, type: 'text' },
+        { id: 'col_status', label: 'Defect Status', width: 140, type: 'status' },
+        { id: 'col_assigned_dev', label: 'Assigned Engineer', width: 170, type: 'text' },
+        { id: 'col_target', label: 'Target Release', width: 130, type: 'text' }
+      ],
+      rows: [
+        {
+          id: 'row-1',
+          col_bug_id: 'DEF-101',
+          col_summary: 'Ensure table cell focus outline doesn\'t overflow table border',
+          col_severity: 'Low',
+          col_repro: 'Consistent',
+          col_status: 'Pass',
+          col_assigned_dev: 'Frontend Team',
+          col_target: 'v1.0.1'
+        },
+        {
+          id: 'row-2',
+          col_bug_id: 'DEF-102',
+          col_summary: 'Sync formula bar text input with active selected cell',
+          col_severity: 'Medium',
+          col_repro: 'Edge case',
+          col_status: 'Pass',
+          col_assigned_dev: 'UI Lead',
+          col_target: 'v1.0.1'
+        }
+      ]
+    }
+  ];
+};
+
+// GET /api/admin/projects/:id/sheets
+app.get('/api/admin/projects/:id/sheets', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+
+  try {
+    // 1. Check if project exists
+    const projRes = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+    const project = projRes.rows[0];
+
+    // 2. Fetch existing sheets
+    const sheetsRes = await pool.query(
+      'SELECT id, project_id, sheet_name, columns, rows, created_at, updated_at FROM project_sheets WHERE project_id = $1 ORDER BY id ASC',
+      [id]
+    );
+
+    if (sheetsRes.rows.length > 0) {
+      return res.json({
+        project: project || { id, name: 'Project' },
+        sheets: sheetsRes.rows
+      });
+    }
+
+    // 3. If no sheets exist for this project, auto-seed default starter sheets
+    const defaultSheets = generateDefaultSheets(project);
+    const createdSheets = [];
+
+    for (const sheet of defaultSheets) {
+      const insertRes = await pool.query(
+        `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, updated_at)
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+         RETURNING id, project_id, sheet_name, columns, rows, created_at, updated_at`,
+        [id, sheet.sheet_name, JSON.stringify(sheet.columns), JSON.stringify(sheet.rows)]
+      );
+      createdSheets.push(insertRes.rows[0]);
+    }
+
+    res.json({
+      project: project || { id, name: 'Project' },
+      sheets: createdSheets
+    });
+  } catch (error) {
+    console.error('Error fetching project sheets:', error);
+    res.status(500).json({ error: 'Failed to fetch project sheets.' });
+  }
+});
+
+// POST /api/admin/projects/:id/sheets - Create a new sheet tab
+app.post('/api/admin/projects/:id/sheets', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+  const { sheet_name, columns, rows } = req.body;
+
+  const finalName = sheet_name?.trim() || 'New Sheet';
+  const defaultCols = columns && Array.isArray(columns) && columns.length > 0 ? columns : [
+    { id: 'col_a', label: 'Column A', width: 140, type: 'text' },
+    { id: 'col_b', label: 'Column B', width: 220, type: 'text' },
+    { id: 'col_c', label: 'Column C', width: 160, type: 'text' },
+    { id: 'col_status', label: 'Status', width: 130, type: 'status' }
+  ];
+  const defaultRows = rows && Array.isArray(rows) ? rows : [
+    { id: 'row-1', col_a: '', col_b: '', col_c: '', col_status: 'Untested' }
+  ];
+
+  try {
+    const insertRes = await pool.query(
+      `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, updated_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+       RETURNING id, project_id, sheet_name, columns, rows, created_at, updated_at`,
+      [id, finalName, JSON.stringify(defaultCols), JSON.stringify(defaultRows)]
+    );
+
+    res.status(201).json(insertRes.rows[0]);
+  } catch (error) {
+    console.error('Error creating sheet tab:', error);
+    res.status(500).json({ error: 'Failed to create sheet tab.' });
+  }
+});
+
+// PUT /api/admin/projects/:id/sheets/:sheetId - Update sheet content or name
+app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id, sheetId } = req.params;
+  const { sheet_name, columns, rows } = req.body;
+
+  try {
+    const existing = await pool.query(
+      'SELECT * FROM project_sheets WHERE id = $1 AND project_id = $2',
+      [sheetId, id]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Sheet tab not found.' });
+    }
+
+    const updateRes = await pool.query(
+      `UPDATE project_sheets SET
+        sheet_name = COALESCE($1, sheet_name),
+        columns = COALESCE($2, columns),
+        rows = COALESCE($3, rows),
+        updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND project_id = $5
+       RETURNING id, project_id, sheet_name, columns, rows, created_at, updated_at`,
+      [
+        sheet_name !== undefined ? sheet_name.trim() : null,
+        columns !== undefined ? JSON.stringify(columns) : null,
+        rows !== undefined ? JSON.stringify(rows) : null,
+        sheetId,
+        id
+      ]
+    );
+
+    res.json(updateRes.rows[0]);
+  } catch (error) {
+    console.error('Error updating sheet:', error);
+    res.status(500).json({ error: 'Failed to update sheet.' });
+  }
+});
+
+// DELETE /api/admin/projects/:id/sheets/:sheetId - Delete a sheet tab
+app.delete('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id, sheetId } = req.params;
+
+  try {
+    const delRes = await pool.query(
+      'DELETE FROM project_sheets WHERE id = $1 AND project_id = $2 RETURNING id',
+      [sheetId, id]
+    );
+
+    if (delRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Sheet tab not found.' });
+    }
+
+    res.json({ message: 'Sheet deleted successfully', deletedId: sheetId });
+  } catch (error) {
+    console.error('Error deleting sheet:', error);
+    res.status(500).json({ error: 'Failed to delete sheet.' });
+  }
+});
+
+
 // Admin Roles: Get all roles & permissions
 app.get('/api/admin/roles', async (req, res) => {
   const authorization = req.headers.authorization;
