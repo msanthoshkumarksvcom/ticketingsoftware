@@ -33,13 +33,25 @@ export const initDatabase = async () => {
         progress INT DEFAULT 0,
         start_date DATE DEFAULT CURRENT_DATE,
         end_date DATE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        test_cases INT DEFAULT 0,
+        documents INT DEFAULT 0,
+        tickets_count INT DEFAULT 0,
+        team_members INT DEFAULT 4,
+        folder_color VARCHAR(50) DEFAULT 'blue',
+        folder_icon VARCHAR(50) DEFAULT 'folder'
       );
     `);
 
-    // Ensure progress column exists if table was created previously without it
+    // Ensure columns exist
     await pool.query(`
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS progress INT DEFAULT 0;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS test_cases INT DEFAULT 0;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS documents INT DEFAULT 0;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS tickets_count INT DEFAULT 0;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_members INT DEFAULT 4;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS folder_color VARCHAR(50) DEFAULT 'blue';
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS folder_icon VARCHAR(50) DEFAULT 'folder';
     `);
 
     // 3. Roles
@@ -105,4 +117,3 @@ export const initDatabase = async () => {
     console.error('Database initialization warning:', error.message);
   }
 };
-

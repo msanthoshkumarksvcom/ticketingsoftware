@@ -392,9 +392,15 @@ app.get('/api/admin/projects', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date, created_at 
+      `SELECT id, project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date, created_at,
+              COALESCE(test_cases, 0) as test_cases,
+              COALESCE(documents, 0) as documents,
+              COALESCE(tickets_count, 0) as tickets_count,
+              COALESCE(team_members, 4) as team_members,
+              COALESCE(folder_color, 'blue') as folder_color,
+              COALESCE(folder_icon, 'folder') as folder_icon
        FROM projects 
-       ORDER BY id DESC`
+       ORDER BY id ASC`
     );
     res.json(result.rows);
   } catch (error) {
@@ -473,6 +479,94 @@ app.post('/api/admin/projects', async (req, res) => {
 });
 
 // Admin Projects: Delete project
+// Admin Projects: Update project
+app.put('/api/admin/projects/:id', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+  const {
+    name,
+    description,
+    lead_name,
+    department,
+    status,
+    priority,
+    progress,
+    start_date,
+    end_date,
+    test_cases,
+    documents,
+    tickets_count,
+    team_members,
+    folder_color,
+    folder_icon
+  } = req.body;
+
+  try {
+    const projCheck = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
+    if (projCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const cur = projCheck.rows[0];
+    const updated = await pool.query(
+      `UPDATE projects SET 
+        name = COALESCE($1, name),
+        description = COALESCE($2, description),
+        lead_name = COALESCE($3, lead_name),
+        department = COALESCE($4, department),
+        status = COALESCE($5, status),
+        priority = COALESCE($6, priority),
+        progress = COALESCE($7, progress),
+        start_date = COALESCE($8, start_date),
+        end_date = COALESCE($9, end_date),
+        test_cases = COALESCE($10, test_cases),
+        documents = COALESCE($11, documents),
+        tickets_count = COALESCE($12, tickets_count),
+        team_members = COALESCE($13, team_members),
+        folder_color = COALESCE($14, folder_color),
+        folder_icon = COALESCE($15, folder_icon)
+       WHERE id = $16
+       RETURNING *`,
+      [
+        name ?? cur.name,
+        description ?? cur.description,
+        lead_name ?? cur.lead_name,
+        department ?? cur.department,
+        status ?? cur.status,
+        priority ?? cur.priority,
+        progress !== undefined ? parseInt(progress, 10) : cur.progress,
+        start_date ?? cur.start_date,
+        end_date ?? cur.end_date,
+        test_cases !== undefined ? parseInt(test_cases, 10) : cur.test_cases,
+        documents !== undefined ? parseInt(documents, 10) : cur.documents,
+        tickets_count !== undefined ? parseInt(tickets_count, 10) : cur.tickets_count,
+        team_members !== undefined ? parseInt(team_members, 10) : cur.team_members,
+        folder_color ?? cur.folder_color,
+        folder_icon ?? cur.folder_icon,
+        id
+      ]
+    );
+
+    res.json({
+      message: 'Project updated successfully',
+      project: updated.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating project:', error);
+    res.status(500).json({ error: error.message || 'Failed to update project' });
+  }
+});
+
 app.delete('/api/admin/projects/:id', async (req, res) => {
   const authorization = req.headers.authorization;
   if (!authorization?.startsWith('Bearer ')) {
