@@ -779,3 +779,221 @@
   gap: 10px;
   margin-top: 20px;
 }
+
+/* Project QA workspace hierarchy */
+.pjs-layout {
+  background: #f3f6f4;
+  color: #1c302c;
+  font-family: 'Aptos', 'Segoe UI', sans-serif;
+  width: 100%;
+  min-width: 0;
+}
+
+.pjs-main { width: 100%; min-width: 0; }
+
+.pjs-header {
+  min-height: 62px;
+  height: auto;
+  padding: 10px 22px;
+  border-bottom-color: #dce5e0;
+}
+
+.pjs-back-btn {
+  border-color: #d5e0da;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.pjs-breadcrumb { color: #72817b; }
+.pjs-breadcrumb-curr { color: #263d35; }
+
+.pjs-proj-badge {
+  border-color: #dce7e0;
+  border-radius: 6px;
+  background: #f4f8f5;
+}
+
+.pjs-proj-code { color: #34785d; }
+.pjs-proj-title { color: #31483e; }
+
+.pjs-qa-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid #dce5e0;
+  background: #f8faf8;
+}
+
+.pjs-qa-stat {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e0e8e3;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.pjs-qa-stat-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 5px;
+  background: #edf3ef;
+  color: #426656;
+}
+
+.pjs-qa-stat.pass .pjs-qa-stat-icon { background: #e8f3ec; color: #2f8051; }
+.pjs-qa-stat.fail .pjs-qa-stat-icon { background: #fbece8; color: #b9513d; }
+.pjs-qa-stat.pending .pjs-qa-stat-icon { background: #faf1df; color: #98712e; }
+.pjs-qa-stat > span:last-child { display: grid; gap: 3px; }
+.pjs-qa-stat small { color: #718078; font-size: 11px; }
+.pjs-qa-stat strong { color: #263a32; font-size: 18px; line-height: 1; }
+
+.pjs-ribbon-bar { background: #fff; border-bottom-color: #dce5e0; }
+.pjs-menu-row { padding: 13px 22px 12px; border-bottom-color: #edf1ee; }
+.pjs-sheet-heading { min-width: 0; }
+.pjs-sheet-eyebrow { color: #73857a; font-size: 9px; font-weight: 750; letter-spacing: 1px; }
+.pjs-sheet-heading h1 { margin: 3px 0 2px; color: #20382e; font-size: 18px; line-height: 1.2; }
+.pjs-sheet-heading p { margin: 0; color: #718078; font-size: 11px; }
+.pjs-sheet-heading p span { padding: 0 4px; }
+
+.pjs-cloud-status { color: #43805e; }
+.pjs-cloud-status.saving { color: #a5792b; }
+
+.pjs-toolbar-row {
+  padding: 9px 22px;
+  background: #f8faf8;
+  gap: 10px;
+}
+
+.pjs-toolbar-group { gap: 5px; }
+.pjs-tool-btn { border-radius: 5px; color: #50645a; }
+.pjs-tool-btn:hover { background: #e9efeb; color: #254b39; }
+.pjs-tool-btn.active { border-color: #c9dfd1; background: #eaf4ee; color: #31734f; }
+.pjs-tool-divider { background: #d8e1db; }
+
+.pjs-action-pill-btn {
+  min-height: 32px;
+  border-color: #d7e1da;
+  border-radius: 5px;
+  color: #3f5549;
+}
+
+.pjs-action-pill-btn:hover { background: #eef4f0; color: #274c38; }
+.pjs-action-pill-btn.primary { border-color: #326d50; background: #397a59; }
+.pjs-action-pill-btn.primary:hover { background: #2f694c; }
+.pjs-action-pill-btn.success { border-color: #d5e1d9; background: #e9f2ec; color: #34734f; }
+.pjs-action-pill-btn.success:hover { background: #dcebe1; }
+.pjs-delete-row-btn:hover { border-color: #e8c4bc; background: #fbefed; color: #ac4d3d; }
+
+.pjs-sheet-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid #d7e1da;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.pjs-sheet-search input {
+  width: 150px;
+  border: 0;
+  outline: 0;
+  color: #293e34;
+  font: inherit;
+  font-size: 12px;
+}
+
+.pjs-sheet-search:focus-within { border-color: #6b9b7d; box-shadow: 0 0 0 2px #6b9b7d1c; }
+
+.pjs-formula-bar {
+  min-height: 40px;
+  padding: 5px 22px;
+  border-bottom-color: #dce5e0;
+  background: #fff;
+}
+
+.pjs-cell-ref-box { border-color: #dbe4de; background: #f6f8f6; color: #3f5a4a; }
+.pjs-fx-icon { color: #52836a; }
+.pjs-formula-text:focus { border-color: #6b9b7d; background: #fbfdfb; }
+
+.pjs-grid-viewport { min-width: 0; background: #fff; }
+.pjs-table { font-size: 12px; }
+.pjs-col-letter-row th { background: #f2f5f3; color: #74827b; border-color: #dce4df; }
+.pjs-col-name-row th { background: #f8faf8; color: #31463b; border-color: #dce4df; }
+.pjs-row-num-cell { background: #f5f7f5; color: #74827b; border-color: #dce4df; }
+.pjs-row.selected .pjs-row-num-cell { background: #dcece2; color: #31734f; }
+.pjs-cell { border-color: #e2e9e4; }
+.pjs-row:hover .pjs-cell { background: #f8fbf9; }
+.pjs-cell.active { outline-color: #42815d !important; }
+.pjs-cell.active::after { background: #42815d; }
+
+.pjs-add-row-btn {
+  width: auto;
+  min-width: 100%;
+  border-color: #cbd9d0;
+  color: #527460;
+  text-align: left;
+}
+.pjs-add-row-btn:hover { border-color: #6b9b7d; background: #f6faf7; color: #34734f; }
+
+.pjs-bottom-bar {
+  min-height: 48px;
+  padding: 0 16px;
+  border-top-color: #d7e1da;
+  background: #f3f6f4;
+}
+.pjs-sheet-tabs { gap: 5px; padding-top: 5px; }
+.pjs-sheet-tab { border-color: #dce5df; border-radius: 5px 5px 0 0; background: #e8eeea; color: #53665b; }
+.pjs-sheet-tab:hover { background: #f5f8f6; color: #294b38; }
+.pjs-sheet-tab.active { border-top-color: #43815d; background: #fff; color: #2b5c40; }
+.pjs-add-tab-btn { color: #51735e; }
+.pjs-add-tab-btn:hover { background: #e0eae3; color: #2f694c; }
+
+.pjs-calc-summary-bar {
+  gap: 12px;
+  border-color: #dce5df;
+  border-radius: 5px;
+  color: #56685e;
+}
+.pjs-progress-wrap { background: #e5ebe7; }
+.pjs-progress-bar.pass { background: #55a875; }
+.pjs-progress-bar.fail { background: #d66e59; }
+.pjs-progress-bar.blocked { background: #d6a451; }
+
+@media (max-width: 900px) {
+  .pjs-main { height: 100dvh; }
+  .pjs-header { padding: 9px 14px; }
+  .pjs-breadcrumb { display: none; }
+  .pjs-qa-overview { padding: 12px 14px; gap: 8px; }
+  .pjs-qa-stat { padding: 10px; }
+  .pjs-toolbar-row { padding: 8px 14px; }
+  .pjs-toolbar-row > .pjs-toolbar-group:last-child { flex-wrap: wrap; }
+  .pjs-formula-bar { padding-inline: 14px; }
+}
+
+@media (max-width: 620px) {
+  .pjs-header { align-items: flex-start; }
+  .pjs-header-left { flex: 1; }
+  .pjs-header-right { max-width: 55%; }
+  .pjs-proj-badge { align-items: flex-start; flex-direction: column; gap: 2px; max-width: 100%; }
+  .pjs-proj-title { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+  .pjs-qa-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pjs-menu-row { align-items: flex-start; gap: 10px; padding-inline: 14px; }
+  .pjs-cloud-status { justify-content: flex-end; font-size: 10px; text-align: right; }
+  .pjs-toolbar-row { align-items: flex-start; }
+  .pjs-toolbar-row > .pjs-toolbar-group:last-child { flex: 1 1 100%; }
+  .pjs-sheet-search { flex: 1 1 100%; }
+  .pjs-sheet-search input { width: 100%; }
+  .pjs-action-pill-btn { padding-inline: 9px; }
+  .pjs-bottom-bar { align-items: flex-start; padding: 0 8px 8px; }
+  .pjs-sheet-tabs { max-width: 100%; }
+  .pjs-calc-summary-bar { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 7px; box-sizing: border-box; }
+}

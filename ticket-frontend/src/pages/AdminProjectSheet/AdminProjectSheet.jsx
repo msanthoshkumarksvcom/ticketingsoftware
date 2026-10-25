@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
   FileSpreadsheet,
@@ -180,9 +180,10 @@ const FALLBACK_STARTER_SHEETS = [
 export default function AdminProjectSheet() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Project metadata
-  const [project, setProject] = useState({
+  const [project, setProject] = useState(() => location.state?.project || {
     id: projectId || 1,
     project_code: `PRJ-${projectId || '01'}`,
     name: 'Project Sheet Workspace',
@@ -615,7 +616,11 @@ export default function AdminProjectSheet() {
         {/* 1. Header Bar */}
         <header className="pjs-header">
           <div className="pjs-header-left">
-            <button className="pjs-back-btn" onClick={() => navigate('/admin/projects')} title="Back to Projects directory">
+            <button
+              className="pjs-back-btn"
+              onClick={() => navigate(`/admin/projects/${projectId}`, { state: { project } })}
+              title="Back to Project workspace"
+            >
               <ArrowLeft size={16} />
               <span>Projects</span>
             </button>
@@ -639,22 +644,32 @@ export default function AdminProjectSheet() {
           </div>
         </header>
 
-        {/* 2. Google Sheets Menu & Ribbon Bar */}
+        <section className="pjs-qa-overview" aria-label="Sheet quality summary">
+          <div className="pjs-qa-stat total">
+            <span className="pjs-qa-stat-icon"><FileSpreadsheet size={17} /></span>
+            <span><small>Test cases</small><strong>{qaMetrics.total}</strong></span>
+          </div>
+          <div className="pjs-qa-stat pass">
+            <span className="pjs-qa-stat-icon"><CheckCircle2 size={17} /></span>
+            <span><small>Pass rate</small><strong>{qaMetrics.passRate}%</strong></span>
+          </div>
+          <div className="pjs-qa-stat fail">
+            <span className="pjs-qa-stat-icon"><AlertTriangle size={17} /></span>
+            <span><small>Issues</small><strong>{qaMetrics.fail + qaMetrics.blocked}</strong></span>
+          </div>
+          <div className="pjs-qa-stat pending">
+            <span className="pjs-qa-stat-icon"><Clock size={17} /></span>
+            <span><small>Needs testing</small><strong>{qaMetrics.untested + qaMetrics.inProgress}</strong></span>
+          </div>
+        </section>
+
+        {/* 2. Sheet heading and toolbar */}
         <div className="pjs-ribbon-bar">
-          {/* Menu items row */}
           <div className="pjs-menu-row">
-            <div className="pjs-menu-items">
-              <span className="pjs-menu-item">File</span>
-              <span className="pjs-menu-item">Edit</span>
-              <span className="pjs-menu-item">View</span>
-              <span className="pjs-menu-item" onClick={() => setShowAddColModal(true)}>
-                Insert
-              </span>
-              <span className="pjs-menu-item">Format</span>
-              <span className="pjs-menu-item" onClick={handleExportCSV}>
-                Data
-              </span>
-              <span className="pjs-menu-item">Tools</span>
+            <div className="pjs-sheet-heading">
+              <span className="pjs-sheet-eyebrow">PROJECT SHEET</span>
+              <h1>{currentSheet.sheet_name || 'Untitled sheet'}</h1>
+              <p>{currentRows.length} test cases <span>·</span> {currentColumns.length} columns</p>
             </div>
 
             <div className={`pjs-cloud-status ${cloudStatus === 'saving' ? 'saving' : ''}`}>
@@ -716,34 +731,28 @@ export default function AdminProjectSheet() {
             </div>
 
             <div className="pjs-toolbar-group">
-              {/* Search in sheet */}
-              <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0 8px', height: '30px' }}>
+              <div className="pjs-sheet-search">
                 <Search size={13} color="#64748b" />
                 <input
                   type="text"
                   placeholder="Find in sheet..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
-                  style={{ border: 'none', outline: 'none', fontSize: '12px', padding: '4px', width: '120px' }}
                 />
               </div>
 
-              {/* Add Row Action */}
-              <button className="pjs-action-pill-btn success" onClick={() => handleAddRow('bottom')} title="Add Row at bottom">
+              <button className="pjs-action-pill-btn success" onClick={() => handleAddRow('bottom')} title="Add row at bottom">
                 <Plus size={14} strokeWidth={2.5} />
-                <span>+ Row</span>
+                <span>Add row</span>
               </button>
 
-              {/* Add Column Action */}
               <button className="pjs-action-pill-btn primary" onClick={() => setShowAddColModal(true)} title="Add Column">
                 <Columns size={14} />
-                <span>+ Column</span>
+                <span>Add column</span>
               </button>
 
-              {/* Delete Selected Row */}
-              <button className="pjs-action-pill-btn" onClick={handleDeleteRow} title="Delete selected row">
+              <button className="pjs-action-pill-btn pjs-delete-row-btn" onClick={handleDeleteRow} title="Delete selected row" aria-label="Delete selected row">
                 <Trash2 size={13} />
-                <span>Delete Row</span>
               </button>
 
               {/* Export to CSV */}

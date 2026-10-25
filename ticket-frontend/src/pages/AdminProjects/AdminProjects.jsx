@@ -247,6 +247,10 @@ function AdminProjects() {
     return `${day}-${month}-${year}`;
   };
 
+  const openProjectWorkspace = (project) => {
+    navigate(`/admin/projects/${project.id}`, { state: { project } });
+  };
+
   // Status badge class
   const getStatusClass = (status) => {
     const s = (status || '').toLowerCase().replace(/\s+/g, '-');
@@ -818,7 +822,14 @@ function AdminProjects() {
           ) : viewMode === 'grid' ? (
             <section className="pj-cards-grid">
               {filteredProjects.map((project) => (
-                <article key={project.id || project.project_code} className="pj-card">
+                <article
+                  key={project.id || project.project_code}
+                  className="pj-card"
+                  onDoubleClick={(event) => {
+                    if (!event.target.closest('button')) openProjectWorkspace(project);
+                  }}
+                  title="Double-click to open project"
+                >
                   {/* Top: Folder Graphic + Status Badge + Actions */}
                   <div className="pj-card-top">
                     <FolderEmblem
@@ -974,7 +985,13 @@ function AdminProjects() {
                   </thead>
                   <tbody>
                     {filteredProjects.map((project) => (
-                      <tr key={project.id || project.project_code}>
+                      <tr
+                        key={project.id || project.project_code}
+                        onDoubleClick={(event) => {
+                          if (!event.target.closest('button')) openProjectWorkspace(project);
+                        }}
+                        title="Double-click to open project"
+                      >
                         <td>
                           <strong>{project.project_code}</strong>
                         </td>

@@ -1,0 +1,139 @@
+.project-workspace {
+  min-height: 100vh;
+  padding: 28px clamp(20px, 4vw, 56px) 56px;
+  background: #f5f7f8;
+  color: #172b35;
+}
+
+.project-workspace-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  max-width: 1180px;
+  margin: 0 auto 32px;
+}
+
+.project-workspace-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #d7e0e3;
+  border-radius: 6px;
+  background: #fff;
+  color: #31515d;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.project-workspace-back:hover { background: #eef4f4; }
+.project-workspace-title { padding-top: 2px; }
+.project-workspace-code { color: #52717b; font-size: 12px; font-weight: 700; }
+.project-workspace-title h1 { margin: 5px 0; font-size: 26px; line-height: 1.2; }
+.project-workspace-title p { margin: 0; color: #627780; font-size: 14px; }
+
+.project-workspace-folders {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 1180px;
+  margin: 0 auto 24px;
+}
+
+.project-folder {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  padding: 16px;
+  border: 1px solid #dce5e7;
+  border-radius: 7px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+
+.project-folder:hover, .project-folder.active {
+  border-color: #4b8790;
+  box-shadow: 0 4px 14px #17434b12;
+  transform: translateY(-1px);
+}
+
+.project-folder-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 6px;
+  background: #e5f2f0;
+  color: #267264;
+}
+.project-folder-icon.tickets { background: #fff0e4; color: #b55d24; }
+.project-folder-icon.documents { background: #e8eff9; color: #426b9a; }
+.project-folder-icon.details { background: #f2efe2; color: #7f6c2b; }
+.project-folder-copy { display: grid; gap: 4px; }
+.project-folder-copy strong { font-size: 15px; }
+.project-folder-copy small { color: #6d7e84; font-size: 12px; }
+
+.project-workspace-content {
+  max-width: 1180px;
+  margin: 0 auto;
+  border-top: 1px solid #dce5e7;
+  padding-top: 22px;
+}
+
+.project-content-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.project-content-heading span { color: #71858b; font-size: 10px; font-weight: 750; letter-spacing: 1px; }
+.project-content-heading h2 { margin: 4px 0 0; font-size: 20px; }
+.project-content-heading > strong { color: #526b73; font-size: 13px; }
+.project-workspace-empty { padding: 18px 0; color: #667b82; font-size: 14px; }
+
+.project-ticket-list { border-top: 1px solid #dce5e7; }
+.project-ticket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 4px;
+  border-bottom: 1px solid #dce5e7;
+}
+.project-ticket-row > div { display: grid; gap: 5px; }
+.project-ticket-row strong { font-size: 14px; }
+.project-ticket-row div span { color: #71858b; font-size: 12px; }
+.project-ticket-status { padding: 5px 8px; border-radius: 4px; background: #e8f2ed; color: #327052; font-size: 11px; font-weight: 700; }
+.project-ticket-status.open { background: #fff0e4; color: #a85828; }
+
+.project-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 24px;
+  margin: 0;
+  border-top: 1px solid #dce5e7;
+}
+.project-details-grid > div { padding: 16px 0; border-bottom: 1px solid #dce5e7; }
+.project-details-grid dt { margin-bottom: 7px; color: #71858b; font-size: 12px; }
+.project-details-grid dd { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 14px; font-weight: 600; }
+.project-details-description { grid-column: 1 / -1; }
+.project-details-description dd { color: #526b73; font-weight: 400; }
+
+@media (max-width: 760px) {
+  .project-workspace-header { flex-direction: column; gap: 16px; }
+  .project-workspace-folders { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .project-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .project-workspace-folders { grid-template-columns: 1fr; }
+  .project-details-grid { grid-template-columns: 1fr; }
+}
