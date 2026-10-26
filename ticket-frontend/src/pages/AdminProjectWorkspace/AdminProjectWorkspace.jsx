@@ -7,9 +7,11 @@ import {
   FileSpreadsheet,
   FileText,
   Folder,
+  LogOut,
   Ticket,
   Users
 } from 'lucide-react';
+import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import './AdminProjectWorkspace.css';
 
 const WORKSPACE_FOLDERS = [
@@ -27,6 +29,7 @@ export default function AdminProjectWorkspace() {
   const [tickets, setTickets] = useState([]);
   const [activeFolder, setActiveFolder] = useState(null);
   const [ticketsUnavailable, setTicketsUnavailable] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -64,91 +67,132 @@ export default function AdminProjectWorkspace() {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
   };
 
+  const confirmLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userDepartment');
+    navigate('/', { replace: true });
+  };
+
+  const logoutConfirmation = showLogoutModal && (
+    <div className="modal-overlay" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) setShowLogoutModal(false);
+    }}>
+      <section className="modal-content" role="dialog" aria-modal="true" aria-labelledby="project-logout-title">
+        <div className="modal-icon"><LogOut size={21} /></div>
+        <h2 className="modal-title" id="project-logout-title">Sign out of your workspace?</h2>
+        <p className="modal-text">You can sign back in at any time with your account.</p>
+        <div className="modal-actions">
+          <button className="modal-btn modal-btn-cancel" onClick={() => setShowLogoutModal(false)}>
+            Stay signed in
+          </button>
+          <button className="modal-btn modal-btn-confirm" onClick={confirmLogout}>
+            Sign out
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+
   if (!project) {
     return (
-      <main className="project-workspace">
-        <button className="project-workspace-back" onClick={() => navigate('/admin/projects')}>
-          <ArrowLeft size={16} /> Projects
-        </button>
-        <p className="project-workspace-empty">Project details are unavailable. Return to Projects and open it again.</p>
-      </main>
+      <div className="admin-layout">
+        {logoutConfirmation}
+        <AdminSidebar onLogout={() => setShowLogoutModal(true)} />
+        <div className="main-content">
+          <main className="project-workspace">
+            <button className="project-workspace-back" onClick={() => navigate('/admin/projects')}>
+              <ArrowLeft size={16} /> Projects
+            </button>
+            <p className="project-workspace-empty">Project details are unavailable. Return to Projects and open it again.</p>
+          </main>
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="project-workspace">
-      <header className="project-workspace-header">
-        <button className="project-workspace-back" onClick={() => navigate('/admin/projects')}>
-          <ArrowLeft size={16} /> Projects
-        </button>
-        <div className="project-workspace-title">
-          <span className="project-workspace-code">{project.project_code}</span>
-          <h1>{project.name}</h1>
-          <p>{project.department || 'Department not set'} · {project.status || 'Status not set'}</p>
-        </div>
-      </header>
-
-      <section className="project-workspace-folders" aria-label="Project folders">
-        {WORKSPACE_FOLDERS.map(({ id, label, detail, icon: Icon }) => (
-          <button
-            className={`project-folder ${activeFolder === id ? 'active' : ''}`}
-            key={id}
-            onClick={() => openFolder(id)}
-          >
-            <span className={`project-folder-icon ${id}`}><Icon size={21} /></span>
-            <span className="project-folder-copy">
-              <strong>{label}</strong>
-              <small>{detail}</small>
-            </span>
-          </button>
-        ))}
-      </section>
-
-      {activeFolder === 'tickets' && (
-        <section className="project-workspace-content">
-          <div className="project-content-heading">
-            <div><span>PROJECT CONTENTS</span><h2>Tickets</h2></div>
-            <strong>{ticketsUnavailable ? project.tickets_count || 0 : tickets.length} total</strong>
-          </div>
-          {ticketsUnavailable ? (
-            <p className="project-workspace-empty">Ticket details are unavailable right now. The project record tracks {project.tickets_count || 0} tickets.</p>
-          ) : tickets.length ? (
-            <div className="project-ticket-list">
-              {tickets.map((ticket) => (
-                <article className="project-ticket-row" key={ticket.id}>
-                  <div><strong>{ticket.title}</strong><span>{ticket.ticket_code} · {ticket.type || 'Ticket'}</span></div>
-                  <span className={`project-ticket-status ${String(ticket.status || '').toLowerCase().replaceAll(' ', '-')}`}>{ticket.status}</span>
-                </article>
-              ))}
+    <div className="admin-layout">
+      {logoutConfirmation}
+      <AdminSidebar onLogout={() => setShowLogoutModal(true)} />
+      <div className="main-content">
+        <main className="project-workspace">
+          <header className="project-workspace-header">
+            <button className="project-workspace-back" onClick={() => navigate('/admin/projects')}>
+              <ArrowLeft size={16} /> Projects
+            </button>
+            <div className="project-workspace-title">
+              <span className="project-workspace-code">{project.project_code}</span>
+              <h1>{project.name}</h1>
+              <p>{project.department || 'Department not set'} · {project.status || 'Status not set'}</p>
             </div>
-          ) : <p className="project-workspace-empty">No tickets are linked to this project yet.</p>}
-        </section>
-      )}
+          </header>
 
-      {activeFolder === 'documents' && (
-        <section className="project-workspace-content">
-          <div className="project-content-heading">
-            <div><span>PROJECT CONTENTS</span><h2>Documents</h2></div>
-            <strong>{project.documents || 0} tracked</strong>
-          </div>
-          <p className="project-workspace-empty">This project tracks {project.documents || 0} documents. Individual document files are not available in the current project data.</p>
-        </section>
-      )}
+          <section className="project-workspace-folders" aria-label="Project folders">
+            {WORKSPACE_FOLDERS.map(({ id, label, detail, icon: Icon }) => (
+              <button
+                className={`project-folder ${activeFolder === id ? 'active' : ''}`}
+                key={id}
+                onClick={() => openFolder(id)}
+              >
+                <span className={`project-folder-icon ${id}`}><Icon size={21} /></span>
+                <span className="project-folder-copy">
+                  <strong>{label}</strong>
+                  <small>{detail}</small>
+                </span>
+              </button>
+            ))}
+          </section>
 
-      {activeFolder === 'details' && (
-        <section className="project-workspace-content">
-          <div className="project-content-heading"><div><span>PROJECT CONTENTS</span><h2>Details</h2></div></div>
-          <dl className="project-details-grid">
-            <div><dt>Project code</dt><dd>{project.project_code || 'Not set'}</dd></div>
-            <div><dt>Project lead</dt><dd>{project.lead_name || 'Not assigned'}</dd></div>
-            <div><dt>Department</dt><dd>{project.department || 'Not set'}</dd></div>
-            <div><dt>Status</dt><dd>{project.status || 'Not set'}</dd></div>
-            <div><dt>Start date</dt><dd><CalendarDays size={15} />{formatDate(project.start_date)}</dd></div>
-            <div><dt>Team members</dt><dd><Users size={15} />{project.team_members ?? 0}</dd></div>
-            <div className="project-details-description"><dt>Description</dt><dd>{project.description || 'No description has been added.'}</dd></div>
-          </dl>
-        </section>
-      )}
-    </main>
+          {activeFolder === 'tickets' && (
+            <section className="project-workspace-content">
+              <div className="project-content-heading">
+                <div><span>PROJECT CONTENTS</span><h2>Tickets</h2></div>
+                <strong>{ticketsUnavailable ? project.tickets_count || 0 : tickets.length} total</strong>
+              </div>
+              {ticketsUnavailable ? (
+                <p className="project-workspace-empty">Ticket details are unavailable right now. The project record tracks {project.tickets_count || 0} tickets.</p>
+              ) : tickets.length ? (
+                <div className="project-ticket-list">
+                  {tickets.map((ticket) => (
+                    <article className="project-ticket-row" key={ticket.id}>
+                      <div><strong>{ticket.title}</strong><span>{ticket.ticket_code} · {ticket.type || 'Ticket'}</span></div>
+                      <span className={`project-ticket-status ${String(ticket.status || '').toLowerCase().replaceAll(' ', '-')}`}>{ticket.status}</span>
+                    </article>
+                  ))}
+                </div>
+              ) : <p className="project-workspace-empty">No tickets are linked to this project yet.</p>}
+            </section>
+          )}
+
+          {activeFolder === 'documents' && (
+            <section className="project-workspace-content">
+              <div className="project-content-heading">
+                <div><span>PROJECT CONTENTS</span><h2>Documents</h2></div>
+                <strong>{project.documents || 0} tracked</strong>
+              </div>
+              <p className="project-workspace-empty">This project tracks {project.documents || 0} documents. Individual document files are not available in the current project data.</p>
+            </section>
+          )}
+
+          {activeFolder === 'details' && (
+            <section className="project-workspace-content">
+              <div className="project-content-heading"><div><span>PROJECT CONTENTS</span><h2>Details</h2></div></div>
+              <dl className="project-details-grid">
+                <div><dt>Project code</dt><dd>{project.project_code || 'Not set'}</dd></div>
+                <div><dt>Project lead</dt><dd>{project.lead_name || 'Not assigned'}</dd></div>
+                <div><dt>Department</dt><dd>{project.department || 'Not set'}</dd></div>
+                <div><dt>Status</dt><dd>{project.status || 'Not set'}</dd></div>
+                <div><dt>Start date</dt><dd><CalendarDays size={15} />{formatDate(project.start_date)}</dd></div>
+                <div><dt>Team members</dt><dd><Users size={15} />{project.team_members ?? 0}</dd></div>
+                <div className="project-details-description"><dt>Description</dt><dd>{project.description || 'No description has been added.'}</dd></div>
+              </dl>
+            </section>
+          )}
+        </main>
+      </div>
+    </div>
   );
 }

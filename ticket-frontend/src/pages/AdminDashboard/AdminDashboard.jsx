@@ -9,7 +9,6 @@ import {
   FolderKanban,
   LogOut,
   RefreshCw,
-  Search,
   ShieldCheck,
   Ticket,
   UsersRound
@@ -29,7 +28,6 @@ function AdminDashboard() {
   const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [userEmail] = useState(() => localStorage.getItem('userEmail') || '');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -128,10 +126,7 @@ function AdminDashboard() {
       tone: 'amber'
     }
   ];
-  const visibleMetrics = metricCards.filter(({ label }) =>
-    label.toLowerCase().includes(searchQuery.trim().toLowerCase())
-  );
-  const chartData = visibleMetrics.map(({ label, value }) => ({
+  const chartData = metricCards.map(({ label, value }) => ({
     name: label.replace('Total ', ''),
     value
   }));
@@ -184,17 +179,6 @@ function AdminDashboard() {
             <span>Workspace</span><span className="breadcrumb-divider">/</span><strong>Overview</strong>
           </div>
           <div className="header-right">
-            <label className="header-search">
-              <Search className="search-icon" size={17} />
-              <input
-                type="search"
-                aria-label="Filter dashboard metrics"
-                placeholder="Find a metric..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
-              <kbd>/</kbd>
-            </label>
             <button className="notification-bell" onClick={focusApprovals} aria-label="View pending approvals">
               <Bell size={19} />
               {stats.pendingApprovals > 0 && <span className="notification-count">{stats.pendingApprovals}</span>}
@@ -251,7 +235,7 @@ function AdminDashboard() {
           </section>
 
           <section className="stats-grid" aria-label="Workspace totals" aria-live="polite">
-            {visibleMetrics.map(({ key, label, value, icon: Icon, tone }) => (
+            {metricCards.map(({ key, label, value, icon: Icon, tone }) => (
               <article
                 className={`stat-card stat-${tone}`}
                 id={key === 'pendingApprovals' ? 'pending-approvals' : undefined}
@@ -268,9 +252,6 @@ function AdminDashboard() {
                 </div>
               </article>
             ))}
-            {!visibleMetrics.length && (
-              <div className="empty-search">No dashboard metrics match “{searchQuery}”.</div>
-            )}
           </section>
 
           <section className="dashboard-panels">
@@ -283,24 +264,20 @@ function AdminDashboard() {
                 </div>
                 <span className="panel-icon"><BarChart3 size={18} /></span>
               </div>
-              {chartData.length ? (
-                <div className="chart-wrap" role="img" aria-label="Bar chart of current workspace record counts">
-                  {chartData.map(({ name, value }) => (
-                    <div className="chart-row" key={name}>
-                      <span className="chart-label">{name}</span>
-                      <div className="chart-track">
-                        <span
-                          className="chart-bar"
-                          style={{ width: `${Math.max((value / maxChartValue) * 100, 1)}%` }}
-                        />
-                      </div>
-                      <span className="chart-value">{value.toLocaleString()}</span>
+              <div className="chart-wrap" role="img" aria-label="Bar chart of current workspace record counts">
+                {chartData.map(({ name, value }) => (
+                  <div className="chart-row" key={name}>
+                    <span className="chart-label">{name}</span>
+                    <div className="chart-track">
+                      <span
+                        className="chart-bar"
+                        style={{ width: `${Math.max((value / maxChartValue) * 100, 1)}%` }}
+                      />
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="chart-empty">Search for a metric to see its total here.</div>
-              )}
+                    <span className="chart-value">{value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
             </article>
 
             <article className="panel approvals-panel">

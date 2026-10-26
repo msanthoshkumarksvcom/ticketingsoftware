@@ -21,8 +21,10 @@ import {
   Search,
   X,
   AlertTriangle,
-  FolderKanban
+  FolderKanban,
+  LogOut
 } from 'lucide-react';
+import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import './AdminProjectSheet.css';
 
 // Letters for columns: A, B, C, ... Z, AA, AB...
@@ -215,6 +217,7 @@ export default function AdminProjectSheet() {
   const [showAddColModal, setShowAddColModal] = useState(false);
   const [newColLabel, setNewColLabel] = useState('');
   const [newColType, setNewColType] = useState('text');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const cellInputRef = useRef(null);
 
@@ -610,9 +613,38 @@ export default function AdminProjectSheet() {
     return { total, pass, fail, blocked, inProgress, untested, passRate, failRate, blockedRate };
   }, [currentRows]);
 
+  const confirmLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userDepartment');
+    navigate('/', { replace: true });
+  };
+
   return (
-    <div className="pjs-layout" onKeyDown={handleKeyDown} tabIndex={0}>
-      <main className="pjs-main">
+    <div className="pjs-layout">
+      {showLogoutModal && (
+        <div className="modal-overlay" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowLogoutModal(false);
+        }}>
+          <section className="modal-content" role="dialog" aria-modal="true" aria-labelledby="sheet-logout-title">
+            <div className="modal-icon"><LogOut size={21} /></div>
+            <h2 className="modal-title" id="sheet-logout-title">Sign out of your workspace?</h2>
+            <p className="modal-text">You can sign back in at any time with your account.</p>
+            <div className="modal-actions">
+              <button className="modal-btn modal-btn-cancel" onClick={() => setShowLogoutModal(false)}>
+                Stay signed in
+              </button>
+              <button className="modal-btn modal-btn-confirm" onClick={confirmLogout}>
+                Sign out
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      <AdminSidebar defaultCollapsed onLogout={() => setShowLogoutModal(true)} />
+      <main className="pjs-main" onKeyDown={handleKeyDown} tabIndex={0}>
         {/* 1. Header Bar */}
         <header className="pjs-header">
           <div className="pjs-header-left">

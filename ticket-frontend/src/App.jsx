@@ -15,6 +15,7 @@ import AdminReports from './pages/AdminReports/AdminReports';
 import AdminApprovals from './pages/AdminApprovals/AdminApprovals';
 import AdminDeployments from './pages/AdminDeployments/AdminDeployments';
 import AdminWorkspacePage from './pages/AdminWorkspacePage/AdminWorkspacePage';
+import './styles/design-system.css';
 
 function App() {
   return (
