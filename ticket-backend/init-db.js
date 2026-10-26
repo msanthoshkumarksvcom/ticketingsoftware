@@ -78,8 +78,13 @@ export const initDatabase = async () => {
         type VARCHAR(50) DEFAULT 'Bug',
         status VARCHAR(50) DEFAULT 'Open',
         reporter VARCHAR(150) DEFAULT 'Admin User',
+        attachments JSONB DEFAULT '[]'::jsonb,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await pool.query(`
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
     `);
 
     // 5. Approvals

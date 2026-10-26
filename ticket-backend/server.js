@@ -1017,6 +1017,21 @@ app.post('/api/admin/roles', async (req, res) => {
   }
 });
 
+const generateTicketCode = async () => {
+  const today = new Date();
+  const prefix = `TCK-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+  const result = await pool.query(
+    `SELECT COALESCE(MAX(CAST(SPLIT_PART(ticket_code, '-', 3) AS INTEGER)), 0) + 1 AS next_number
+     FROM tickets
+     WHERE ticket_code LIKE $1`,
+    [`${prefix}-%`]
+  );
+
+  const number = Number(result.rows[0]?.next_number ?? 1);
+  return `${prefix}-${String(number).padStart(4, '0')}`;
+};
+
 // Admin Tickets: Get all tickets
 app.get('/api/admin/tickets', async (req, res) => {
   const authorization = req.headers.authorization;
@@ -1032,11 +1047,14 @@ app.get('/api/admin/tickets', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter, created_at 
+      `SELECT id, ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter, attachments, created_at
        FROM tickets 
        ORDER BY id DESC`
     );
-    res.json(result.rows);
+    res.json(result.rows.map((row) => ({
+      ...row,
+      attachments: Array.isArray(row.attachments) ? row.attachments : []
+    })));
   } catch (error) {
     console.error('Error fetching tickets:', error);
     res.status(500).json({ error: 'Failed to fetch tickets from database.' });
@@ -1056,42 +1074,91 @@ app.post('/api/admin/tickets', async (req, res) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const { ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter } = req.body;
+  const { title, description, project_code, assigned_to, priority, type, status, reporter, attachments } = req.body;
 
-  if (!ticket_code || !title) {
-    return res.status(400).json({ error: 'Ticket Code and Title are required.' });
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: 'Ticket title is required.' });
   }
 
   try {
-    const existing = await pool.query('SELECT * FROM tickets WHERE ticket_code = $1', [ticket_code]);
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ error: 'A ticket with this Ticket Code already exists.' });
-    }
+    const ticket_code = await generateTicketCode();
+    const safeAttachments = Array.isArray(attachments) ? attachments : [];
 
     const result = await pool.query(
-      `INSERT INTO tickets (ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO tickets (ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter, attachments)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         ticket_code,
-        title,
+        title.trim(),
         description || '',
         project_code || 'General',
         assigned_to || 'Unassigned',
         priority || 'Medium',
         type || 'Bug',
         status || 'Open',
-        reporter || 'Admin User'
+        reporter || 'Admin User',
+        JSON.stringify(safeAttachments)
       ]
     );
 
+    const newTicket = {
+      ...result.rows[0],
+      attachments: Array.isArray(result.rows[0].attachments) ? result.rows[0].attachments : []
+    };
+
     res.status(201).json({
       message: 'Ticket created successfully',
-      ticket: result.rows[0]
+      ticket: newTicket
     });
   } catch (error) {
     console.error('Error creating ticket:', error);
     res.status(500).json({ error: 'Failed to create ticket in database.' });
+  }
+});
+
+// Admin Tickets: Update ticket status
+app.put('/api/admin/tickets/:id/status', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { status } = req.body;
+  const allowedStatuses = ['Open', 'In Progress', 'Resolved', 'Closed'];
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Choose a valid ticket status.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE tickets
+       SET status = $1
+       WHERE id = $2
+       RETURNING id, ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter, attachments, created_at`,
+      [status, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ticket not found.' });
+    }
+
+    res.json({
+      message: 'Ticket status updated successfully.',
+      ticket: {
+        ...result.rows[0],
+        attachments: Array.isArray(result.rows[0].attachments) ? result.rows[0].attachments : []
+      }
+    });
+  } catch (error) {
+    console.error('Error updating ticket status:', error);
+    res.status(500).json({ error: 'Failed to update ticket status.' });
   }
 });
 
