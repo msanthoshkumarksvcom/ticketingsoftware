@@ -20,6 +20,15 @@ const seedUsers = async () => {
       department: 'Quality Assurance',
       role: 'QA Lead',
       status: 'Active'
+    },
+    {
+      emp_id: 'EMP-003',
+      full_name: 'QA Member',
+      email: 'qamember@gmail.com',
+      password: 'Kanavu@123',
+      department: 'Quality Assurance',
+      role: 'QA Member',
+      status: 'Active'
     }
   ];
 
@@ -58,7 +67,7 @@ const seedUsers = async () => {
         [u.emp_id, u.full_name, u.email, hashedPassword, u.department, u.role, u.status]
       );
     }
-    console.log('Inbuilt system accounts (manager@gmail.com, qalead@gmail.com) created or updated.');
+    console.log('Inbuilt system accounts (manager@gmail.com, qalead@gmail.com, qamember@gmail.com) created or updated.');
   } catch (error) {
     console.error('Error seeding database:', error);
     process.exitCode = 1;

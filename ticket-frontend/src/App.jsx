@@ -17,6 +17,24 @@ import AdminDeployments from './pages/AdminDeployments/AdminDeployments';
 import AdminWorkspacePage from './pages/AdminWorkspacePage/AdminWorkspacePage';
 import './styles/design-system.css';
 
+function RoleRoute({ allowedRoles, fallback = '/', children }) {
+  const token = localStorage.getItem('token');
+  const userRole = localStorage.getItem('userRole') || '';
+
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
+    if (userRole === 'QA Member') return <Navigate to="/qa-member" replace />;
+    if (userRole === 'Developer') return <Navigate to="/developer" replace />;
+    if (userRole === 'Project Lead') return <Navigate to="/project-lead" replace />;
+    return <Navigate to={fallback} replace />;
+  }
+
+  return children;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -27,17 +45,45 @@ function App() {
         <Route path="/project-lead" element={<ProjectLeadDashboard />} />
         <Route path="/qa-member" element={<QAMemberDashboard />} />
 
-        {/* Admin Console Routes */}
-        <Route path="/admin" element={<AdminDashboard />} />
+        {/* Admin & Management Console Routes */}
+        <Route
+          path="/admin"
+          element={
+            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
+              <AdminDashboard />
+            </RoleRoute>
+          }
+        />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/projects" element={<AdminProjects />} />
         <Route path="/admin/projects/:projectId" element={<AdminProjectWorkspace />} />
         <Route path="/admin/projects/:projectId/sheet" element={<AdminProjectSheet />} />
-        <Route path="/admin/roles-permissions" element={<AdminRoles />} />
+        <Route
+          path="/admin/roles-permissions"
+          element={
+            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
+              <AdminRoles />
+            </RoleRoute>
+          }
+        />
         <Route path="/admin/tickets" element={<AdminTickets />} />
         <Route path="/admin/reports" element={<AdminReports />} />
-        <Route path="/admin/approvals" element={<AdminApprovals />} />
-        <Route path="/admin/deployment-approval" element={<AdminDeployments />} />
+        <Route
+          path="/admin/approvals"
+          element={
+            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
+              <AdminApprovals />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/admin/deployment-approval"
+          element={
+            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
+              <AdminDeployments />
+            </RoleRoute>
+          }
+        />
         <Route path="/admin/settings" element={<AdminWorkspacePage section="settings" />} />
         {/* Redirect unknown routes to login */}
         <Route path="*" element={<Navigate to="/" replace />} />

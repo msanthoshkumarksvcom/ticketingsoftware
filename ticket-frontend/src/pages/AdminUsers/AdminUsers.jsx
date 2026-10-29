@@ -143,6 +143,9 @@ function AdminUsers() {
   const [createFieldErrors, setCreateFieldErrors] = useState({});
   const [editFieldErrors, setEditFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+
+  const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
+  const isQAMember = currentUserRole === 'QA Member';
   const [formError, setFormError] = useState('');
 
   const createFileInputRef = useRef(null);
@@ -840,7 +843,7 @@ function AdminUsers() {
               </div>
               <div className="user-info">
                 <span className="user-name">{displayName}</span>
-                <span className="user-role">Administrator</span>
+                <span className="user-role">{currentUserRole}</span>
               </div>
               <ChevronDown size={14} className="profile-chevron" />
             </div>
@@ -857,21 +860,47 @@ function AdminUsers() {
                   <Users size={24} />
                 </div>
                 <div className="um-header-titles">
-                  <h1>User Management</h1>
+                  <h1>{isQAMember ? 'Team Directory & Users' : 'User Management'}</h1>
                   <p>
-                    Add and manage team members, departments, roles, and employee IDs. Control access and permissions across the QA workspace.
+                    {isQAMember
+                      ? 'Explore workspace team members, departments, roles, and employee contact details. QA Member directory mode active.'
+                      : 'Add and manage team members, departments, roles, and employee IDs. Control access and permissions across the QA workspace.'}
                   </p>
                 </div>
               </div>
 
-              <button
-                className="um-btn-create"
-                onClick={handleOpenCreateModal}
-              >
-                <Plus size={18} />
-                <span>Create User</span>
-              </button>
+              {!isQAMember && (
+                <button
+                  className="um-btn-create"
+                  onClick={handleOpenCreateModal}
+                >
+                  <Plus size={18} />
+                  <span>Create User</span>
+                </button>
+              )}
             </div>
+
+            {/* QA Member Read-Only Notice */}
+            {isQAMember && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                color: '#166534',
+                padding: '12px 18px',
+                borderRadius: '10px',
+                fontSize: '0.88rem',
+                fontWeight: '500',
+                marginBottom: '18px'
+              }}>
+                <ShieldCheck size={18} color="#16a34a" />
+                <span>
+                  <strong>QA Member Directory View:</strong> You have view-only access to inspect user profiles and contact info. User administration and role assignment are reserved for Managers.
+                </span>
+              </div>
+            )}
 
             {/* 4 Summary Stat Cards */}
             <div className="um-stats-grid">
@@ -1127,41 +1156,45 @@ function AdminUsers() {
                                 </button>
 
                                 {/* Edit Action */}
-                                {protectedAcc ? (
-                                  <button
-                                    className="um-btn-icon is-locked"
-                                    disabled
-                                    title="Protected system user cannot be edited"
-                                  >
-                                    <Lock size={14} />
-                                  </button>
-                                ) : (
-                                  <button
-                                    className="um-btn-icon"
-                                    title="Edit user"
-                                    onClick={() => openEditModal(user)}
-                                  >
-                                    <Pencil size={15} />
-                                  </button>
+                                {!isQAMember && (
+                                  protectedAcc ? (
+                                    <button
+                                      className="um-btn-icon is-locked"
+                                      disabled
+                                      title="Protected system user cannot be edited"
+                                    >
+                                      <Lock size={14} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="um-btn-icon"
+                                      title="Edit user"
+                                      onClick={() => openEditModal(user)}
+                                    >
+                                      <Pencil size={15} />
+                                    </button>
+                                  )
                                 )}
 
                                 {/* Delete / More Action */}
-                                {protectedAcc ? (
-                                  <button
-                                    className="um-btn-icon is-locked"
-                                    disabled
-                                    title="Protected system user cannot be deleted"
-                                  >
-                                    <Lock size={14} />
-                                  </button>
-                                ) : (
-                                  <button
-                                    className="um-btn-icon btn-delete"
-                                    title="Delete user"
-                                    onClick={() => setUserToDelete(user)}
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
+                                {!isQAMember && (
+                                  protectedAcc ? (
+                                    <button
+                                      className="um-btn-icon is-locked"
+                                      disabled
+                                      title="Protected system user cannot be deleted"
+                                    >
+                                      <Lock size={14} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="um-btn-icon btn-delete"
+                                      title="Delete user"
+                                      onClick={() => setUserToDelete(user)}
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  )
                                 )}
                               </div>
                             </td>

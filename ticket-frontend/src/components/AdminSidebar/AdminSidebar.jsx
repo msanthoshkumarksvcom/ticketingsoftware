@@ -31,6 +31,15 @@ const mainMenuNav = [
   { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
 
+export const QA_MEMBER_NAV = [
+  { label: 'Dashboard', to: '/qa-member', icon: LayoutDashboard, end: true },
+  { label: 'Projects', to: '/admin/projects', icon: FolderKanban },
+  { label: 'Users', to: '/admin/users', icon: Users, end: true },
+  { label: 'Tickets', to: '/admin/tickets', icon: Ticket },
+  { label: 'Reports', to: '/admin/reports', icon: BarChart3 },
+  { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
+];
+
 export const SmallCubeLogo = () => (
   <svg viewBox="0 0 100 100" className="sidebar-logo" aria-hidden="true">
     <g transform="translate(50, 50)">
@@ -46,10 +55,18 @@ function AdminSidebar({
   onLogout,
   defaultCollapsed = false,
   hasConnectionError = false,
-  homeRoute = '/admin',
-  workspaceRole = 'Admin console',
-  navItems = mainMenuNav
+  homeRoute,
+  workspaceRole,
+  navItems
 }) {
+  const currentRole = typeof window !== 'undefined' ? (window.localStorage.getItem('userRole') || '') : '';
+  const isQAMember = currentRole === 'QA Member';
+
+  const effectiveHomeRoute = homeRoute || (isQAMember ? '/qa-member' : '/admin');
+  const effectiveWorkspaceRole = workspaceRole || (isQAMember ? 'QA Member console' : 'Admin console');
+  const effectiveNavItems = (navItems && navItems !== mainMenuNav)
+    ? navItems
+    : (isQAMember ? QA_MEMBER_NAV : mainMenuNav);
   const [collapsed, setCollapsed] = useState(() => {
     const savedState = window.localStorage.getItem('workspaceSidebarCollapsed');
     return defaultCollapsed || (savedState !== null
@@ -99,7 +116,7 @@ function AdminSidebar({
         id="workspace-sidebar"
       >
         <div className="sidebar-brand-row">
-          <Link className="sidebar-brand" to={homeRoute} aria-label="QA Software dashboard">
+          <Link className="sidebar-brand" to={effectiveHomeRoute} aria-label="QA Software dashboard">
             <SmallCubeLogo />
             <div className="brand-text-col">
               <span className="brand-name"><span>QA</span> Software</span>
@@ -132,7 +149,7 @@ function AdminSidebar({
 
         <div className="sidebar-section-label">MAIN MENU</div>
         <nav className="sidebar-nav" aria-label="Main navigation">
-          {navItems.map(({ label, to, icon: Icon, end }) => (
+          {effectiveNavItems.map(({ label, to, icon: Icon, end }) => (
             <NavLink
               className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
               end={end}
@@ -155,7 +172,7 @@ function AdminSidebar({
             <div className="workspace-card-icon"><Activity size={17} /></div>
             <div>
               <strong>QA Workspace</strong>
-              <span>{workspaceRole}</span>
+              <span>{effectiveWorkspaceRole}</span>
             </div>
             <span className={`connection-dot${hasConnectionError ? ' connection-dot-error' : ''}`} />
           </div>

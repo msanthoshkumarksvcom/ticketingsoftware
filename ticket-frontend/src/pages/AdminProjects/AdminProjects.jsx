@@ -200,6 +200,8 @@ function AdminProjects() {
   // User Profile
   const [userEmail] = useState(() => localStorage.getItem('userEmail') || 'admin1@gmail.com');
   const displayName = userEmail ? userEmail.split('@')[0] : 'admin1';
+  const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
+  const isQAMember = currentUserRole === 'QA Member';
 
   // Fetch projects from backend
   const fetchProjects = useCallback(async () => {
@@ -597,7 +599,7 @@ function AdminProjects() {
               <div className="pj-profile-avatar">A</div>
               <div className="pj-profile-text">
                 <span className="pj-profile-name">{displayName}</span>
-                <span className="pj-profile-role">Administrator</span>
+                <span className="pj-profile-role">{currentUserRole}</span>
               </div>
               <ChevronDown size={14} className="pj-profile-chevron" />
             </div>
@@ -666,12 +668,36 @@ function AdminProjects() {
               </button>
 
               {/* + Create Project Primary Button */}
-              <button className="pj-btn-create-primary" onClick={openCreateModal}>
-                <Plus size={18} strokeWidth={2.5} />
-                <span>Create Project</span>
-              </button>
+              {!isQAMember && (
+                <button className="pj-btn-create-primary" onClick={openCreateModal}>
+                  <Plus size={18} strokeWidth={2.5} />
+                  <span>Create Project</span>
+                </button>
+              )}
             </div>
           </section>
+
+          {/* QA Member Projects Notice */}
+          {isQAMember && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              color: '#166534',
+              padding: '12px 18px',
+              borderRadius: '10px',
+              fontSize: '0.88rem',
+              fontWeight: '500',
+              marginBottom: '16px'
+            }}>
+              <span>📁</span>
+              <span>
+                <strong>QA Projects Access:</strong> You can inspect project details, review test suites, and open execution sheets. Creating and deleting projects is managed by Leads and Managers.
+              </span>
+            </div>
+          )}
 
           {/* 2. Secondary Filter & Search Bar */}
           <section className="pj-filter-controls-row">
@@ -860,10 +886,10 @@ function AdminProjects() {
                           <div className="pj-dropdown-menu">
                             <button
                               className="pj-dropdown-item"
-                              onClick={() => openEditModal(project)}
+                              onClick={() => openProjectWorkspace(project)}
                             >
-                              <Edit2 size={14} />
-                              <span>Edit Details</span>
+                              <Folder size={14} />
+                              <span>View Workspace</span>
                             </button>
                             <button
                               className="pj-dropdown-item"
@@ -872,20 +898,31 @@ function AdminProjects() {
                               <FileSpreadsheet size={14} />
                               <span>Open Sheet Module</span>
                             </button>
-                            <button
-                              className="pj-dropdown-item"
-                              onClick={() => handleToggleStatus(project)}
-                            >
-                              <PlayCircle size={14} />
-                              <span>Change Status</span>
-                            </button>
-                            <button
-                              className="pj-dropdown-item danger"
-                              onClick={() => handleDeleteProject(project.id)}
-                            >
-                              <Trash2 size={14} />
-                              <span>Delete</span>
-                            </button>
+                            {!isQAMember && (
+                              <>
+                                <button
+                                  className="pj-dropdown-item"
+                                  onClick={() => openEditModal(project)}
+                                >
+                                  <Edit2 size={14} />
+                                  <span>Edit Details</span>
+                                </button>
+                                <button
+                                  className="pj-dropdown-item"
+                                  onClick={() => handleToggleStatus(project)}
+                                >
+                                  <PlayCircle size={14} />
+                                  <span>Change Status</span>
+                                </button>
+                                <button
+                                  className="pj-dropdown-item danger"
+                                  onClick={() => handleDeleteProject(project.id)}
+                                >
+                                  <Trash2 size={14} />
+                                  <span>Delete</span>
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1022,14 +1059,16 @@ function AdminProjects() {
                           >
                             <FileSpreadsheet size={15} />
                           </button>
-                          <button
-                            className="pj-btn-more"
-                            style={{ display: 'inline-flex' }}
-                            onClick={() => openEditModal(project)}
-                            title="Edit"
-                          >
-                            <Edit2 size={15} />
-                          </button>
+                          {!isQAMember && (
+                            <button
+                              className="pj-btn-more"
+                              style={{ display: 'inline-flex' }}
+                              onClick={() => openEditModal(project)}
+                              title="Edit"
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

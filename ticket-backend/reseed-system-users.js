@@ -77,6 +77,17 @@ const reseedSystem = async () => {
         phone: '+1 (555) 014-9922',
         status: 'Active',
         created_at: new Date('2026-10-08T09:30:00Z')
+      },
+      {
+        emp_id: 'EMP-003',
+        full_name: 'QA Member',
+        email: 'qamember@gmail.com',
+        password: systemPasswordHash,
+        department: 'Quality Assurance',
+        role: 'QA Member',
+        phone: '+1 (555) 017-4321',
+        status: 'Active',
+        created_at: new Date('2026-10-08T10:00:00Z')
       }
     ];
 
@@ -95,7 +106,7 @@ const reseedSystem = async () => {
         [u.emp_id, u.full_name, u.email, u.password, u.department, u.role, u.phone, u.status, u.created_at]
       );
     }
-    console.log('Seeded manager@gmail.com and qalead@gmail.com successfully.');
+    console.log('Seeded manager@gmail.com, qalead@gmail.com, and qamember@gmail.com successfully.');
 
     // 5. Update Roles Table with the 5 required roles
     await pool.query(`

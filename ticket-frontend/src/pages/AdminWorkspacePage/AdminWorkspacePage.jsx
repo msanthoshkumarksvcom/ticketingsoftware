@@ -163,7 +163,7 @@ function AdminWorkspacePage({ section }) {
               <div className="avatar">{displayName.charAt(0).toUpperCase()}</div>
               <div className="user-info">
                 <span className="user-name">{displayName}</span>
-                <span className="user-role">Administrator</span>
+                <span className="user-role">{localStorage.getItem('userRole') || 'Administrator'}</span>
               </div>
             </div>
           </div>
