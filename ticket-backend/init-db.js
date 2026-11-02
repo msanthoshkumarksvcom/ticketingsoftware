@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import pool from './db.js';
 
 export const initDatabase = async () => {
@@ -129,6 +130,88 @@ export const initDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // ========================================
+    // AUTO-SEED: Default system users on first boot
+    // Only inserts if no users exist yet (fresh database)
+    // ========================================
+    const userCount = await pool.query('SELECT COUNT(*) FROM users');
+    if (parseInt(userCount.rows[0].count, 10) === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const systemUsers = [
+        {
+          emp_id: 'EMP-001',
+          full_name: 'Manager',
+          email: 'manager@gmail.com',
+          password: 'Kanavu@123',
+          department: 'Quality Assurance',
+          role: 'Manager',
+          status: 'Active'
+        },
+        {
+          emp_id: 'EMP-002',
+          full_name: 'QA Lead',
+          email: 'qalead@gmail.com',
+          password: 'Kanavu@123',
+          department: 'Quality Assurance',
+          role: 'QA Lead',
+          status: 'Active'
+        }
+      ];
+
+      for (const u of systemUsers) {
+        const hashedPassword = await bcrypt.hash(u.password, salt);
+        await pool.query(
+          `INSERT INTO users (emp_id, full_name, email, password, department, role, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (email) DO NOTHING;`,
+          [u.emp_id, u.full_name, u.email, hashedPassword, u.department, u.role, u.status]
+        );
+      }
+      console.log('Auto-seeded default system users: manager@gmail.com, qalead@gmail.com');
+    }
+
+    // AUTO-SEED: Default roles on first boot
+    const roleCount = await pool.query('SELECT COUNT(*) FROM roles');
+    if (parseInt(roleCount.rows[0].count, 10) === 0) {
+      const standardRoles = [
+        {
+          role_name: 'Manager',
+          description: 'Complete workspace administration, team management, project governance, and system security controls',
+          permissions: ['manage_users', 'manage_projects', 'manage_roles', 'view_reports', 'manage_tickets', 'approve_deployments']
+        },
+        {
+          role_name: 'QA Lead',
+          description: 'Oversees test strategies, test runs, sprint ticket approvals, and production release sign-offs',
+          permissions: ['manage_tickets', 'view_reports', 'manage_projects', 'approve_deployments']
+        },
+        {
+          role_name: 'QA Member',
+          description: 'Executes manual and automated test cases, logs bug reports, and verifies defect fixes',
+          permissions: ['manage_tickets', 'view_reports']
+        },
+        {
+          role_name: 'Developer',
+          description: 'Investigates assigned defect tickets, develops code fixes, and submits fixes for QA verification',
+          permissions: ['manage_tickets']
+        },
+        {
+          role_name: 'Project Lead',
+          description: 'Directs roadmap execution, sprint velocity, cross-department ticket triage, and delivery milestones',
+          permissions: ['manage_projects', 'manage_tickets', 'view_reports']
+        }
+      ];
+
+      for (const r of standardRoles) {
+        await pool.query(
+          `INSERT INTO roles (role_name, description, permissions)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (role_name) DO NOTHING;`,
+          [r.role_name, r.description, r.permissions]
+        );
+      }
+      console.log('Auto-seeded default roles: Manager, QA Lead, QA Member, Developer, Project Lead');
+    }
 
     console.log('Database tables verified and initialized successfully.');
   } catch (error) {

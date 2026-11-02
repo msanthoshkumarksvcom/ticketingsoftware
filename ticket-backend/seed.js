@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import pool from './db.js';
 
-const seedUsers = async () => {
-  const usersToSeed = [
+const seedSystemUsers = async () => {
+  const systemUsers = [
     {
       emp_id: 'EMP-001',
       full_name: 'Manager',
@@ -20,41 +20,13 @@ const seedUsers = async () => {
       department: 'Quality Assurance',
       role: 'QA Lead',
       status: 'Active'
-    },
-    {
-      emp_id: 'EMP-003',
-      full_name: 'QA Member',
-      email: 'qamember@gmail.com',
-      password: 'Kanavu@123',
-      department: 'Quality Assurance',
-      role: 'QA Member',
-      status: 'Active'
     }
   ];
 
   try {
-    // 1. Ensure the users table exists
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        emp_id VARCHAR(50) UNIQUE,
-        full_name VARCHAR(150),
-        department VARCHAR(100),
-        role VARCHAR(50) DEFAULT 'QA Member',
-        phone VARCHAR(30),
-        status VARCHAR(20) DEFAULT 'Active'
-      );
-    `);
-
-    // Remove legacy admin accounts if present
-    await pool.query(`DELETE FROM users WHERE email IN ('admin1@gmail.com', 'admin@gmail.com')`);
-
     const salt = await bcrypt.genSalt(10);
 
-    for (const u of usersToSeed) {
+    for (const u of systemUsers) {
       const hashedPassword = await bcrypt.hash(u.password, salt);
       await pool.query(
         `INSERT INTO users (emp_id, full_name, email, password, department, role, status)
@@ -67,7 +39,7 @@ const seedUsers = async () => {
         [u.emp_id, u.full_name, u.email, hashedPassword, u.department, u.role, u.status]
       );
     }
-    console.log('Inbuilt system accounts (manager@gmail.com, qalead@gmail.com, qamember@gmail.com) created or updated.');
+    console.log('System accounts (manager@gmail.com, qalead@gmail.com) created or updated.');
   } catch (error) {
     console.error('Error seeding database:', error);
     process.exitCode = 1;
@@ -76,4 +48,4 @@ const seedUsers = async () => {
   }
 };
 
-seedUsers();
+seedSystemUsers();
