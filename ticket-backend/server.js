@@ -618,6 +618,7 @@ const generateDefaultSheets = (project) => {
         { id: 'col_steps', label: 'Test Steps / Precondition', width: 280, type: 'text' },
         { id: 'col_expected', label: 'Expected Result', width: 240, type: 'text' },
         { id: 'col_status', label: 'Status', width: 130, type: 'status' },
+        { id: 'col_screenshot', label: 'Screenshot / Proof', width: 170, type: 'image' },
         { id: 'col_assigned', label: 'Assigned QA', width: 160, type: 'text' },
         { id: 'col_date', label: 'Execution Date', width: 130, type: 'date' }
       ],
@@ -787,7 +788,7 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
 
     // 2. Fetch existing sheets
     const sheetsRes = await pool.query(
-      'SELECT id, project_id, sheet_name, columns, rows, created_at, updated_at FROM project_sheets WHERE project_id = $1 ORDER BY id ASC',
+      'SELECT id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at FROM project_sheets WHERE project_id = $1 ORDER BY id ASC',
       [id]
     );
 
@@ -804,10 +805,10 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
 
     for (const sheet of defaultSheets) {
       const insertRes = await pool.query(
-        `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, updated_at)
-         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-         RETURNING id, project_id, sheet_name, columns, rows, created_at, updated_at`,
-        [id, sheet.sheet_name, JSON.stringify(sheet.columns), JSON.stringify(sheet.rows)]
+        `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, formatting, updated_at)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+         RETURNING id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at`,
+        [id, sheet.sheet_name, JSON.stringify(sheet.columns), JSON.stringify(sheet.rows), JSON.stringify(sheet.formatting || {})]
       );
       createdSheets.push(insertRes.rows[0]);
     }
@@ -836,7 +837,7 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
   }
 
   const { id } = req.params;
-  const { sheet_name, columns, rows } = req.body;
+  const { sheet_name, columns, rows, formatting } = req.body;
 
   const finalName = sheet_name?.trim() || 'New Sheet';
   const defaultCols = columns && Array.isArray(columns) && columns.length > 0 ? columns : [
@@ -851,10 +852,10 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
 
   try {
     const insertRes = await pool.query(
-      `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, updated_at)
-       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-       RETURNING id, project_id, sheet_name, columns, rows, created_at, updated_at`,
-      [id, finalName, JSON.stringify(defaultCols), JSON.stringify(defaultRows)]
+      `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, formatting, updated_at)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+       RETURNING id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at`,
+      [id, finalName, JSON.stringify(defaultCols), JSON.stringify(defaultRows), JSON.stringify(formatting || {})]
     );
 
     res.status(201).json(insertRes.rows[0]);
@@ -878,7 +879,7 @@ app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
   }
 
   const { id, sheetId } = req.params;
-  const { sheet_name, columns, rows } = req.body;
+  const { sheet_name, columns, rows, formatting } = req.body;
 
   try {
     const existing = await pool.query(
@@ -895,13 +896,15 @@ app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
         sheet_name = COALESCE($1, sheet_name),
         columns = COALESCE($2, columns),
         rows = COALESCE($3, rows),
+        formatting = COALESCE($4, formatting),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 AND project_id = $5
-       RETURNING id, project_id, sheet_name, columns, rows, created_at, updated_at`,
+       WHERE id = $5 AND project_id = $6
+       RETURNING id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at`,
       [
         sheet_name !== undefined ? sheet_name.trim() : null,
         columns !== undefined ? JSON.stringify(columns) : null,
         rows !== undefined ? JSON.stringify(rows) : null,
+        formatting !== undefined ? JSON.stringify(formatting) : null,
         sheetId,
         id
       ]

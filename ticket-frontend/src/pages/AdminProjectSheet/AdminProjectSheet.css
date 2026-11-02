@@ -1,14 +1,29 @@
 /* ==========================================================================
-   AdminProjectSheet.css - Dedicated Project Sheet Workspace
-   Full Google Sheets / Excel Application UI for QA Projects
+   AdminProjectSheet.css - Google Sheets-Style Project Spreadsheet Workspace
+   Authentic Google Sheets UI, Multi-Sheet Tabs Engine, Row/Col Copy & Paste
    ========================================================================== */
+
+:root {
+  --gs-green: #0F9D58;
+  --gs-green-dark: #0b8043;
+  --gs-blue: #1a73e8;
+  --gs-blue-hover: #1765cc;
+  --gs-blue-light: #e8f0fe;
+  --gs-blue-tint: rgba(26, 115, 232, 0.09);
+  --gs-border: #dadce0;
+  --gs-header-bg: #f8f9fa;
+  --gs-toolbar-bg: #edf2fa;
+  --gs-text: #202124;
+  --gs-text-muted: #5f6368;
+}
 
 .pjs-layout {
   display: flex;
   min-height: 100vh;
-  background-color: #f8fafc;
+  background-color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  color: #0f172a;
+  color: var(--gs-text);
+  overflow: hidden;
 }
 
 .pjs-main {
@@ -18,350 +33,774 @@
   min-width: 0;
   height: 100vh;
   overflow: hidden;
+  outline: none;
+  background: #ffffff;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   1. Header Bar
+   1. Google Sheets App Header Bar
    ────────────────────────────────────────────────────────────────────────── */
 .pjs-header {
-  height: 64px;
+  height: 60px;
   background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--gs-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 16px;
   gap: 16px;
   flex-shrink: 0;
+  user-select: none;
 }
 
 .pjs-header-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .pjs-back-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  color: #334155;
-  font-size: 13px;
+  background: #f1f3f4;
+  border: 1px solid var(--gs-border);
+  color: var(--gs-text);
+  font-size: 12px;
   font-weight: 600;
-  padding: 7px 12px;
-  border-radius: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .pjs-back-btn:hover {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: #e8eaed;
+  color: #000000;
 }
 
-.pjs-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.pjs-breadcrumb-curr {
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.pjs-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.pjs-proj-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  padding: 6px 12px;
-  border-radius: 8px;
-}
-
-.pjs-proj-code {
-  font-weight: 800;
-  color: #1d4ed8;
-  font-size: 12px;
-}
-
-.pjs-proj-title {
-  font-weight: 600;
-  color: #1e293b;
-  font-size: 13px;
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
-   2. Google Sheets Menu & Ribbon Bar
-   ────────────────────────────────────────────────────────────────────────── */
-.pjs-ribbon-bar {
+.pjs-back-btn.pjs-back-btn-secondary {
   background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
+  border-color: #dadce0;
+  color: #3c4043;
 }
 
-.pjs-menu-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 16px 4px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 12.5px;
+.pjs-back-btn.pjs-back-btn-secondary:hover {
+  background: #f8f9fa;
+  color: #1a73e8;
+  border-color: #1a73e8;
 }
 
-.pjs-menu-items {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.pjs-menu-item {
-  padding: 4px 8px;
-  border-radius: 4px;
-  color: #334155;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.15s ease;
-}
-
-.pjs-menu-item:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.pjs-cloud-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #059669;
-}
-
-.pjs-cloud-status.saving {
-  color: #d97706;
-}
-
-/* Tool buttons ribbon */
-.pjs-toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 16px;
-  background: #f8fafc;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.pjs-toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pjs-tool-btn {
-  width: 32px;
-  height: 30px;
+.pjs-gsheets-logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #475569;
+  padding: 4px;
   border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.pjs-gsheets-logo:hover {
+  background: #e6f4ea;
+}
+
+.pjs-doc-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pjs-doc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pjs-doc-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gs-text);
+  line-height: 1.2;
+}
+
+.pjs-doc-pill {
+  font-size: 11px;
+  font-weight: 700;
+  background: #e8f0fe;
+  color: var(--gs-blue);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.pjs-cloud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--gs-text-muted);
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.pjs-cloud-pill.saving {
+  color: #e8710a;
+}
+
+.pjs-cloud-pill.saved {
+  color: #137333;
+}
+
+/* Google Sheets Menus (File, Edit, View, Insert, Format, Data) */
+.pjs-menu-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 1px;
+}
+
+.pjs-menu-item-wrap {
+  position: relative;
+}
+
+.pjs-menu-item-btn {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: #3c4043;
+  padding: 2px 6px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.12s;
 }
 
-.pjs-tool-btn:hover {
-  background: #e2e8f0;
-  color: #0f172a;
+.pjs-menu-item-btn:hover,
+.pjs-menu-item-btn.active {
+  background: #f1f3f4;
+  color: #202124;
 }
 
-.pjs-tool-btn.active {
-  background: #e0f2fe;
-  color: #0284c7;
-  border-color: #bae6fd;
+/* Dropdown Menu (Google Sheets style) */
+.pjs-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  min-width: 200px;
+  padding: 6px 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
 }
 
-.pjs-tool-divider {
-  width: 1px;
-  height: 20px;
-  background: #cbd5e1;
-  margin: 0 4px;
+.pjs-dropdown-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: var(--gs-text);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
 }
 
-.pjs-action-pill-btn {
+.pjs-dropdown-opt:hover {
+  background: #f1f3f4;
+}
+
+.pjs-dropdown-opt.danger {
+  color: #d93025;
+}
+
+.pjs-dropdown-opt.danger:hover {
+  background: #fce8e6;
+}
+
+.pjs-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--gs-text-muted);
+}
+
+.pjs-dropdown-divider {
+  height: 1px;
+  background: var(--gs-border);
+  margin: 4px 0;
+}
+
+/* Header Right */
+.pjs-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pjs-header-stat-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  background: #f8f9fa;
+  border: 1px solid var(--gs-border);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  color: var(--gs-text);
+}
+
+.pjs-header-stat-chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pjs-header-stat-chip .dot.pass {
+  background: var(--gs-green);
+}
+
+.pjs-header-stat-chip .dot.fail {
+  background: #d93025;
+}
+
+.pjs-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #c2e7ff;
+  border: none;
+  color: #001d35;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 18px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.pjs-action-pill-btn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.pjs-action-pill-btn.primary {
-  background: #2563eb;
-  border-color: #1d4ed8;
-  color: #ffffff;
-}
-
-.pjs-action-pill-btn.primary:hover {
-  background: #1d4ed8;
-}
-
-.pjs-action-pill-btn.success {
-  background: #107c41;
-  border-color: #0e6b37;
-  color: #ffffff;
-}
-
-.pjs-action-pill-btn.success:hover {
-  background: #0e6b37;
+.pjs-share-btn:hover {
+  background: #b3defa;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   3. Formula Bar (fx)
+   2. Google Sheets Action Toolbar
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 12px;
+  background: var(--gs-toolbar-bg);
+  border-bottom: 1px solid var(--gs-border);
+  flex-shrink: 0;
+  user-select: none;
+  overflow-x: auto;
+}
+
+.pjs-tb-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #444746;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+
+.pjs-tb-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1f1f1f;
+}
+
+.pjs-tb-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pjs-tb-btn.active {
+  background: #d3e3fd;
+  color: #041e49;
+  border-color: #a8c7fa;
+}
+
+.pjs-tb-btn.danger:hover {
+  background: #fce8e6;
+  color: #d93025;
+}
+
+.pjs-tb-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gs-text);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.pjs-tb-pill-btn:hover {
+  background: #f1f3f4;
+  border-color: #bdc1c6;
+}
+
+.pjs-tb-divider {
+  width: 1px;
+  height: 18px;
+  background: #c4c7c5;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.pjs-tb-select {
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 12px;
+  color: #444746;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  height: 28px;
+}
+
+.pjs-tb-select:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Font Family Dropdown */
+.pjs-tb-font-select {
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  font-size: 12px;
+  color: #202124;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  height: 28px;
+  max-width: 130px;
+  font-weight: 500;
+  transition: all 0.12s;
+}
+
+.pjs-tb-font-select:hover {
+  background: #f1f3f4;
+  border-color: #bdc1c6;
+}
+
+/* Font Size Controls Group (- [size] +) */
+.pjs-tb-font-size-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  border-radius: 4px;
+  padding: 1px;
+  height: 28px;
+  box-sizing: border-box;
+}
+
+.pjs-tb-size-btn {
+  width: 22px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 3px;
+  color: #444746;
+  padding: 0;
+}
+
+.pjs-tb-size-btn:hover {
+  background: #e8eaed;
+  color: #1f1f1f;
+}
+
+.pjs-tb-size-select {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #202124;
+  padding: 0 4px;
+  height: 24px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Color Picker Trigger & Popover */
+.pjs-color-picker-wrap {
+  position: relative;
+}
+
+.pjs-tb-color-trigger {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.pjs-color-bar {
+  width: 14px;
+  height: 3px;
+  border-radius: 1px;
+  margin-top: 1px;
+}
+
+.pjs-color-palette-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 216px;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  padding: 10px;
+  border-radius: 8px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pjs-palette-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pjs-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+
+.pjs-palette-swatch {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 0;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.pjs-palette-swatch:hover {
+  transform: scale(1.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  z-index: 2;
+}
+
+.pjs-palette-swatch.selected {
+  outline: 2px solid var(--gs-blue);
+  outline-offset: 1px;
+}
+
+.pjs-palette-reset-btn {
+  background: #f1f3f4;
+  border: 1px solid #dadce0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #3c4043;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.12s;
+}
+
+.pjs-palette-reset-btn:hover {
+  background: #e8eaed;
+  color: #1f1f1f;
+}
+
+/* Search in Toolbar */
+.pjs-tb-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  border-radius: 16px;
+  padding: 3px 10px;
+  height: 26px;
+  margin-left: auto;
+}
+
+.pjs-tb-search input {
+  border: none;
+  outline: none;
+  font-size: 11.5px;
+  width: 130px;
+  background: transparent;
+  color: var(--gs-text);
+}
+
+.pjs-tb-search-clear {
+  background: transparent;
+  border: none;
+  color: var(--gs-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3. Google Sheets Formula Bar
    ────────────────────────────────────────────────────────────────────────── */
 .pjs-formula-bar {
   display: flex;
   align-items: center;
   background: #ffffff;
-  border-bottom: 1px solid #cbd5e1;
-  padding: 4px 16px;
+  border-bottom: 1px solid var(--gs-border);
+  padding: 3px 12px;
   gap: 8px;
   flex-shrink: 0;
+  height: 32px;
 }
 
-.pjs-cell-ref-box {
-  width: 60px;
-  height: 28px;
+.pjs-name-box {
+  min-width: 65px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #1e293b;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  border-radius: 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #3c4043;
   font-family: monospace;
+  padding: 0 6px;
+  user-select: none;
 }
 
 .pjs-fx-icon {
   font-size: 13px;
   font-style: italic;
-  font-weight: 800;
-  color: #64748b;
+  font-weight: 700;
+  color: #70757a;
   user-select: none;
-  padding: 0 4px;
+  width: 18px;
+  text-align: center;
 }
 
-.pjs-formula-text {
+.pjs-formula-input {
   flex: 1;
-  height: 28px;
-  border: 1px solid transparent;
-  padding: 0 10px;
-  font-size: 13px;
-  color: #0f172a;
+  height: 24px;
+  border: none;
   outline: none;
-  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--gs-text);
+  background: transparent;
+  padding: 0 4px;
   font-family: inherit;
-  background: #ffffff;
 }
 
-.pjs-formula-text:focus {
-  border-color: #2563eb;
-  background: #fafcff;
+.pjs-formula-input:focus {
+  background: #f8fbff;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   4. Spreadsheet Grid
+   4. Google Sheets Spreadsheet Grid
    ────────────────────────────────────────────────────────────────────────── */
 .pjs-grid-viewport {
   flex: 1;
   overflow: auto;
   background: #ffffff;
   position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: #bdc1c6 #f1f3f4;
 }
 
 .pjs-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 12.5px;
+  font-size: 12px;
+  user-select: none;
 }
 
-/* Column Letter Row (A, B, C...) */
+/* Corner Select All Box (#) */
+.pjs-select-all-cell {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  background: #f8f9fa;
+  border: 1px solid var(--gs-border);
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 25;
+  text-align: center;
+}
+
+.pjs-select-all-cell:hover {
+  background: #e8f0fe;
+}
+
+.pjs-select-all-cell.active {
+  background: var(--gs-blue) !important;
+}
+
+.pjs-select-all-cell.active .pjs-select-all-triangle {
+  border-bottom-color: #ffffff !important;
+}
+
+/* Entire Sheet Select All Highlights */
+.pjs-col-letter-th.all-selected {
+  background: #d3e3fd !important;
+  color: #041e49 !important;
+  border-color: #a8c7fa !important;
+}
+
+.pjs-row-number-td.all-selected {
+  background: #d3e3fd !important;
+  color: #041e49 !important;
+  border-color: #a8c7fa !important;
+}
+
+.pjs-cell.all-selected-cell {
+  background-color: #e8f0fe !important;
+  border-color: #bad3fb !important;
+}
+
+.pjs-select-all-triangle {
+  width: 0;
+  height: 0;
+  border-bottom: 7px solid #70757a;
+  border-left: 7px solid transparent;
+  margin: 0 auto;
+}
+
+/* Column Letter Headers (A, B, C...) */
 .pjs-col-letter-row th {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #f8f9fa;
+  color: #5f6368;
   font-size: 11px;
   font-weight: 700;
   text-align: center;
-  padding: 4px 6px;
-  border: 1px solid #cbd5e1;
+  padding: 3px 6px;
+  border: 1px solid var(--gs-border);
   letter-spacing: 0.5px;
-  user-select: none;
   position: sticky;
   top: 0;
-  z-index: 12;
+  z-index: 15;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.pjs-col-letter-th:hover {
+  background: #ebeef2;
+  color: #202124;
+}
+
+/* Selected Column Header */
+.pjs-col-letter-th.selected {
+  background: var(--gs-blue) !important;
+  color: #ffffff !important;
+  border-color: var(--gs-blue-hover) !important;
+}
+
+/* Copied Column Outline */
+.pjs-col-letter-th.copied {
+  border: 2px dashed var(--gs-blue) !important;
+}
+
+.pjs-col-letter-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.pjs-col-menu-arrow {
+  position: absolute;
+  right: 0;
+  opacity: 0;
+  padding: 1px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.pjs-col-letter-th:hover .pjs-col-menu-arrow {
+  opacity: 1;
 }
 
 /* Column Name Row */
 .pjs-col-name-row th {
-  background: #f8fafc;
-  color: #1e293b;
-  font-size: 12px;
-  font-weight: 700;
+  background: #ffffff;
+  color: #3c4043;
+  font-size: 11.5px;
+  font-weight: 600;
   text-align: left;
-  padding: 8px 10px;
-  border: 1px solid #cbd5e1;
+  padding: 6px 8px;
+  border: 1px solid var(--gs-border);
   position: sticky;
-  top: 26px;
-  z-index: 11;
-  user-select: none;
+  top: 24px;
+  z-index: 14;
   white-space: nowrap;
+}
+
+.pjs-row-header-th {
+  background: #f8f9fa !important;
+  color: #70757a !important;
+  text-align: center !important;
+  font-size: 10px !important;
+  position: sticky;
+  left: 0;
+  z-index: 20;
 }
 
 .pjs-col-header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 4px;
+}
+
+.pjs-col-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pjs-col-del-btn {
   opacity: 0;
   background: transparent;
   border: none;
-  color: #ef4444;
+  color: #d93025;
   cursor: pointer;
-  padding: 2px;
+  padding: 1px;
   border-radius: 3px;
 }
 
@@ -369,70 +808,124 @@
   opacity: 1;
 }
 
-.pjs-row-num-cell {
-  width: 48px;
-  min-width: 48px;
-  max-width: 48px;
-  background: #f1f5f9;
-  color: #64748b;
+/* Row Number Headers (1, 2, 3...) */
+.pjs-row-number-td {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  background: #f8f9fa;
+  color: #5f6368;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
-  border: 1px solid #cbd5e1;
-  user-select: none;
+  border: 1px solid var(--gs-border);
+  position: sticky;
+  left: 0;
+  z-index: 10;
   cursor: pointer;
+  transition: background 0.1s;
 }
 
-.pjs-row.selected .pjs-row-num-cell {
-  background: #bfdbfe;
-  color: #1e40af;
+.pjs-row-number-td:hover {
+  background: #ebeef2;
+  color: #202124;
+}
+
+/* Selected Row Header */
+.pjs-row-number-td.selected {
+  background: var(--gs-blue) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+/* Row and Column Selection Highlight Washes */
+.pjs-cell.row-highlight {
+  background: var(--gs-blue-tint) !important;
+  border-top-color: #a8c7fa !important;
+  border-bottom-color: #a8c7fa !important;
+}
+
+.pjs-cell.col-highlight {
+  background: var(--gs-blue-tint) !important;
+  border-left-color: #a8c7fa !important;
+  border-right-color: #a8c7fa !important;
+}
+
+/* Fail status conditional formatting - entire row colored red */
+.pjs-row.row-status-fail .pjs-row-number-td {
+  background: #fce8e6 !important;
+  color: #c5221f !important;
+  font-weight: 700 !important;
+  border-left: 3px solid #d93025 !important;
+}
+
+.pjs-row.row-status-fail .pjs-cell,
+.pjs-cell.fail-row-cell {
+  background-color: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+}
+
+.pjs-row.row-status-fail:hover .pjs-cell {
+  background-color: #fecaca !important;
+}
+
+.pjs-row.row-status-fail .pjs-cell.row-highlight {
+  background-color: #fca5a5 !important;
+}
+
+.pjs-row.row-status-fail .pjs-cell.active {
+  background-color: #ffffff !important;
+  outline: 2px solid var(--gs-blue) !important;
+}
+
+/* Copied Row Indicator */
+.pjs-row.row-copied .pjs-cell {
+  border-top: 1px dashed var(--gs-blue) !important;
+  border-bottom: 1px dashed var(--gs-blue) !important;
 }
 
 /* Grid Cells */
 .pjs-cell {
   position: relative;
   padding: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e1e3e1;
   background: #ffffff;
-  height: 38px;
+  height: 30px;
   vertical-align: middle;
   outline: none;
 }
 
-.pjs-row:hover .pjs-cell {
-  background: #f8fbff;
-}
-
 .pjs-cell.active {
-  outline: 2px solid #1a73e8 !important;
+  outline: 2px solid var(--gs-blue) !important;
   outline-offset: -2px;
-  z-index: 5;
+  z-index: 8;
   background: #ffffff !important;
 }
 
-.pjs-cell.active::after {
-  content: '';
+/* Authentic Google Sheets Bottom-Right Cell Handle */
+.pjs-cell-handle {
   position: absolute;
   right: -3px;
   bottom: -3px;
   width: 6px;
   height: 6px;
-  background: #1a73e8;
+  background: var(--gs-blue);
   border: 1px solid #ffffff;
   cursor: crosshair;
-  z-index: 6;
+  z-index: 9;
 }
 
 .pjs-cell-content {
   width: 100%;
   height: 100%;
-  padding: 6px 10px;
+  padding: 4px 8px;
   display: flex;
   align-items: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   box-sizing: border-box;
+  font-size: 12px;
 }
 
 .pjs-cell-editor {
@@ -441,9 +934,9 @@
   border: none;
   outline: none;
   background: #ffffff;
-  padding: 6px 10px;
-  font-size: 12.5px;
-  color: #0f172a;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--gs-text);
   box-sizing: border-box;
   font-family: inherit;
 }
@@ -454,546 +947,950 @@
   border: none;
   outline: none;
   background: #ffffff;
-  padding: 4px 6px;
-  font-size: 12px;
-  color: #0f172a;
+  padding: 2px 4px;
+  font-size: 11.5px;
+  color: var(--gs-text);
   box-sizing: border-box;
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
 }
 
-/* Status Chips inside cell */
+/* Status Chips */
 .pjs-status-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 9999px;
-  font-size: 11px;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 10.5px;
   font-weight: 700;
 }
 
 .pjs-status-chip.pass {
-  background: #dcfce7;
-  color: #15803d;
+  background: #ceead6;
+  color: #0d652d;
 }
 
 .pjs-status-chip.fail {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #fad2cf;
+  color: #a50e0e;
 }
 
 .pjs-status-chip.blocked {
-  background: #ffedd5;
-  color: #c2410c;
+  background: #feefe3;
+  color: #b06000;
 }
 
 .pjs-status-chip.inprogress {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #d2e3fc;
+  color: #174ea6;
 }
 
 .pjs-status-chip.untested {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #f1f3f4;
+  color: #5f6368;
 }
 
 /* Priority Chips */
 .pjs-priority-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
 }
 
 .pjs-priority-chip.critical {
-  background: #fef2f2;
-  color: #ef4444;
-  border: 1px solid #fecaca;
+  background: #fce8e6;
+  color: #c5221f;
 }
 
 .pjs-priority-chip.high {
-  background: #fff7ed;
-  color: #ea580c;
-  border: 1px solid #fed7aa;
+  background: #feefe3;
+  color: #c26401;
 }
 
 .pjs-priority-chip.medium {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
+  background: #e8f0fe;
+  color: #1967d2;
 }
 
 .pjs-priority-chip.low {
-  background: #f8fafc;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
+  background: #f1f3f4;
+  color: #5f6368;
 }
 
-/* Add Row at table bottom */
-.pjs-add-row-btn {
+/* Quick Add Row Button */
+.pjs-bottom-add-row-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 10px 16px;
+  padding: 8px 16px;
   background: #ffffff;
-  border: 1px dashed #cbd5e1;
-  color: #64748b;
-  font-size: 12.5px;
+  border: 1px dashed var(--gs-border);
+  color: var(--gs-text-muted);
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.12s;
 }
 
-.pjs-add-row-btn:hover {
-  background: #f8fafc;
-  border-color: #2563eb;
-  color: #2563eb;
+.pjs-bottom-add-row-btn:hover {
+  background: #f8fbff;
+  border-color: var(--gs-blue);
+  color: var(--gs-blue);
+}
+
+/* Toolbar Row Input Group */
+.pjs-tb-row-input-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  border-radius: 4px;
+  padding: 1px;
+  height: 28px;
+}
+
+.pjs-tb-row-input-group .pjs-tb-pill-btn {
+  border: none;
+  background: transparent;
+  padding: 0 6px;
+  height: 24px;
+}
+
+.pjs-tb-row-input-group .pjs-tb-pill-btn:hover {
+  background: #f1f3f4;
+}
+
+.pjs-tb-row-count-input {
+  width: 38px;
+  height: 22px;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--gs-blue);
+  background: #f8fbff;
+  outline: none;
+  padding: 0;
+}
+
+.pjs-tb-row-count-input:focus {
+  border-color: var(--gs-blue);
+  background: #ffffff;
+}
+
+/* Google Sheets Bottom Add N Rows Control */
+.pjs-bottom-add-rows-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border-top: 1px solid var(--gs-border);
+  border-bottom: 1px solid var(--gs-border);
+  flex-wrap: wrap;
+  gap: 12px;
+  user-select: none;
+}
+
+.pjs-bottom-add-rows-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pjs-add-rows-txt {
+  font-size: 13px;
+  color: #3c4043;
+  font-weight: 500;
+}
+
+.pjs-add-rows-input {
+  width: 58px;
+  height: 30px;
+  border: 1px solid var(--gs-border);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #202124;
+  outline: none;
+  background: #ffffff;
+  transition: all 0.15s;
+}
+
+.pjs-add-rows-input:focus {
+  border-color: var(--gs-blue);
+  box-shadow: 0 0 0 2px var(--gs-blue-light);
+}
+
+.pjs-add-rows-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  color: var(--gs-blue);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pjs-add-rows-action-btn:hover {
+  background: var(--gs-blue-light);
+  border-color: var(--gs-blue);
+}
+
+.pjs-quick-add-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pjs-quick-add-label {
+  font-size: 12px;
+  color: var(--gs-text-muted);
+  font-weight: 500;
+}
+
+.pjs-quick-chip {
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  color: #444746;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.pjs-quick-chip:hover {
+  background: var(--gs-blue-light);
+  border-color: var(--gs-blue);
+  color: var(--gs-blue);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   5. Bottom Tabs & QA Calculations Bar
+   5. Google Sheets Bottom Tab Bar (N number of sheets)
    ────────────────────────────────────────────────────────────────────────── */
 .pjs-bottom-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f1f5f9;
-  border-top: 1px solid #cbd5e1;
-  padding: 0 12px;
+  background: #f1f3f4;
+  border-top: 1px solid var(--gs-border);
+  padding: 0 8px;
+  height: 38px;
   flex-shrink: 0;
-  flex-wrap: wrap;
-  gap: 8px;
+  user-select: none;
 }
 
-.pjs-sheet-tabs {
+.pjs-sheet-tabs-container {
   display: flex;
   align-items: center;
-  gap: 2px;
-  overflow-x: auto;
-  padding-top: 4px;
+  gap: 3px;
+  overflow: hidden;
+  height: 100%;
 }
 
-.pjs-sheet-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: #e2e8f0;
-  border: 1px solid #cbd5e1;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.pjs-sheet-tab:hover {
-  background: #f8fafc;
-  color: #1e293b;
-}
-
-.pjs-sheet-tab.active {
-  background: #ffffff;
-  color: #0f172a;
-  border-top: 2px solid #107c41;
-  font-weight: 700;
-  position: relative;
-  top: 1px;
-}
-
-.pjs-sheet-tab-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
-}
-
-.pjs-sheet-tab-close:hover {
-  color: #ef4444;
-  background: #fee2e2;
-}
-
-.pjs-add-tab-btn {
+.pjs-tab-action-btn {
   width: 28px;
   height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
   background: transparent;
-  color: #64748b;
+  border: none;
+  color: #444746;
   border-radius: 4px;
   cursor: pointer;
+  transition: background 0.12s;
+  flex-shrink: 0;
 }
 
-.pjs-add-tab-btn:hover {
-  background: #cbd5e1;
-  color: #0f172a;
+.pjs-tab-action-btn:hover {
+  background: #e3e6e8;
+  color: #1f1f1f;
 }
 
-/* Real-Time QA Metrics Summary Bar */
-.pjs-calc-summary-bar {
+.pjs-tabs-scroll-area {
   display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  overflow-x: auto;
+  height: 100%;
+  scrollbar-width: none;
+}
+
+.pjs-tabs-scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
+/* Google Sheets Tab */
+.pjs-sheet-tab {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  background: #e3e6e8;
+  border: 1px solid var(--gs-border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
   font-size: 11.5px;
   font-weight: 600;
-  padding: 5px 12px;
+  color: #444746;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+
+.pjs-sheet-tab:hover {
+  background: #eaedef;
+  color: #1f1f1f;
+}
+
+.pjs-sheet-tab.active {
   background: #ffffff;
-  border: 1px solid #cbd5e1;
+  color: var(--gs-text);
+  font-weight: 700;
+  border-bottom: 2px solid #ffffff;
+  z-index: 2;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.pjs-tab-color-stripe {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 0 0 2px 2px;
+}
+
+.pjs-tab-title {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pjs-tab-rename-input {
+  border: 1px solid var(--gs-blue);
+  outline: none;
+  background: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  width: 110px;
+}
+
+.pjs-tab-dropdown-btn {
+  background: transparent;
+  border: none;
+  color: #70757a;
+  padding: 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.pjs-sheet-tab:hover .pjs-tab-dropdown-btn,
+.pjs-sheet-tab.active .pjs-tab-dropdown-btn {
+  opacity: 1;
+}
+
+.pjs-tab-dropdown-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #000000;
+}
+
+/* Sheet Tab Dropdown Menu */
+.pjs-tab-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
   border-radius: 6px;
+  min-width: 170px;
+  padding: 6px 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.pjs-tab-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--gs-text);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.pjs-tab-menu-item:hover {
+  background: #f1f3f4;
+}
+
+.pjs-tab-menu-item.danger {
+  color: #d93025;
+}
+
+.pjs-tab-menu-item.danger:hover {
+  background: #fce8e6;
+}
+
+.pjs-tab-menu-divider {
+  height: 1px;
+  background: var(--gs-border);
   margin: 4px 0;
 }
 
-.pjs-calc-stat {
+.pjs-tab-color-section {
+  padding: 4px 14px;
+}
+
+.pjs-tab-color-label {
+  font-size: 11px;
+  color: var(--gs-text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.pjs-tab-colors-grid {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+}
+
+.pjs-tab-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--gs-border);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.pjs-tab-color-dot:hover {
+  transform: scale(1.25);
+}
+
+/* Bottom Calculation & QA Stats Bar */
+.pjs-calc-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+  color: #3c4043;
 }
 
 .pjs-calc-stat.pass {
-  color: #15803d;
+  color: #137333;
+  font-weight: 700;
 }
 
-.pjs-calc-stat.fail {
-  color: #b91c1c;
+.pjs-calc-stat.issues {
+  color: #c5221f;
+  font-weight: 700;
 }
 
-.pjs-calc-stat.blocked {
-  color: #c2410c;
-}
-
-/* Visual Progress Bar */
-.pjs-progress-wrap {
-  width: 100px;
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
+.pjs-calc-progress {
+  width: 80px;
+  height: 6px;
+  background: #dadce0;
+  border-radius: 3px;
   overflow: hidden;
-  display: flex;
 }
 
-.pjs-progress-bar {
+.pjs-calc-progress-fill {
   height: 100%;
-  transition: width 0.3s ease;
+  background: var(--gs-green);
+  transition: width 0.3s;
 }
 
-.pjs-progress-bar.pass {
-  background: #22c55e;
+/* ──────────────────────────────────────────────────────────────────────────
+   6. Right-Click Context Menu (Google Sheets Style)
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-context-menu {
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid var(--gs-border);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  min-width: 210px;
+  padding: 6px 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
 }
 
-.pjs-progress-bar.fail {
-  background: #ef4444;
+.pjs-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  color: var(--gs-text);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
 }
 
-.pjs-progress-bar.blocked {
-  background: #f97316;
+.pjs-ctx-item:hover {
+  background: #f1f3f4;
 }
 
-/* Column Add Modal */
+.pjs-ctx-item.danger {
+  color: #d93025;
+}
+
+.pjs-ctx-item.danger:hover {
+  background: #fce8e6;
+}
+
+.pjs-ctx-divider {
+  height: 1px;
+  background: var(--gs-border);
+  margin: 4px 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   7. Google Sheets Snackbar Toast
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-toast {
+  position: fixed;
+  bottom: 48px;
+  left: 24px;
+  background: #202124;
+  color: #ffffff;
+  font-size: 13px;
+  padding: 10px 18px;
+  border-radius: 4px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.28);
+  z-index: 10000;
+  animation: pjsFadeIn 0.2s ease;
+}
+
+@keyframes pjsFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   8. Modals
+   ────────────────────────────────────────────────────────────────────────── */
 .pjs-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 20000;
+  animation: pjsFadeIn 0.15s ease;
 }
 
 .pjs-modal-box {
-  width: 100%;
-  max-width: 440px;
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 440px;
+  overflow: hidden;
+}
+
+.pjs-modal-box.sheets-nav {
+  max-width: 480px;
 }
 
 .pjs-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gs-border);
 }
 
 .pjs-modal-title {
-  font-size: 16px;
+  margin: 0;
+  font-size: 15px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--gs-text);
 }
 
 .pjs-modal-close {
   background: transparent;
   border: none;
-  color: #64748b;
+  color: var(--gs-text-muted);
   cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.pjs-modal-close:hover {
+  background: #f1f3f4;
+  color: #000000;
 }
 
 .pjs-form-group {
-  margin-bottom: 14px;
+  padding: 14px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .pjs-form-group label {
-  display: block;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: #334155;
-  margin-bottom: 6px;
+  color: #3c4043;
 }
 
 .pjs-form-group input,
 .pjs-form-group select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  height: 36px;
+  border: 1px solid var(--gs-border);
+  border-radius: 4px;
+  padding: 0 10px;
   font-size: 13px;
-  color: #0f172a;
   outline: none;
-  box-sizing: border-box;
+  transition: border-color 0.15s;
 }
 
 .pjs-form-group input:focus,
 .pjs-form-group select:focus {
-  border-color: #2563eb;
+  border-color: var(--gs-blue);
+  box-shadow: 0 0 0 1px var(--gs-blue);
 }
 
 .pjs-modal-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 8px;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid var(--gs-border);
+  margin-top: 16px;
 }
-
-/* Project QA workspace hierarchy */
-.pjs-layout {
-  background: #f3f6f4;
-  color: #1c302c;
-  font-family: 'Aptos', 'Segoe UI', sans-serif;
-  width: 100%;
-  min-width: 0;
-}
-
-.pjs-main { width: 100%; min-width: 0; }
-
-.pjs-header {
-  min-height: 62px;
-  height: auto;
-  padding: 10px 22px;
-  border-bottom-color: #dce5e0;
-}
-
-.pjs-back-btn {
-  border-color: #d5e0da;
-  border-radius: 6px;
-  background: #fff;
-}
-
-.pjs-breadcrumb { color: #72817b; }
-.pjs-breadcrumb-curr { color: #263d35; }
-
-.pjs-proj-badge {
-  border-color: #dce7e0;
-  border-radius: 6px;
-  background: #f4f8f5;
-}
-
-.pjs-proj-code { color: #34785d; }
-.pjs-proj-title { color: #31483e; }
-
-.pjs-qa-overview {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px 22px;
-  border-bottom: 1px solid #dce5e0;
-  background: #f8faf8;
-}
-
-.pjs-qa-stat {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid #e0e8e3;
-  border-radius: 6px;
-  background: #fff;
-}
-
-.pjs-qa-stat-icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 5px;
-  background: #edf3ef;
-  color: #426656;
-}
-
-.pjs-qa-stat.pass .pjs-qa-stat-icon { background: #e8f3ec; color: #2f8051; }
-.pjs-qa-stat.fail .pjs-qa-stat-icon { background: #fbece8; color: #b9513d; }
-.pjs-qa-stat.pending .pjs-qa-stat-icon { background: #faf1df; color: #98712e; }
-.pjs-qa-stat > span:last-child { display: grid; gap: 3px; }
-.pjs-qa-stat small { color: #718078; font-size: 11px; }
-.pjs-qa-stat strong { color: #263a32; font-size: 18px; line-height: 1; }
-
-.pjs-ribbon-bar { background: #fff; border-bottom-color: #dce5e0; }
-.pjs-menu-row { padding: 13px 22px 12px; border-bottom-color: #edf1ee; }
-.pjs-sheet-heading { min-width: 0; }
-.pjs-sheet-eyebrow { color: #73857a; font-size: 9px; font-weight: 750; letter-spacing: 1px; }
-.pjs-sheet-heading h1 { margin: 3px 0 2px; color: #20382e; font-size: 18px; line-height: 1.2; }
-.pjs-sheet-heading p { margin: 0; color: #718078; font-size: 11px; }
-.pjs-sheet-heading p span { padding: 0 4px; }
-
-.pjs-cloud-status { color: #43805e; }
-.pjs-cloud-status.saving { color: #a5792b; }
-
-.pjs-toolbar-row {
-  padding: 9px 22px;
-  background: #f8faf8;
-  gap: 10px;
-}
-
-.pjs-toolbar-group { gap: 5px; }
-.pjs-tool-btn { border-radius: 5px; color: #50645a; }
-.pjs-tool-btn:hover { background: #e9efeb; color: #254b39; }
-.pjs-tool-btn.active { border-color: #c9dfd1; background: #eaf4ee; color: #31734f; }
-.pjs-tool-divider { background: #d8e1db; }
 
 .pjs-action-pill-btn {
-  min-height: 32px;
-  border-color: #d7e1da;
-  border-radius: 5px;
-  color: #3f5549;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--gs-border);
+  background: #ffffff;
+  color: #3c4043;
+  cursor: pointer;
+  transition: all 0.12s;
 }
 
-.pjs-action-pill-btn:hover { background: #eef4f0; color: #274c38; }
-.pjs-action-pill-btn.primary { border-color: #326d50; background: #397a59; }
-.pjs-action-pill-btn.primary:hover { background: #2f694c; }
-.pjs-action-pill-btn.success { border-color: #d5e1d9; background: #e9f2ec; color: #34734f; }
-.pjs-action-pill-btn.success:hover { background: #dcebe1; }
-.pjs-delete-row-btn:hover { border-color: #e8c4bc; background: #fbefed; color: #ac4d3d; }
+.pjs-action-pill-btn:hover {
+  background: #f1f3f4;
+}
 
-.pjs-sheet-search {
+.pjs-action-pill-btn.primary {
+  background: var(--gs-blue);
+  border-color: var(--gs-blue);
+  color: #ffffff;
+}
+
+.pjs-action-pill-btn.primary:hover {
+  background: var(--gs-blue-hover);
+}
+
+/* All Sheets List Modal */
+.pjs-all-sheets-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pjs-all-sheets-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 9px;
-  border: 1px solid #d7e1da;
-  border-radius: 5px;
-  background: #fff;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #f1f3f4;
+  transition: all 0.12s;
 }
 
-.pjs-sheet-search input {
-  width: 150px;
-  border: 0;
-  outline: 0;
-  color: #293e34;
-  font: inherit;
+.pjs-all-sheets-item:hover {
+  background: #f8f9fa;
+  border-color: var(--gs-border);
+}
+
+.pjs-all-sheets-item.active {
+  background: #e8f0fe;
+  border-color: #a8c7fa;
+}
+
+.pjs-sheet-info-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pjs-sheet-color-badge {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pjs-sheet-name-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gs-text);
+}
+
+.pjs-sheet-rows-count {
+  font-size: 11.5px;
+  color: var(--gs-text-muted);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   11. Image / Screenshot Column Data Type & Lightbox
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-cell-img-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 2px 6px;
+  box-sizing: border-box;
+}
+
+.pjs-cell-img-thumb {
+  height: 24px;
+  max-width: 44px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--gs-border);
+  cursor: pointer;
+  background: #ffffff;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.pjs-cell-img-thumb:hover {
+  transform: scale(1.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.pjs-cell-img-expand-btn,
+.pjs-cell-img-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--gs-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: all 0.12s;
+}
+
+.pjs-cell:hover .pjs-cell-img-expand-btn,
+.pjs-cell:hover .pjs-cell-img-clear-btn {
+  opacity: 1;
+}
+
+.pjs-cell-img-expand-btn:hover {
+  background: #e8f0fe;
+  color: var(--gs-blue);
+}
+
+.pjs-cell-img-clear-btn:hover {
+  background: #fce8e6;
+  color: #d93025;
+}
+
+.pjs-cell-img-empty {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 8px;
+  font-size: 11px;
+  color: #80868b;
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+
+.pjs-cell-img-empty:hover {
+  background: #e8f0fe;
+  color: var(--gs-blue);
+}
+
+.pjs-cell-img-empty-icon {
+  color: #1a73e8;
+  flex-shrink: 0;
+}
+
+.pjs-cell-img-edit-box {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.pjs-img-upload-trigger {
+  background: transparent;
+  border: none;
+  color: var(--gs-text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.12s;
+}
+
+.pjs-img-upload-trigger:hover {
+  color: var(--gs-blue);
+}
+
+/* Image Lightbox Modal */
+.pjs-image-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30000;
+  animation: pjsFadeIn 0.15s ease;
+  backdrop-filter: blur(3px);
+}
+
+.pjs-image-lightbox-box {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pjs-image-lightbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--gs-border);
+}
+
+.pjs-lightbox-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gs-text);
+}
+
+.pjs-lightbox-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pjs-lightbox-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 4px;
   font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--gs-border);
+  background: #ffffff;
+  color: var(--gs-text);
+  text-decoration: none;
+  transition: all 0.12s;
 }
 
-.pjs-sheet-search:focus-within { border-color: #6b9b7d; box-shadow: 0 0 0 2px #6b9b7d1c; }
-
-.pjs-formula-bar {
-  min-height: 40px;
-  padding: 5px 22px;
-  border-bottom-color: #dce5e0;
-  background: #fff;
+.pjs-lightbox-btn:hover {
+  background: #f1f3f4;
 }
 
-.pjs-cell-ref-box { border-color: #dbe4de; background: #f6f8f6; color: #3f5a4a; }
-.pjs-fx-icon { color: #52836a; }
-.pjs-formula-text:focus { border-color: #6b9b7d; background: #fbfdfb; }
-
-.pjs-grid-viewport { min-width: 0; background: #fff; }
-.pjs-table { font-size: 12px; }
-.pjs-col-letter-row th { background: #f2f5f3; color: #74827b; border-color: #dce4df; }
-.pjs-col-name-row th { background: #f8faf8; color: #31463b; border-color: #dce4df; }
-.pjs-row-num-cell { background: #f5f7f5; color: #74827b; border-color: #dce4df; }
-.pjs-row.selected .pjs-row-num-cell { background: #dcece2; color: #31734f; }
-.pjs-cell { border-color: #e2e9e4; }
-.pjs-row:hover .pjs-cell { background: #f8fbf9; }
-.pjs-cell.active { outline-color: #42815d !important; }
-.pjs-cell.active::after { background: #42815d; }
-
-.pjs-add-row-btn {
-  width: auto;
-  min-width: 100%;
-  border-color: #cbd9d0;
-  color: #527460;
-  text-align: left;
-}
-.pjs-add-row-btn:hover { border-color: #6b9b7d; background: #f6faf7; color: #34734f; }
-
-.pjs-bottom-bar {
-  min-height: 48px;
-  padding: 0 16px;
-  border-top-color: #d7e1da;
-  background: #f3f6f4;
-}
-.pjs-sheet-tabs { gap: 5px; padding-top: 5px; }
-.pjs-sheet-tab { border-color: #dce5df; border-radius: 5px 5px 0 0; background: #e8eeea; color: #53665b; }
-.pjs-sheet-tab:hover { background: #f5f8f6; color: #294b38; }
-.pjs-sheet-tab.active { border-top-color: #43815d; background: #fff; color: #2b5c40; }
-.pjs-add-tab-btn { color: #51735e; }
-.pjs-add-tab-btn:hover { background: #e0eae3; color: #2f694c; }
-
-.pjs-calc-summary-bar {
-  gap: 12px;
-  border-color: #dce5df;
-  border-radius: 5px;
-  color: #56685e;
-}
-.pjs-progress-wrap { background: #e5ebe7; }
-.pjs-progress-bar.pass { background: #55a875; }
-.pjs-progress-bar.fail { background: #d66e59; }
-.pjs-progress-bar.blocked { background: #d6a451; }
-
-@media (max-width: 900px) {
-  .pjs-main { height: 100dvh; }
-  .pjs-header { padding: 9px 14px; }
-  .pjs-breadcrumb { display: none; }
-  .pjs-qa-overview { padding: 12px 14px; gap: 8px; }
-  .pjs-qa-stat { padding: 10px; }
-  .pjs-toolbar-row { padding: 8px 14px; }
-  .pjs-toolbar-row > .pjs-toolbar-group:last-child { flex-wrap: wrap; }
-  .pjs-formula-bar { padding-inline: 14px; }
+.pjs-lightbox-btn.download {
+  background: var(--gs-blue);
+  border-color: var(--gs-blue);
+  color: #ffffff;
 }
 
-@media (max-width: 620px) {
-  .pjs-header { align-items: flex-start; }
-  .pjs-header-left { flex: 1; }
-  .pjs-header-right { max-width: 55%; }
-  .pjs-proj-badge { align-items: flex-start; flex-direction: column; gap: 2px; max-width: 100%; }
-  .pjs-proj-title { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
-  .pjs-qa-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pjs-menu-row { align-items: flex-start; gap: 10px; padding-inline: 14px; }
-  .pjs-cloud-status { justify-content: flex-end; font-size: 10px; text-align: right; }
-  .pjs-toolbar-row { align-items: flex-start; }
-  .pjs-toolbar-row > .pjs-toolbar-group:last-child { flex: 1 1 100%; }
-  .pjs-sheet-search { flex: 1 1 100%; }
-  .pjs-sheet-search input { width: 100%; }
-  .pjs-action-pill-btn { padding-inline: 9px; }
-  .pjs-bottom-bar { align-items: flex-start; padding: 0 8px 8px; }
-  .pjs-sheet-tabs { max-width: 100%; }
-  .pjs-calc-summary-bar { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 7px; box-sizing: border-box; }
+.pjs-lightbox-btn.download:hover {
+  background: var(--gs-blue-hover);
+}
+
+.pjs-lightbox-btn.close {
+  padding: 5px 8px;
+}
+
+.pjs-image-lightbox-body {
+  padding: 16px;
+  background: #1f1f1f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  max-height: calc(90vh - 60px);
+}
+
+.pjs-lightbox-full-img {
+  max-width: 100%;
+  max-height: calc(90vh - 100px);
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
 }
