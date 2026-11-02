@@ -956,40 +956,289 @@
   cursor: pointer;
 }
 
-/* Status Chips */
-.pjs-status-chip {
-  display: inline-flex;
+/* ──────────────────────────────────────────────────────────────────────────
+   Text Wrapping Styles
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-cell.wrap-text,
+.pjs-cell-content.wrap-text {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  line-height: 1.4 !important;
+  height: auto !important;
+  min-height: 28px !important;
+}
+
+.pjs-cell.clip-text,
+.pjs-cell-content.clip-text {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Status Cover Cell UI (Fills & Covers the whole cell completely)
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-cell-status-container {
+  width: 100%;
+  height: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex;
+}
+
+.pjs-status-cover {
+  width: 100%;
+  height: 100%;
+  min-height: 30px;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 12px;
-  font-size: 10.5px;
+  justify-content: center;
+  position: relative;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  user-select: none;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  box-sizing: border-box;
+  text-transform: uppercase;
+}
+
+.pjs-status-cover:hover {
+  filter: brightness(0.96);
+}
+
+.pjs-status-cover.pass {
+  background: #d1fae5;
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+
+.pjs-status-cover.fail {
+  background: #fee2e2;
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+}
+
+.pjs-status-cover.blocked {
+  background: #fef3c7;
+  color: #92400e;
+  border-left: 4px solid #f59e0b;
+}
+
+.pjs-status-cover.inprogress,
+.pjs-status-cover.in-progress {
+  background: #e0f2fe;
+  color: #075985;
+  border-left: 4px solid #0284c7;
+}
+
+.pjs-status-cover.untested {
+  background: #f3f4f6;
+  color: #4b5563;
+  border-left: 4px solid #9ca3af;
+}
+
+.pjs-status-cover-arrow {
+  position: absolute;
+  right: 6px;
+  opacity: 0.35;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.pjs-status-cover:hover .pjs-status-cover-arrow {
+  opacity: 0.85;
+}
+
+.pjs-status-cover-empty {
+  width: 100%;
+  height: 100%;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9aa0a6;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pjs-status-cover-empty:hover {
+  background: #f8f9fa;
+}
+
+.pjs-status-cover-select {
+  width: 100%;
+  height: 100%;
+  min-height: 30px;
+  border: none;
+  outline: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+  background: #ffffff;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Image Paste Cell UI
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-cell-img-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #5f6368;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  box-sizing: border-box;
+  user-select: none;
+  transition: all 0.12s;
+}
+
+.pjs-cell-img-box:hover {
+  background: #f8fbff;
+  color: #1a73e8;
+}
+
+.pjs-cell.active .pjs-cell-img-box,
+.pjs-cell-img-box.active-target {
+  background: #e8f0fe;
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Conditional Formatting Modal
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-conditional-modal {
+  max-width: 490px;
+  width: 100%;
+}
+
+.pjs-modal-title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pjs-modal-close {
+  background: transparent;
+  border: none;
+  color: #5f6368;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.pjs-modal-close:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
+
+.pjs-cond-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.pjs-cond-rule-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8f9fa;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.pjs-cond-rule-chip {
+  flex: 1;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
-.pjs-status-chip.pass {
-  background: #ceead6;
-  color: #0d652d;
+.pjs-cond-del-btn {
+  background: transparent;
+  border: none;
+  color: #d93025;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
 }
 
-.pjs-status-chip.fail {
-  background: #fad2cf;
-  color: #a50e0e;
+.pjs-cond-del-btn:hover {
+  background: #fee2e2;
 }
 
-.pjs-status-chip.blocked {
-  background: #feefe3;
-  color: #b06000;
+.pjs-cond-add-box {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 12px;
 }
 
-.pjs-status-chip.inprogress {
-  background: #d2e3fc;
-  color: #174ea6;
+.pjs-cond-inputs-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
-.pjs-status-chip.untested {
-  background: #f1f3f4;
-  color: #5f6368;
+.pjs-cond-select {
+  padding: 6px 8px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+  background: #ffffff;
+}
+
+.pjs-cond-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+}
+
+.pjs-cond-colors-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.pjs-cond-color-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pjs-cond-color-item input[type="color"] {
+  width: 28px;
+  height: 24px;
+  border: 1px solid #dadce0;
+  border-radius: 3px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pjs-cond-preview-chip {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-left: auto;
 }
 
 /* Priority Chips */

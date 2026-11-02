@@ -18,6 +18,8 @@ import {
   Baseline,
   Minus,
   RemoveFormatting,
+  WrapText,
+  Sparkles,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -333,6 +335,13 @@ const FILL_COLORS = [
 
 const CELL_BG_COLORS = FILL_COLORS;
 
+const DEFAULT_CONDITIONAL_RULES = [
+  { id: 'cr-1', enabled: true, condition: 'equals', value: 'Pass', bgColor: '#d1fae5', color: '#065f46', label: 'Pass -> Soft Green' },
+  { id: 'cr-2', enabled: true, condition: 'equals', value: 'Fail', bgColor: '#fee2e2', color: '#991b1b', label: 'Fail -> Soft Red' },
+  { id: 'cr-3', enabled: true, condition: 'equals', value: 'Blocked', bgColor: '#fef3c7', color: '#92400e', label: 'Blocked -> Soft Amber' },
+  { id: 'cr-4', enabled: true, condition: 'equals', value: 'In Progress', bgColor: '#e0f2fe', color: '#075985', label: 'In Progress -> Soft Blue' }
+];
+
 export default function AdminProjectSheet() {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -354,8 +363,20 @@ export default function AdminProjectSheet() {
   // Selection state: mode can be 'cell', 'row', 'column', 'all'
   const [selectionMode, setSelectionMode] = useState('cell');
   const [activeCell, setActiveCell] = useState({ rowIndex: 0, colId: 'col_title' });
-  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
+  const [selectedRowIndices, setSelectedRowIndices] = useState([]); // Array of selected row indices
+  const [lastRowClicked, setLastRowClicked] = useState(null);
   const [selectedColId, setSelectedColId] = useState(null);
+
+  const selectedRowIndex = selectedRowIndices[0] ?? null;
+  const setSelectedRowIndex = (val) => {
+    if (val === null || val === undefined) {
+      setSelectedRowIndices([]);
+      setLastRowClicked(null);
+    } else {
+      setSelectedRowIndices([val]);
+      setLastRowClicked(val);
+    }
+  };
 
   // Active editing state
   const [editingCell, setEditingCell] = useState(null); // { rowIndex, colId }
@@ -364,8 +385,13 @@ export default function AdminProjectSheet() {
   const [searchFilter, setSearchFilter] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
 
-  // Formatting state
+  // Formatting & Modals state
   const [openColorPopover, setOpenColorPopover] = useState(null); // 'text' | 'fill' | null
+  const [showConditionalModal, setShowConditionalModal] = useState(false);
+  const [newRuleValue, setNewRuleValue] = useState('');
+  const [newRuleCondition, setNewRuleCondition] = useState('equals');
+  const [newRuleBgColor, setNewRuleBgColor] = useState('#d1fae5');
+  const [newRuleColor, setNewRuleColor] = useState('#065f46');
 
   // Undo / Redo history stack
   const [undoStack, setUndoStack] = useState([]);
@@ -460,7 +486,15 @@ export default function AdminProjectSheet() {
 
   const activeCoord = useMemo(() => {
     if (selectionMode === 'all') return 'All';
-    if (selectionMode === 'row' && selectedRowIndex !== null) return `Row ${selectedRowIndex + 1}`;
+    if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      if (selectedRowIndices.length === 1) return `Row ${selectedRowIndices[0] + 1}`;
+      const sorted = [...selectedRowIndices].sort((a, b) => a - b);
+      const isContiguous = sorted.every((val, i) => i === 0 || val === sorted[i - 1] + 1);
+      if (isContiguous) {
+        return `${sorted[0] + 1}:${sorted[sorted.length - 1] + 1}`;
+      }
+      return `Rows (${selectedRowIndices.length})`;
+    }
     if (selectionMode === 'column' && selectedColId) {
       const idx = currentColumns.findIndex((c) => c.id === selectedColId);
       return `Col ${getColLetter(idx >= 0 ? idx : 0)}`;
@@ -468,7 +502,7 @@ export default function AdminProjectSheet() {
     const letter = getColLetter(activeColIndex >= 0 ? activeColIndex : 0);
     const rowNum = activeCell.rowIndex + 1;
     return `${letter}${rowNum}`;
-  }, [selectionMode, selectedRowIndex, selectedColId, activeColIndex, activeCell.rowIndex, currentColumns]);
+  }, [selectionMode, selectedRowIndices, selectedColId, activeColIndex, activeCell.rowIndex, currentColumns]);
 
   // Load sheets from backend API or localStorage
   const loadProjectSheets = useCallback(async () => {
@@ -586,7 +620,7 @@ export default function AdminProjectSheet() {
     setRedoStack([]);
   };
 
-  // Resolve Cell Style with fallback inheritance: sheet_all -> col -> row -> cell
+  // Resolve Cell Style with fallback inheritance: sheet_all -> col -> row -> cell + conditional formatting
   const resolveCellStyle = useCallback((rIdx, colId) => {
     const formatting = currentSheet.formatting || {};
     const allStyle = formatting['sheet_all'] || {};
@@ -600,10 +634,36 @@ export default function AdminProjectSheet() {
     const isItalic = (cellStyle.italic !== undefined ? cellStyle.italic : (rowStyle.italic !== undefined ? rowStyle.italic : (colStyle.italic !== undefined ? colStyle.italic : allStyle.italic))) || false;
     const isUnderline = (cellStyle.underline !== undefined ? cellStyle.underline : (rowStyle.underline !== undefined ? rowStyle.underline : (colStyle.underline !== undefined ? colStyle.underline : allStyle.underline))) || false;
     const isStrikethrough = (cellStyle.strikethrough !== undefined ? cellStyle.strikethrough : (rowStyle.strikethrough !== undefined ? rowStyle.strikethrough : (colStyle.strikethrough !== undefined ? colStyle.strikethrough : allStyle.strikethrough))) || false;
-    const color = cellStyle.color || rowStyle.color || colStyle.color || allStyle.color || '#202124';
-    const bgColor = cellStyle.bgColor || rowStyle.bgColor || colStyle.bgColor || allStyle.bgColor || '';
     const align = cellStyle.align || rowStyle.align || colStyle.align || allStyle.align || 'left';
     const valign = cellStyle.valign || rowStyle.valign || colStyle.valign || allStyle.valign || 'middle';
+    const wrap = cellStyle.wrap || rowStyle.wrap || colStyle.wrap || allStyle.wrap || 'overflow';
+
+    // Evaluate conditional formatting rules
+    const rawVal = String(displayRows[rIdx]?.[colId] ?? '').trim();
+    const lowerVal = rawVal.toLowerCase();
+    const rules = currentSheet.conditionalRules || DEFAULT_CONDITIONAL_RULES;
+    let conditionalBg = null;
+    let conditionalColor = null;
+
+    if (rawVal) {
+      for (const rule of rules) {
+        if (!rule.enabled) continue;
+        const ruleVal = String(rule.value || '').trim().toLowerCase();
+        let match = false;
+        if (rule.condition === 'equals' && lowerVal === ruleVal) match = true;
+        else if (rule.condition === 'contains' && lowerVal.includes(ruleVal)) match = true;
+        else if (rule.condition === 'starts_with' && lowerVal.startsWith(ruleVal)) match = true;
+
+        if (match) {
+          conditionalBg = rule.bgColor;
+          conditionalColor = rule.color;
+          break;
+        }
+      }
+    }
+
+    const color = cellStyle.color || rowStyle.color || colStyle.color || allStyle.color || conditionalColor || '#202124';
+    const bgColor = cellStyle.bgColor || rowStyle.bgColor || colStyle.bgColor || allStyle.bgColor || conditionalBg || '';
 
     return {
       fontFamily,
@@ -616,12 +676,13 @@ export default function AdminProjectSheet() {
       backgroundColor: bgColor,
       textAlign: align,
       verticalAlign: valign,
+      wrap,
       isBold,
       isItalic,
       isUnderline,
       isStrikethrough
     };
-  }, [currentSheet.formatting]);
+  }, [currentSheet.formatting, currentSheet.conditionalRules, displayRows]);
 
   // Active Selection Style for Toolbar reflection
   const activeStyle = useMemo(() => {
@@ -637,11 +698,13 @@ export default function AdminProjectSheet() {
         color: allStyle.color || '#202124',
         bgColor: allStyle.bgColor || '',
         align: allStyle.align || 'left',
-        valign: allStyle.valign || 'middle'
+        valign: allStyle.valign || 'middle',
+        wrap: allStyle.wrap || 'overflow'
       };
     }
-    if (selectionMode === 'row' && selectedRowIndex !== null) {
-      const rowStyle = currentSheet.formatting?.[`row_${selectedRowIndex}`] || {};
+    if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      const rIdx = selectedRowIndices[0];
+      const rowStyle = currentSheet.formatting?.[`row_${rIdx}`] || {};
       return {
         fontFamily: rowStyle.fontFamily || 'Arial, sans-serif',
         fontSize: rowStyle.fontSize || 12,
@@ -652,7 +715,8 @@ export default function AdminProjectSheet() {
         color: rowStyle.color || '#202124',
         bgColor: rowStyle.bgColor || '',
         align: rowStyle.align || 'left',
-        valign: rowStyle.valign || 'middle'
+        valign: rowStyle.valign || 'middle',
+        wrap: rowStyle.wrap || 'overflow'
       };
     }
     if (selectionMode === 'column' && selectedColId) {
@@ -667,7 +731,8 @@ export default function AdminProjectSheet() {
         color: colStyle.color || '#202124',
         bgColor: colStyle.bgColor || '',
         align: colStyle.align || 'left',
-        valign: colStyle.valign || 'middle'
+        valign: colStyle.valign || 'middle',
+        wrap: colStyle.wrap || 'overflow'
       };
     }
     const resolved = resolveCellStyle(activeCell.rowIndex, activeCell.colId);
@@ -681,31 +746,32 @@ export default function AdminProjectSheet() {
       color: resolved.color,
       bgColor: resolved.backgroundColor,
       align: resolved.textAlign,
-      valign: resolved.verticalAlign
+      valign: resolved.verticalAlign,
+      wrap: resolved.wrap
     };
-  }, [selectionMode, selectedRowIndex, selectedColId, activeCell, resolveCellStyle, currentSheet.formatting]);
+  }, [selectionMode, selectedRowIndices, selectedColId, activeCell, resolveCellStyle, currentSheet.formatting]);
 
   // Apply Formatting to Selection (All, Row, Column, or Active Cell)
   const applyFormatting = (property, value) => {
     recordUndo();
     const currentFmt = { ...(currentSheet.formatting || {}) };
 
-    let targetKey;
     if (selectionMode === 'all') {
-      targetKey = 'sheet_all';
-    } else if (selectionMode === 'row' && selectedRowIndex !== null) {
-      targetKey = `row_${selectedRowIndex}`;
+      const existing = currentFmt['sheet_all'] || {};
+      currentFmt['sheet_all'] = { ...existing, [property]: value };
+    } else if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      selectedRowIndices.forEach((rIdx) => {
+        const existing = currentFmt[`row_${rIdx}`] || {};
+        currentFmt[`row_${rIdx}`] = { ...existing, [property]: value };
+      });
     } else if (selectionMode === 'column' && selectedColId) {
-      targetKey = `col_${selectedColId}`;
+      const existing = currentFmt[`col_${selectedColId}`] || {};
+      currentFmt[`col_${selectedColId}`] = { ...existing, [property]: value };
     } else {
-      targetKey = `${activeCell.rowIndex}_${activeCell.colId}`;
+      const targetKey = `${activeCell.rowIndex}_${activeCell.colId}`;
+      const existing = currentFmt[targetKey] || {};
+      currentFmt[targetKey] = { ...existing, [property]: value };
     }
-
-    const existing = currentFmt[targetKey] || {};
-    currentFmt[targetKey] = {
-      ...existing,
-      [property]: value
-    };
 
     const updatedSheets = [...sheets];
     updatedSheets[activeSheetIndex] = {
@@ -734,9 +800,11 @@ export default function AdminProjectSheet() {
       return;
     }
 
-    if (selectionMode === 'row' && selectedRowIndex !== null) {
-      delete currentFmt[`row_${selectedRowIndex}`];
-      currentColumns.forEach((c) => delete currentFmt[`${selectedRowIndex}_${c.id}`]);
+    if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      selectedRowIndices.forEach((rIdx) => {
+        delete currentFmt[`row_${rIdx}`];
+        currentColumns.forEach((c) => delete currentFmt[`${rIdx}_${c.id}`]);
+      });
     } else if (selectionMode === 'column' && selectedColId) {
       delete currentFmt[`col_${selectedColId}`];
       displayRows.forEach((_, rIdx) => delete currentFmt[`${rIdx}_${selectedColId}`]);
@@ -886,7 +954,8 @@ export default function AdminProjectSheet() {
   // Cell click
   const handleCellClick = (rowIndex, colId) => {
     setSelectionMode('cell');
-    setSelectedRowIndex(null);
+    setSelectedRowIndices([]);
+    setLastRowClicked(null);
     setSelectedColId(null);
     if (activeCell.rowIndex === rowIndex && activeCell.colId === colId) {
       startEditing(rowIndex, colId);
@@ -896,20 +965,44 @@ export default function AdminProjectSheet() {
     }
   };
 
-  // Select entire row
-  const handleSelectRow = (rIdx) => {
+  // Select entire row(s) with Shift+click range and Ctrl/Cmd+click multi-selection
+  const handleSelectRow = (rIdx, e) => {
     setSelectionMode('row');
-    setSelectedRowIndex(rIdx);
     setSelectedColId(null);
-    setActiveCell({ rowIndex: rIdx, colId: currentColumns[0]?.id || 'col_title' });
     setEditingCell(null);
+    setActiveCell({ rowIndex: rIdx, colId: currentColumns[0]?.id || 'col_title' });
+
+    if (e && e.shiftKey && lastRowClicked !== null) {
+      // Contiguous range selection from lastRowClicked to rIdx
+      const start = Math.min(lastRowClicked, rIdx);
+      const end = Math.max(lastRowClicked, rIdx);
+      const range = [];
+      for (let i = start; i <= end; i++) range.push(i);
+      setSelectedRowIndices(range);
+    } else if (e && (e.ctrlKey || e.metaKey)) {
+      // Toggle row in selection
+      setSelectedRowIndices((prev) => {
+        if (prev.includes(rIdx)) {
+          const next = prev.filter((i) => i !== rIdx);
+          return next.length > 0 ? next : [rIdx];
+        } else {
+          return [...prev, rIdx];
+        }
+      });
+      setLastRowClicked(rIdx);
+    } else {
+      // Single row selection
+      setSelectedRowIndices([rIdx]);
+      setLastRowClicked(rIdx);
+    }
   };
 
   // Select entire column
   const handleSelectColumn = (colId) => {
     setSelectionMode('column');
     setSelectedColId(colId);
-    setSelectedRowIndex(null);
+    setSelectedRowIndices([]);
+    setLastRowClicked(null);
     setActiveCell({ rowIndex: 0, colId });
     setEditingCell(null);
   };
@@ -917,7 +1010,8 @@ export default function AdminProjectSheet() {
   // Select all cells
   const handleSelectAll = () => {
     setSelectionMode('all');
-    setSelectedRowIndex(null);
+    setSelectedRowIndices([]);
+    setLastRowClicked(null);
     setSelectedColId(null);
     setActiveCell({ rowIndex: 0, colId: currentColumns[0]?.id || 'col_title' });
     setEditingCell(null);
@@ -944,27 +1038,27 @@ export default function AdminProjectSheet() {
       setCopiedIndicator({ type: 'all' });
       try {
         await navigator.clipboard.writeText(tsvText);
-      } catch (err) {
-        /* fallback */
-      }
+      } catch (err) {}
       showToast('Entire sheet copied to clipboard');
-    } else if (selectionMode === 'row' && selectedRowIndex !== null) {
-      const row = displayRows[selectedRowIndex];
-      if (!row) return;
-      const rowValues = currentColumns.map((col) => String(row[col.id] ?? ''));
+    } else if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      const sortedIndices = [...selectedRowIndices].sort((a, b) => a - b);
+      const tsvLines = sortedIndices.map((rIdx) => {
+        const row = displayRows[rIdx];
+        return currentColumns.map((col) => String(row?.[col.id] ?? '')).join('\t');
+      });
+      const tsvText = tsvLines.join('\n');
       const clipData = {
-        type: 'row',
-        row: { ...row },
-        values: rowValues
+        type: 'rows',
+        indices: sortedIndices,
+        values: tsvLines,
+        singleRowValues: currentColumns.map((col) => String(displayRows[sortedIndices[0]]?.[col.id] ?? ''))
       };
       setSheetClipboard(clipData);
-      setCopiedIndicator({ type: 'row', index: selectedRowIndex });
+      setCopiedIndicator({ type: 'rows', indices: sortedIndices });
       try {
-        await navigator.clipboard.writeText(rowValues.join('\t'));
-      } catch (err) {
-        /* fallback */
-      }
-      showToast(`Row ${selectedRowIndex + 1} copied to clipboard`);
+        await navigator.clipboard.writeText(tsvText);
+      } catch (err) {}
+      showToast(sortedIndices.length === 1 ? `Row ${sortedIndices[0] + 1} copied` : `${sortedIndices.length} rows copied to clipboard`);
     } else if (selectionMode === 'column' && selectedColId) {
       const col = currentColumns.find((c) => c.id === selectedColId);
       const colValues = displayRows.map((r) => String(r[selectedColId] ?? ''));
@@ -978,24 +1072,19 @@ export default function AdminProjectSheet() {
       setCopiedIndicator({ type: 'column', id: selectedColId });
       try {
         await navigator.clipboard.writeText(colValues.join('\n'));
-      } catch (err) {
-        /* fallback */
-      }
+      } catch (err) {}
       showToast(`Column "${col?.label || 'Selected'}" copied to clipboard`);
     } else {
-      // Cell mode
       const row = displayRows[activeCell.rowIndex];
       const val = String(row?.[activeCell.colId] ?? '');
       setSheetClipboard({ type: 'cell', value: val });
       setCopiedIndicator({ type: 'cell', rowIndex: activeCell.rowIndex, colId: activeCell.colId });
       try {
         await navigator.clipboard.writeText(val);
-      } catch (err) {
-        /* fallback */
-      }
+      } catch (err) {}
       showToast('Cell copied');
     }
-  }, [selectionMode, selectedRowIndex, selectedColId, displayRows, currentColumns, activeCell, showToast]);
+  }, [selectionMode, selectedRowIndices, selectedColId, displayRows, currentColumns, activeCell, showToast]);
 
   // Cut Action
   const handleCut = useCallback(() => {
@@ -1005,7 +1094,7 @@ export default function AdminProjectSheet() {
       const updatedRows = currentRows.map((r) => {
         const cleared = { id: r.id };
         currentColumns.forEach((c) => {
-          cleared[c.id] = c.type === 'status' ? 'Untested' : '';
+          cleared[c.id] = '';
         });
         return cleared;
       });
@@ -1014,13 +1103,12 @@ export default function AdminProjectSheet() {
       setSheets(updatedSheets);
       persistSheetChanges(updatedSheets);
       showToast('Entire sheet cut');
-    } else if (selectionMode === 'row' && selectedRowIndex !== null) {
-      const row = displayRows[selectedRowIndex];
-      if (!row) return;
-      const updatedRows = currentRows.map((r) => {
-        if (r.id === row.id) {
+    } else if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      const targetIndices = new Set(selectedRowIndices);
+      const updatedRows = currentRows.map((r, idx) => {
+        if (targetIndices.has(idx)) {
           const cleared = { id: r.id };
-          currentColumns.forEach((c) => { cleared[c.id] = c.type === 'status' ? 'Untested' : ''; });
+          currentColumns.forEach((c) => { cleared[c.id] = ''; });
           return cleared;
         }
         return r;
@@ -1029,12 +1117,12 @@ export default function AdminProjectSheet() {
       updatedSheets[activeSheetIndex] = { ...currentSheet, rows: updatedRows };
       setSheets(updatedSheets);
       persistSheetChanges(updatedSheets);
-      showToast(`Row ${selectedRowIndex + 1} cut`);
+      showToast(selectedRowIndices.length === 1 ? `Row ${selectedRowIndices[0] + 1} cut` : `${selectedRowIndices.length} rows cut`);
     } else if (selectionMode === 'column' && selectedColId) {
       const col = currentColumns.find((c) => c.id === selectedColId);
       const updatedRows = currentRows.map((r) => ({
         ...r,
-        [selectedColId]: col?.type === 'status' ? 'Untested' : ''
+        [selectedColId]: ''
       }));
       const updatedSheets = [...sheets];
       updatedSheets[activeSheetIndex] = { ...currentSheet, rows: updatedRows };
@@ -1044,16 +1132,14 @@ export default function AdminProjectSheet() {
     } else {
       commitEdit(activeCell.rowIndex, activeCell.colId, '');
     }
-  }, [handleCopy, selectionMode, selectedRowIndex, selectedColId, displayRows, currentRows, currentColumns, sheets, activeSheetIndex, currentSheet, activeCell, showToast]);
+  }, [handleCopy, selectionMode, selectedRowIndices, selectedColId, displayRows, currentRows, currentColumns, sheets, activeSheetIndex, currentSheet, activeCell, showToast]);
 
   // Paste Action
   const handlePaste = useCallback(async () => {
     let clipboardText = '';
     try {
       clipboardText = await navigator.clipboard.readText();
-    } catch (err) {
-      /* clipboard read restricted, fallback to internal sheetClipboard */
-    }
+    } catch (err) {}
 
     recordUndo();
 
@@ -1095,42 +1181,44 @@ export default function AdminProjectSheet() {
       }
     }
 
-    // 1. PASTING AN ENTIRE ROW
-    if (selectionMode === 'row' && selectedRowIndex !== null) {
-      const targetRow = displayRows[selectedRowIndex];
-      if (!targetRow) return;
-
-      let valuesToPaste = [];
-      if (sheetClipboard?.type === 'row') {
-        valuesToPaste = sheetClipboard.values;
+    // 1. PASTING AN ENTIRE ROW / MULTIPLE ROWS
+    if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      const targetStartRow = Math.min(...selectedRowIndices);
+      let lines = [];
+      if (sheetClipboard?.type === 'rows' && sheetClipboard.values) {
+        lines = sheetClipboard.values;
+      } else if (sheetClipboard?.type === 'row' && sheetClipboard.values) {
+        lines = [sheetClipboard.values.join('\t')];
       } else if (clipboardText) {
-        // Parse tab-separated row from external Google Sheets / Excel
-        const firstLine = clipboardText.split(/\r?\n/)[0];
-        valuesToPaste = firstLine.split('\t');
+        lines = clipboardText.split(/\r?\n/).filter(Boolean);
       }
 
-      if (valuesToPaste.length > 0) {
+      if (lines.length > 0) {
         let updatedRows = [...currentRows];
-        if (selectedRowIndex >= updatedRows.length) {
-          while (updatedRows.length <= selectedRowIndex) {
-            const blank = { id: `row-${Date.now()}-${updatedRows.length + 1}` };
-            currentColumns.forEach((c) => { blank[c.id] = ''; });
-            updatedRows.push(blank);
-          }
+        const maxNeeded = targetStartRow + lines.length;
+        while (updatedRows.length < maxNeeded) {
+          const blank = { id: `row-${Date.now()}-${updatedRows.length + 1}` };
+          currentColumns.forEach((c) => { blank[c.id] = ''; });
+          updatedRows.push(blank);
         }
-        const patched = { ...updatedRows[selectedRowIndex] };
-        currentColumns.forEach((col, idx) => {
-          if (valuesToPaste[idx] !== undefined) {
-            patched[col.id] = valuesToPaste[idx];
-          }
+
+        lines.forEach((line, offset) => {
+          const rIdx = targetStartRow + offset;
+          const vals = line.split('\t');
+          const patched = { ...updatedRows[rIdx] };
+          currentColumns.forEach((col, cIdx) => {
+            if (vals[cIdx] !== undefined) {
+              patched[col.id] = vals[cIdx];
+            }
+          });
+          updatedRows[rIdx] = patched;
         });
-        updatedRows[selectedRowIndex] = patched;
 
         const updatedSheets = [...sheets];
         updatedSheets[activeSheetIndex] = { ...currentSheet, rows: updatedRows };
         setSheets(updatedSheets);
         persistSheetChanges(updatedSheets);
-        showToast(`Pasted entire row into Row ${selectedRowIndex + 1}`);
+        showToast(`Pasted ${lines.length} row${lines.length > 1 ? 's' : ''} starting at Row ${targetStartRow + 1}`);
         return;
       }
     }
@@ -1143,7 +1231,6 @@ export default function AdminProjectSheet() {
       if (sheetClipboard?.type === 'column') {
         valuesToPaste = sheetClipboard.values;
       } else if (clipboardText) {
-        // Parse newline separated column values
         valuesToPaste = clipboardText.split(/\r?\n/).filter(Boolean);
       }
 
@@ -1212,7 +1299,7 @@ export default function AdminProjectSheet() {
       commitEdit(activeCell.rowIndex, activeCell.colId, valToPaste);
       showToast('Pasted into cell');
     }
-  }, [selectionMode, selectedRowIndex, selectedColId, displayRows, sheetClipboard, currentRows, currentColumns, sheets, activeSheetIndex, currentSheet, activeCell, activeColIndex, showToast]);
+  }, [selectionMode, selectedRowIndices, selectedColId, displayRows, sheetClipboard, currentRows, currentColumns, sheets, activeSheetIndex, currentSheet, activeCell, activeColIndex, showToast]);
 
   // Keyboard navigation & global shortcuts
   const handleKeyDown = (e) => {
@@ -1331,7 +1418,7 @@ export default function AdminProjectSheet() {
         const updatedRows = currentRows.map((r) => {
           const cleared = { id: r.id };
           currentColumns.forEach((c) => {
-            cleared[c.id] = c.type === 'status' ? 'Untested' : '';
+            cleared[c.id] = '';
           });
           return cleared;
         });
@@ -1340,7 +1427,7 @@ export default function AdminProjectSheet() {
         setSheets(updatedSheets);
         persistSheetChanges(updatedSheets);
         showToast('Cleared entire sheet content');
-      } else if (selectionMode === 'row' && selectedRowIndex !== null) {
+      } else if (selectionMode === 'row' && selectedRowIndices.length > 0) {
         handleDeleteRow();
       } else if (selectionMode === 'column' && selectedColId) {
         recordUndo();
@@ -1359,7 +1446,7 @@ export default function AdminProjectSheet() {
     }
   };
 
-  // Add N Rows automatically from input count
+  // Add N Rows automatically from input count (all fields empty)
   const handleAddNRows = (count = 1, position = 'bottom') => {
     const numRows = Math.max(1, Math.min(1000, parseInt(count, 10) || 1));
     recordUndo();
@@ -1368,7 +1455,7 @@ export default function AdminProjectSheet() {
     for (let i = 0; i < numRows; i++) {
       const newRow = { id: `row-${now}-${i}` };
       currentColumns.forEach((col) => {
-        newRow[col.id] = col.type === 'status' ? 'Untested' : '';
+        newRow[col.id] = ''; // Do NOT add any default data
       });
       newRowsList.push(newRow);
     }
@@ -1377,10 +1464,10 @@ export default function AdminProjectSheet() {
     if (position === 'bottom') {
       updatedRows.push(...newRowsList);
     } else if (position === 'above') {
-      const idx = selectionMode === 'row' && selectedRowIndex !== null ? selectedRowIndex : activeCell.rowIndex;
+      const idx = selectionMode === 'row' && selectedRowIndices.length > 0 ? Math.min(...selectedRowIndices) : activeCell.rowIndex;
       updatedRows.splice(idx, 0, ...newRowsList);
     } else if (position === 'below') {
-      const idx = selectionMode === 'row' && selectedRowIndex !== null ? selectedRowIndex : activeCell.rowIndex;
+      const idx = selectionMode === 'row' && selectedRowIndices.length > 0 ? Math.max(...selectedRowIndices) : activeCell.rowIndex;
       updatedRows.splice(idx + 1, 0, ...newRowsList);
     }
 
@@ -1399,14 +1486,36 @@ export default function AdminProjectSheet() {
     handleAddNRows(1, position);
   };
 
-  // Delete Row
+  // Delete Row(s)
   const handleDeleteRow = () => {
     if (currentRows.length === 0) return;
-    const targetIdx = selectionMode === 'row' && selectedRowIndex !== null ? selectedRowIndex : activeCell.rowIndex;
+    recordUndo();
+
+    if (selectionMode === 'row' && selectedRowIndices.length > 0) {
+      const toDeleteIds = new Set();
+      selectedRowIndices.forEach((rIdx) => {
+        const row = visibleRows[rIdx];
+        if (row?.id) toDeleteIds.add(row.id);
+      });
+      const updatedRows = currentRows.filter((r) => !toDeleteIds.has(r.id));
+      const count = selectedRowIndices.length;
+      const updatedSheets = [...sheets];
+      updatedSheets[activeSheetIndex] = { ...currentSheet, rows: updatedRows };
+      setSheets(updatedSheets);
+      persistSheetChanges(updatedSheets);
+      setSelectedRowIndices([]);
+      setLastRowClicked(null);
+      if (updatedRows.length > 0) {
+        setActiveCell({ rowIndex: Math.min(activeCell.rowIndex, updatedRows.length - 1), colId: activeCell.colId });
+      }
+      showToast(`Deleted ${count} row${count > 1 ? 's' : ''}`);
+      return;
+    }
+
+    const targetIdx = activeCell.rowIndex;
     const rowToDelete = visibleRows[targetIdx];
     if (!rowToDelete) return;
 
-    recordUndo();
     const updatedRows = currentRows.filter((r) => r.id !== rowToDelete.id);
     const updatedSheets = [...sheets];
     updatedSheets[activeSheetIndex] = { ...currentSheet, rows: updatedRows };
@@ -1415,7 +1524,6 @@ export default function AdminProjectSheet() {
 
     if (targetIdx >= updatedRows.length && updatedRows.length > 0) {
       setActiveCell({ rowIndex: updatedRows.length - 1, colId: activeCell.colId });
-      setSelectedRowIndex(updatedRows.length - 1);
     }
     showToast(`Row ${targetIdx + 1} deleted`);
   };
@@ -1437,7 +1545,7 @@ export default function AdminProjectSheet() {
     const updatedColumns = [...currentColumns, newCol];
     const updatedRows = currentRows.map((r) => ({
       ...r,
-      [newColId]: newColType === 'status' ? 'Untested' : ''
+      [newColId]: '' // Blank data
     }));
 
     const updatedSheets = [...sheets];
@@ -1453,6 +1561,74 @@ export default function AdminProjectSheet() {
     setNewColLabel('');
     setNewColType('text');
     showToast(`Column "${newCol.label}" inserted`);
+  };
+
+  // Image Double Click Trigger for upload
+  const handleImageDoubleClick = (rIdx, colId) => {
+    setPendingUploadCell({ rowIndex: rIdx, colId });
+    fileInputRef.current?.click();
+  };
+
+  // Conditional Formatting Rules management
+  const handleAddConditionalRule = (e) => {
+    e.preventDefault();
+    if (!newRuleValue.trim()) return;
+
+    recordUndo();
+    const newRule = {
+      id: `cr-${Date.now()}`,
+      enabled: true,
+      condition: newRuleCondition,
+      value: newRuleValue.trim(),
+      bgColor: newRuleBgColor,
+      color: newRuleColor,
+      label: `"${newRuleValue.trim()}" -> Highlight`
+    };
+
+    const currentRules = currentSheet.conditionalRules || [...DEFAULT_CONDITIONAL_RULES];
+    const updatedRules = [...currentRules, newRule];
+
+    const updatedSheets = [...sheets];
+    updatedSheets[activeSheetIndex] = {
+      ...currentSheet,
+      conditionalRules: updatedRules
+    };
+
+    setSheets(updatedSheets);
+    persistSheetChanges(updatedSheets);
+    setNewRuleValue('');
+    showToast(`Added rule for "${newRule.value}"`);
+  };
+
+  const handleToggleConditionalRule = (ruleId) => {
+    recordUndo();
+    const currentRules = currentSheet.conditionalRules || [...DEFAULT_CONDITIONAL_RULES];
+    const updatedRules = currentRules.map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r));
+
+    const updatedSheets = [...sheets];
+    updatedSheets[activeSheetIndex] = {
+      ...currentSheet,
+      conditionalRules: updatedRules
+    };
+
+    setSheets(updatedSheets);
+    persistSheetChanges(updatedSheets);
+  };
+
+  const handleDeleteConditionalRule = (ruleId) => {
+    recordUndo();
+    const currentRules = currentSheet.conditionalRules || [...DEFAULT_CONDITIONAL_RULES];
+    const updatedRules = currentRules.filter((r) => r.id !== ruleId);
+
+    const updatedSheets = [...sheets];
+    updatedSheets[activeSheetIndex] = {
+      ...currentSheet,
+      conditionalRules: updatedRules
+    };
+
+    setSheets(updatedSheets);
+    persistSheetChanges(updatedSheets);
+    showToast('Conditional rule removed');
   };
 
   // Delete Column
@@ -1908,6 +2084,17 @@ export default function AdminProjectSheet() {
                         <Strikethrough size={14} /> Strikethrough
                       </button>
                       <div className="pjs-dropdown-divider" />
+                      <button className="pjs-dropdown-opt" onClick={() => { applyFormatting('wrap', 'wrap'); setActiveMenu(null); showToast('Wrap text enabled'); }}>
+                        <WrapText size={14} /> Text Wrapping: Wrap
+                      </button>
+                      <button className="pjs-dropdown-opt" onClick={() => { applyFormatting('wrap', 'overflow'); setActiveMenu(null); showToast('Overflow enabled'); }}>
+                        <WrapText size={14} /> Text Wrapping: Overflow
+                      </button>
+                      <div className="pjs-dropdown-divider" />
+                      <button className="pjs-dropdown-opt" onClick={() => { setShowConditionalModal(true); setActiveMenu(null); }}>
+                        <Sparkles size={14} color="#1a73e8" /> Conditional formatting...
+                      </button>
+                      <div className="pjs-dropdown-divider" />
                       <button className="pjs-dropdown-opt" onClick={() => { handleClearFormatting(); setActiveMenu(null); }}>
                         <RemoveFormatting size={14} /> Clear Formatting
                       </button>
@@ -2222,6 +2409,30 @@ export default function AdminProjectSheet() {
             <ArrowDown size={13} />
           </button>
 
+          <div className="pjs-tb-divider" />
+
+          {/* Text Wrap */}
+          <button
+            className={`pjs-tb-btn ${activeStyle.wrap === 'wrap' ? 'active' : ''}`}
+            onClick={() => {
+              const nextWrap = activeStyle.wrap === 'wrap' ? 'overflow' : 'wrap';
+              applyFormatting('wrap', nextWrap);
+              showToast(`Text wrap: ${nextWrap}`);
+            }}
+            title={`Text Wrap (${activeStyle.wrap || 'overflow'})`}
+          >
+            <WrapText size={15} />
+          </button>
+
+          {/* Conditional Formatting Modal Launcher */}
+          <button
+            className={`pjs-tb-btn ${showConditionalModal ? 'active' : ''}`}
+            onClick={() => setShowConditionalModal(true)}
+            title="Conditional Formatting Rules"
+          >
+            <Sparkles size={15} color="#1a73e8" />
+          </button>
+
           {/* Clear Formatting */}
           <button
             className="pjs-tb-btn"
@@ -2393,8 +2604,8 @@ export default function AdminProjectSheet() {
 
             <tbody>
               {displayRows.map((row, rIdx) => {
-                const isRowSelected = selectionMode === 'row' && selectedRowIndex === rIdx;
-                const isCopiedRow = copiedIndicator?.type === 'row' && copiedIndicator.index === rIdx;
+                const isRowSelected = selectionMode === 'row' && selectedRowIndices.includes(rIdx);
+                const isCopiedRow = copiedIndicator?.type === 'rows' ? copiedIndicator.indices?.includes(rIdx) : (copiedIndicator?.type === 'row' && copiedIndicator.index === rIdx);
 
                 // Check if any status column or status property in this row indicates "Fail"
                 const isFailRow = currentColumns.some((col) => {
@@ -2414,9 +2625,9 @@ export default function AdminProjectSheet() {
                     {/* Row Index Number Header (1, 2, 3...) with Whole-Row Selection */}
                     <td
                       className={`pjs-row-number-td ${selectionMode === 'all' ? 'all-selected' : ''} ${isRowSelected ? 'selected' : ''}`}
-                      onClick={() => handleSelectRow(rIdx)}
+                      onClick={(e) => handleSelectRow(rIdx, e)}
                       onContextMenu={(e) => handleContextMenu(e, 'row', rIdx)}
-                      title={`Row ${rIdx + 1} - Click to select entire row`}
+                      title={`Row ${rIdx + 1} - Click to select row (Shift+click for range, Ctrl+click for multi)`}
                     >
                       {rIdx + 1}
                     </td>
@@ -2451,7 +2662,7 @@ export default function AdminProjectSheet() {
                             col.type === 'status' ? (
                               <select
                                 ref={cellInputRef}
-                                className="pjs-cell-select"
+                                className="pjs-status-cover-select"
                                 value={editValue}
                                 onChange={(e) => {
                                   setEditValue(e.target.value);
@@ -2459,6 +2670,7 @@ export default function AdminProjectSheet() {
                                 }}
                                 onBlur={() => commitEdit(rIdx, col.id, editValue)}
                               >
+                                <option value="">(Empty)</option>
                                 <option value="Pass">Pass</option>
                                 <option value="Fail">Fail</option>
                                 <option value="Blocked">Blocked</option>
@@ -2515,16 +2727,26 @@ export default function AdminProjectSheet() {
                               />
                             )
                           ) : col.type === 'status' ? (
-                            <div
-                              className="pjs-cell-content"
-                              style={{
-                                justifyContent: cellStyle.textAlign === 'center' ? 'center' : cellStyle.textAlign === 'right' ? 'flex-end' : 'flex-start'
-                              }}
-                            >
-                              <span className={`pjs-status-chip ${String(rawVal).toLowerCase().replace(/\s+/g, '')}`}>
-                                {rawVal || 'Untested'}
-                              </span>
-                            </div>
+                            !rawVal ? (
+                              <div
+                                className="pjs-status-cover-empty"
+                                onClick={() => startEditing(rIdx, col.id)}
+                                title="Click to set status"
+                              >
+                                —
+                              </div>
+                            ) : (
+                              <div
+                                className={`pjs-status-cover ${String(rawVal).toLowerCase().replace(/\s+/g, '')}`}
+                                onClick={() => startEditing(rIdx, col.id)}
+                                title={`Status: ${rawVal} (Click to change)`}
+                              >
+                                <span>{rawVal}</span>
+                                <span className="pjs-status-cover-arrow">
+                                  <ChevronDown size={11} />
+                                </span>
+                              </div>
+                            )
                           ) : col.type === 'priority' ? (
                             <div
                               className="pjs-cell-content"
@@ -2538,7 +2760,11 @@ export default function AdminProjectSheet() {
                             </div>
                           ) : col.type === 'image' ? (
                             rawVal ? (
-                              <div className="pjs-cell-img-content">
+                              <div
+                                className="pjs-cell-img-content"
+                                onClick={() => handleCellClick(rIdx, col.id)}
+                                onDoubleClick={() => handleImageDoubleClick(rIdx, col.id)}
+                              >
                                 <img
                                   src={rawVal}
                                   alt="Screenshot"
@@ -2547,7 +2773,7 @@ export default function AdminProjectSheet() {
                                     e.stopPropagation();
                                     setPreviewImageModal(rawVal);
                                   }}
-                                  title="Click to view full image"
+                                  title="Click to view full image, dbl-click to replace"
                                 />
                                 <button
                                   className="pjs-cell-img-expand-btn"
@@ -2573,21 +2799,18 @@ export default function AdminProjectSheet() {
                               </div>
                             ) : (
                               <div
-                                className="pjs-cell-img-empty"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPendingUploadCell({ rowIndex: rIdx, colId: col.id });
-                                  fileInputRef.current?.click();
-                                }}
-                                title="Click to upload image or press Ctrl+V while cell is active to paste image"
+                                className={`pjs-cell-img-box ${isActiveCell ? 'active-target' : ''}`}
+                                onClick={() => handleCellClick(rIdx, col.id)}
+                                onDoubleClick={() => handleImageDoubleClick(rIdx, col.id)}
+                                title="Click to select cell (Ctrl+V to paste screenshot) | Double-click to browse file"
                               >
                                 <Image size={13} className="pjs-cell-img-empty-icon" />
-                                <span>Paste or upload</span>
+                                <span>{isActiveCell ? 'Paste (Ctrl+V) / Dbl-click' : 'Paste or dbl-click'}</span>
                               </div>
                             )
                           ) : (
                             <div
-                              className="pjs-cell-content"
+                              className={`pjs-cell-content ${cellStyle.wrap === 'wrap' ? 'wrap-text' : (cellStyle.wrap === 'clip' ? 'clip-text' : '')}`}
                               style={{
                                 justifyContent: cellStyle.textAlign === 'center' ? 'center' : cellStyle.textAlign === 'right' ? 'flex-end' : 'flex-start',
                                 fontWeight: cellStyle.fontWeight,
@@ -2595,7 +2818,9 @@ export default function AdminProjectSheet() {
                                 textDecoration: cellStyle.textDecoration,
                                 color: cellStyle.color,
                                 fontFamily: cellStyle.fontFamily,
-                                fontSize: cellStyle.fontSize
+                                fontSize: cellStyle.fontSize,
+                                whiteSpace: cellStyle.wrap === 'wrap' ? 'normal' : 'nowrap',
+                                wordBreak: cellStyle.wrap === 'wrap' ? 'break-word' : 'normal'
                               }}
                             >
                               {rawVal}
@@ -2960,6 +3185,125 @@ export default function AdminProjectSheet() {
                 >
                   <Plus size={14} /> Add New Sheet
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Conditional Formatting Modal */}
+        {showConditionalModal && (
+          <div
+            className="pjs-modal-overlay"
+            onMouseDown={(e) => e.target === e.currentTarget && setShowConditionalModal(false)}
+          >
+            <div className="pjs-modal-box pjs-conditional-modal">
+              <div className="pjs-modal-header">
+                <div className="pjs-modal-title-with-icon">
+                  <Sparkles size={18} color="#1a73e8" />
+                  <h3 className="pjs-modal-title">Conditional Formatting Rules</h3>
+                </div>
+                <button className="pjs-modal-close" onClick={() => setShowConditionalModal(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ padding: '16px 20px' }}>
+                <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#5f6368' }}>
+                  Highlight cells automatically when cell content matches any active rule below:
+                </p>
+
+                <div className="pjs-cond-rules-list">
+                  {(currentSheet.conditionalRules || DEFAULT_CONDITIONAL_RULES).map((rule) => (
+                    <div key={rule.id} className="pjs-cond-rule-item">
+                      <input
+                        type="checkbox"
+                        checked={rule.enabled}
+                        onChange={() => handleToggleConditionalRule(rule.id)}
+                        title="Enable or disable rule"
+                      />
+                      <span
+                        className="pjs-cond-rule-chip"
+                        style={{ backgroundColor: rule.bgColor, color: rule.color }}
+                      >
+                        {rule.condition === 'equals' ? 'Exact: ' : rule.condition === 'contains' ? 'Contains: ' : 'Starts with: '}
+                        "{rule.value}"
+                      </span>
+                      <button
+                        type="button"
+                        className="pjs-cond-del-btn"
+                        onClick={() => handleDeleteConditionalRule(rule.id)}
+                        title="Delete rule"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <form onSubmit={handleAddConditionalRule} style={{ borderTop: '1px solid #dadce0', paddingTop: '14px', marginTop: '10px' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 600, color: '#202124' }}>Add Custom Rule</h4>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <select
+                      value={newRuleCondition}
+                      onChange={(e) => setNewRuleCondition(e.target.value)}
+                      style={{ padding: '6px 8px', border: '1px solid #dadce0', borderRadius: '4px', fontSize: '12px', background: '#fff' }}
+                    >
+                      <option value="equals">Exact match</option>
+                      <option value="contains">Contains</option>
+                      <option value="starts_with">Starts with</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="e.g. Pass, Fail, Blocked, Done, High..."
+                      value={newRuleValue}
+                      onChange={(e) => setNewRuleValue(e.target.value)}
+                      style={{ flex: 1, padding: '6px 10px', border: '1px solid #dadce0', borderRadius: '4px', fontSize: '12px' }}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                    <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      Bg:
+                      <input
+                        type="color"
+                        value={newRuleBgColor}
+                        onChange={(e) => setNewRuleBgColor(e.target.value)}
+                        style={{ width: '28px', height: '26px', padding: 0, border: 'none', cursor: 'pointer' }}
+                      />
+                    </label>
+                    <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      Text:
+                      <input
+                        type="color"
+                        value={newRuleColor}
+                        onChange={(e) => setNewRuleColor(e.target.value)}
+                        style={{ width: '28px', height: '26px', padding: 0, border: 'none', cursor: 'pointer' }}
+                      />
+                    </label>
+                    <div
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        backgroundColor: newRuleBgColor,
+                        color: newRuleColor,
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        marginLeft: 'auto'
+                      }}
+                    >
+                      {newRuleValue || 'Preview'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="pjs-action-pill-btn primary"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    <Plus size={14} /> Add Rule
+                  </button>
+                </form>
               </div>
             </div>
           </div>
