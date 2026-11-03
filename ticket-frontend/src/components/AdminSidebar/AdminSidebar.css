@@ -240,17 +240,16 @@
 .sidebar-collapsed {
   width: 76px;
   align-items: stretch;
-  padding-right: 8px;
-  padding-left: 8px;
+  padding-right: 10px;
+  padding-left: 10px;
 }
 
 .sidebar-collapsed .sidebar-brand-row {
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  margin-right: 0;
-  margin-left: 0;
+  gap: 10px;
+  margin: 0 0 24px;
 }
 
 .sidebar-collapsed .sidebar-brand {
@@ -259,21 +258,21 @@
 }
 
 .sidebar-collapsed .sidebar-logo {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
 }
 
 .sidebar-collapsed .sidebar-toggle {
-  width: 24px;
-  height: 24px;
-  border-color: rgba(219, 234, 254, .2);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, .1);
+  width: 28px;
+  height: 28px;
+  border-color: rgba(219, 234, 254, .25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .12);
 }
 
 .sidebar-collapsed .sidebar-toggle svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 .sidebar-collapsed .brand-text-col,
@@ -285,24 +284,53 @@
 
 .sidebar-collapsed .sidebar-nav {
   align-items: center;
+  gap: 6px;
 }
 
 .sidebar-collapsed .nav-item {
-  width: 48px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0 auto;
   justify-content: center;
   gap: 0;
   padding: 0;
+  border-radius: 10px;
+}
+
+.sidebar-collapsed .nav-item .nav-icon {
+  width: 19px;
+  height: 19px;
 }
 
 .sidebar-collapsed .workspace-card {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 10px;
+  padding: 0;
   justify-content: center;
-  margin-right: 0;
-  margin-left: 0;
-  padding: 8px 0;
+  align-items: center;
+  border-radius: 10px;
+}
+
+.sidebar-collapsed .workspace-card-icon {
+  width: 100%;
+  height: 100%;
+  background: transparent;
 }
 
 .sidebar-collapsed .workspace-card .connection-dot {
   display: none;
+}
+
+.sidebar-collapsed .nav-logout {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0 auto;
+  justify-content: center;
+  padding: 0;
+  border-radius: 10px;
 }
 
 .mobile-nav-toggle,

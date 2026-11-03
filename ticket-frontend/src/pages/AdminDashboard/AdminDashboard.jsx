@@ -188,7 +188,7 @@ function AdminDashboard() {
               <div className="avatar">{avatarLabel}</div>
               <div className="user-info">
                 <span className="user-name">{displayName}</span>
-                <span className="user-role">Administrator</span>
+                <span className="user-role">{localStorage.getItem('userRole') || 'Administrator'}</span>
               </div>
               <ChevronDown size={15} className="profile-chevron" />
             </div>

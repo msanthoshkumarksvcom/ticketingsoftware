@@ -158,8 +158,6 @@ function AdminSidebar({
               to={to}
               onClick={() => {
                 setMobileOpen(false);
-                window.localStorage.setItem('workspaceSidebarCollapsed', 'true');
-                setCollapsed(true);
               }}
             >
               <Icon className="nav-icon" /> <span className="nav-label">{label}</span>

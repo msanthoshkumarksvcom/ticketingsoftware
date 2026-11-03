@@ -449,17 +449,17 @@ function AdminProjects() {
       {/* Main Content Pane */}
       <main className="main-content">
         {/* Exact Header Bar */}
-        <header className="pj-exact-header">
+        <header className="header pj-exact-header">
           {/* Breadcrumb: Workspace > Projects */}
-          <div className="pj-exact-breadcrumb">
+          <div className="breadcrumb pj-exact-breadcrumb">
             <span>Workspace</span>
-            <span className="divider">&gt;</span>
-            <span className="current">Projects</span>
+            <span className="breadcrumb-divider">&gt;</span>
+            <strong>Projects</strong>
           </div>
 
           {/* Right Header: Search Pill + Notification Bell + Profile */}
-          <div className="pj-exact-header-right">
-            <div className="pj-header-search-pill">
+          <div className="header-right pj-exact-header-right">
+            <div className="header-search pj-header-search-pill">
               <Search size={15} />
               <input
                 type="text"
@@ -469,18 +469,18 @@ function AdminProjects() {
               />
             </div>
 
-            <button className="pj-header-bell-btn" title="Notifications" aria-label="Notifications">
+            <button className="notification-bell pj-header-bell-btn" title="Notifications" aria-label="Notifications">
               <Bell size={18} />
-              <span className="pj-bell-badge">1</span>
+              <span className="notification-count pj-bell-badge">1</span>
             </button>
 
-            <div className="pj-header-profile" title="Administrator account">
-              <div className="pj-profile-avatar">A</div>
-              <div className="pj-profile-text">
-                <span className="pj-profile-name">{displayName}</span>
-                <span className="pj-profile-role">{currentUserRole}</span>
+            <div className="user-profile pj-header-profile" title="Administrator account">
+              <div className="avatar pj-profile-avatar">{displayName ? displayName.charAt(0).toUpperCase() : 'M'}</div>
+              <div className="user-info pj-profile-text">
+                <span className="user-name pj-profile-name">{displayName}</span>
+                <span className="user-role pj-profile-role">{currentUserRole}</span>
               </div>
-              <ChevronDown size={14} className="pj-profile-chevron" />
+              <ChevronDown size={14} className="profile-chevron pj-profile-chevron" />
             </div>
           </div>
         </header>
