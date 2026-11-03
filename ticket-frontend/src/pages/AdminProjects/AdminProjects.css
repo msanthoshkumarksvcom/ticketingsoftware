@@ -692,12 +692,16 @@
   top: 0;
   z-index: 10;
   display: flex;
-  height: 64px;
+  min-height: 68px;
+  height: 68px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 32px;
-  background: #ffffff;
-  border-bottom: 1px solid #f1f5f9;
+  gap: 18px;
+  padding: 0 clamp(20px, 3vw, 40px);
+  background: rgba(255, 255, 255, .96);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .03);
 }
 
 .pj-exact-breadcrumb {
@@ -1014,6 +1018,18 @@
 }
 
 @media (max-width: 768px) {
+  .pj-exact-header {
+    min-height: 64px;
+    height: auto;
+    padding: 10px 14px 10px 64px;
+  }
+  .pj-header-search-pill {
+    display: none;
+  }
+  .pj-profile-text,
+  .pj-profile-chevron {
+    display: none;
+  }
   .pj-cards-grid {
     grid-template-columns: 1fr;
   }

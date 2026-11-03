@@ -48,6 +48,8 @@ import {
   Folder
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import RaiseBugTicketModal from '../../components/RaiseBugTicketModal/RaiseBugTicketModal';
+import { Bug } from 'lucide-react';
 import './AdminProjectSheet.css';
 
 // Letters for columns: A, B, C, ... Z, AA, AB...
@@ -437,6 +439,8 @@ export default function AdminProjectSheet() {
 
   // Image Lightbox & Upload state
   const [previewImageModal, setPreviewImageModal] = useState(null);
+  const [raiseBugModalOpen, setRaiseBugModalOpen] = useState(false);
+  const [selectedFailTestCase, setSelectedFailTestCase] = useState(null);
   const [pendingUploadCell, setPendingUploadCell] = useState(null);
 
   const showToast = useCallback((msg) => {
@@ -2736,15 +2740,32 @@ export default function AdminProjectSheet() {
                                 —
                               </div>
                             ) : (
-                              <div
-                                className={`pjs-status-cover ${String(rawVal).toLowerCase().replace(/\s+/g, '')}`}
-                                onClick={() => startEditing(rIdx, col.id)}
-                                title={`Status: ${rawVal} (Click to change)`}
-                              >
-                                <span>{rawVal}</span>
-                                <span className="pjs-status-cover-arrow">
-                                  <ChevronDown size={11} />
-                                </span>
+                              <div className="pjs-status-cell-wrapper">
+                                <div
+                                  className={`pjs-status-cover ${String(rawVal).toLowerCase().replace(/\s+/g, '')}`}
+                                  onClick={() => startEditing(rIdx, col.id)}
+                                  title={`Status: ${rawVal} (Click to change)`}
+                                >
+                                  <span>{rawVal}</span>
+                                  <span className="pjs-status-cover-arrow">
+                                    <ChevronDown size={11} />
+                                  </span>
+                                </div>
+                                {isFailRow && (
+                                  <button
+                                    type="button"
+                                    className="pjs-cell-raise-bug-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedFailTestCase(row);
+                                      setRaiseBugModalOpen(true);
+                                    }}
+                                    title="Click to raise project bug ticket for this failure"
+                                  >
+                                    <Bug size={11} />
+                                    <span>Raise Bug</span>
+                                  </button>
+                                )}
                               </div>
                             )
                           ) : col.type === 'priority' ? (
@@ -3326,6 +3347,17 @@ export default function AdminProjectSheet() {
               reader.readAsDataURL(file);
             }
             e.target.value = '';
+          }}
+        />
+
+        {/* Raise Bug Ticket Automation Modal */}
+        <RaiseBugTicketModal
+          isOpen={raiseBugModalOpen}
+          onClose={() => setRaiseBugModalOpen(false)}
+          project={project}
+          testCaseData={selectedFailTestCase}
+          onTicketCreated={(createdTicket) => {
+            showToast(`Bug ticket ${createdTicket.ticket_code} created successfully!`);
           }}
         />
 

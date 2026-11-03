@@ -143,6 +143,7 @@ function AdminUsers() {
   const [createFieldErrors, setCreateFieldErrors] = useState({});
   const [editFieldErrors, setEditFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [successToast, setSuccessToast] = useState(null);
 
   const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
   const isQAMember = currentUserRole === 'QA Member';
@@ -559,6 +560,11 @@ function AdminUsers() {
       setUsers((prev) => [...prev, response.data.user]);
       setIsCreateModalOpen(false);
       setFormData(initialFormData);
+      setSuccessToast({
+        title: 'User Created & Invitation Sent',
+        message: `Account for ${response.data.user.full_name} (${response.data.user.role}) was created successfully. A welcome email with secure login credentials was dispatched to ${response.data.user.email}.`
+      });
+      setTimeout(() => setSuccessToast(null), 6000);
     } catch (error) {
       console.error('Error creating user:', error);
       setFormError(
@@ -852,6 +858,26 @@ function AdminUsers() {
 
         {/* Dashboard Body */}
         <div className="dashboard-container">
+          {/* Email Invitation / Action Success Toast */}
+          {successToast && (
+            <div className="um-success-toast" role="alert">
+              <div className="um-success-toast-content">
+                <span className="um-toast-check">✓</span>
+                <div>
+                  <strong>{successToast.title}</strong>
+                  <p>{successToast.message}</p>
+                </div>
+              </div>
+              <button
+                className="um-toast-close-btn"
+                onClick={() => setSuccessToast(null)}
+                aria-label="Dismiss message"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <div className="users-page-layout">
             {/* Page Header */}
             <div className="um-header-container">
@@ -1366,7 +1392,7 @@ function AdminUsers() {
                       Mobile Number <span className="req-star">*</span>
                     </label>
                     <div className={`um-input-box ${createFieldErrors.phone ? 'um-input-error' : ''}`}>
-                      <span className="um-country-prefix">🇮🇳 +91</span>
+                      <span className="um-country-prefix">IN +91</span>
                       <input
                         id="create-phone"
                         type="tel"
@@ -1466,7 +1492,7 @@ function AdminUsers() {
                 {/* 6. Password Delivery Notice Note */}
                 <div className="um-password-notice-banner">
                   <div className="um-notice-icon-box">
-                    <MailCheck size={14} />
+                    <Mail size={16} />
                   </div>
                   <div className="um-notice-text">
                     <span className="um-notice-title">Password will be sent through email</span>
@@ -1652,7 +1678,7 @@ function AdminUsers() {
                       Mobile Number <span className="req-star">*</span>
                     </label>
                     <div className={`um-input-box ${editFieldErrors.phone ? 'um-input-error' : ''}`}>
-                      <span className="um-country-prefix">🇮🇳 +91</span>
+                      <span className="um-country-prefix">IN +91</span>
                       <input
                         id="edit-phone"
                         type="tel"

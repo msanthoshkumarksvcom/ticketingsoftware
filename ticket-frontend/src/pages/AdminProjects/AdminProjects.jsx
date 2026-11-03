@@ -39,8 +39,11 @@ const initialProjectForm = {
   project_code: '',
   name: '',
   description: '',
-  lead_name: 'Manikandan',
-  department: 'Operations',
+  client_name: '',
+  project_lead_id: '',
+  lead_name: '',
+  priority: 'Medium',
+  department: 'Quality Assurance',
   status: 'In Progress',
   start_date: new Date().toISOString().split('T')[0],
   team_members: 4,
@@ -69,6 +72,19 @@ function AdminProjects() {
   const [editId, setEditId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [projectLeads, setProjectLeads] = useState([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    axios.get('http://localhost:5000/api/admin/project-leads', {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((res) => {
+      setProjectLeads(Array.isArray(res.data) ? res.data : []);
+    }).catch((err) => {
+      console.warn('Could not fetch project leads:', err.message);
+    });
+  }, []);
 
   // Dropdown context menu state
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -215,7 +231,10 @@ function AdminProjects() {
       project_code: project.project_code || '',
       name: project.name || '',
       description: project.description || '',
-      lead_name: project.lead_name || 'Manikandan',
+      client_name: project.client_name || '',
+      project_lead_id: project.project_lead_id || '',
+      lead_name: project.lead_name || '',
+      priority: project.priority || 'Medium',
       department: project.department || 'Operations',
       status: project.status || 'Active',
       start_date: project.start_date ? project.start_date.split('T')[0] : '2026-10-12',
@@ -449,17 +468,17 @@ function AdminProjects() {
       {/* Main Content Pane */}
       <main className="main-content">
         {/* Exact Header Bar */}
-        <header className="pj-exact-header">
+        <header className="header pj-exact-header">
           {/* Breadcrumb: Workspace > Projects */}
-          <div className="pj-exact-breadcrumb">
+          <div className="breadcrumb pj-exact-breadcrumb">
             <span>Workspace</span>
-            <span className="divider">&gt;</span>
-            <span className="current">Projects</span>
+            <span className="breadcrumb-divider">&gt;</span>
+            <strong>Projects</strong>
           </div>
 
           {/* Right Header: Search Pill + Notification Bell + Profile */}
-          <div className="pj-exact-header-right">
-            <div className="pj-header-search-pill">
+          <div className="header-right pj-exact-header-right">
+            <div className="header-search pj-header-search-pill">
               <Search size={15} />
               <input
                 type="text"
@@ -469,18 +488,18 @@ function AdminProjects() {
               />
             </div>
 
-            <button className="pj-header-bell-btn" title="Notifications" aria-label="Notifications">
+            <button className="notification-bell pj-header-bell-btn" title="Notifications" aria-label="Notifications">
               <Bell size={18} />
-              <span className="pj-bell-badge">1</span>
+              <span className="notification-count pj-bell-badge">1</span>
             </button>
 
-            <div className="pj-header-profile" title="Administrator account">
-              <div className="pj-profile-avatar">A</div>
-              <div className="pj-profile-text">
-                <span className="pj-profile-name">{displayName}</span>
-                <span className="pj-profile-role">{currentUserRole}</span>
+            <div className="user-profile pj-header-profile" title="Administrator account">
+              <div className="avatar pj-profile-avatar">{displayName ? displayName.charAt(0).toUpperCase() : 'M'}</div>
+              <div className="user-info pj-profile-text">
+                <span className="user-name pj-profile-name">{displayName}</span>
+                <span className="user-role pj-profile-role">{currentUserRole}</span>
               </div>
-              <ChevronDown size={14} className="pj-profile-chevron" />
+              <ChevronDown size={14} className="profile-chevron pj-profile-chevron" />
             </div>
           </div>
         </header>
@@ -1039,14 +1058,52 @@ function AdminProjects() {
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Project Lead</label>
+                    <label>Client Name</label>
                     <input
                       type="text"
-                      name="lead_name"
-                      placeholder="e.g. Manikandan"
-                      value={formData.lead_name}
+                      name="client_name"
+                      placeholder="e.g. Acme Health Corp"
+                      value={formData.client_name || ''}
                       onChange={handleInputChange}
                     />
+                  </div>
+
+                  <div className="pj-form-group">
+                    <label>Project Lead</label>
+                    <select
+                      name="project_lead_id"
+                      value={formData.project_lead_id || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const leadObj = projectLeads.find((l) => String(l.id) === String(val));
+                        setFormData((prev) => ({
+                          ...prev,
+                          project_lead_id: val,
+                          lead_name: leadObj ? leadObj.full_name : ''
+                        }));
+                      }}
+                    >
+                      <option value="">-- Select Project Lead (Optional) --</option>
+                      {projectLeads.map((lead) => (
+                        <option key={lead.id} value={lead.id}>
+                          {lead.full_name} ({lead.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="pj-form-group">
+                    <label>Priority</label>
+                    <select
+                      name="priority"
+                      value={formData.priority || 'Medium'}
+                      onChange={handleInputChange}
+                    >
+                      <option value="Critical">Critical</option>
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
                   </div>
 
                   <div className="pj-form-group">

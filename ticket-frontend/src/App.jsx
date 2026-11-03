@@ -57,7 +57,17 @@ function App() {
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/projects" element={<AdminProjects />} />
         <Route path="/admin/projects/:projectId" element={<AdminProjectWorkspace />} />
-        <Route path="/admin/projects/:projectId/sheet" element={<AdminProjectSheet />} />
+        
+        {/* Test Case Sheet - Restricted from Developers */}
+        <Route
+          path="/admin/projects/:projectId/sheet"
+          element={
+            <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Super Admin']} fallback="/developer">
+              <AdminProjectSheet />
+            </RoleRoute>
+          }
+        />
+
         <Route
           path="/admin/roles-permissions"
           element={
