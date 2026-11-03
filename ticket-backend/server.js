@@ -11,6 +11,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey_change_in_production';
 
 // Protected inbuilt system emails that cannot be edited or deleted
 const PROTECTED_SYSTEM_EMAILS = ['manager@gmail.com', 'qalead@gmail.com'];
@@ -54,7 +55,7 @@ app.post('/api/login', async (req, res) => {
     // 3. Generate the JWT Token
     const token = jwt.sign(
       { userId: user.id, email: user.email }, // Data packed inside the token
-      process.env.JWT_SECRET,                 // The secret key to sign it
+      JWT_SECRET,                 // The secret key to sign it
       { expiresIn: '24h' }                    // Token expires in 24 hours
     );
 
@@ -74,7 +75,7 @@ app.post('/api/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
@@ -86,7 +87,7 @@ app.get('/api/auth/me', async (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    const decoded = jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
     const userQuery = await pool.query(
       'SELECT id, email, full_name, emp_id, department, role, status, avatar FROM users WHERE id = $1',
       [decoded.userId]
@@ -110,7 +111,7 @@ app.get('/api/admin/dashboard-stats', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ error: 'Invalid or expired token' });
@@ -154,7 +155,7 @@ app.get('/api/admin/users', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -180,7 +181,7 @@ app.post('/api/admin/users', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -266,7 +267,7 @@ app.put('/api/admin/users/:id', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -343,7 +344,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -385,7 +386,7 @@ app.get('/api/admin/projects', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -417,7 +418,7 @@ app.post('/api/admin/projects', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -487,7 +488,7 @@ app.put('/api/admin/projects/:id', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -574,7 +575,7 @@ app.delete('/api/admin/projects/:id', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -774,7 +775,7 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -831,7 +832,7 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -873,7 +874,7 @@ app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -925,7 +926,7 @@ app.delete('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -958,7 +959,7 @@ app.get('/api/admin/roles', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -984,7 +985,7 @@ app.post('/api/admin/roles', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1043,7 +1044,7 @@ app.get('/api/admin/tickets', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1072,7 +1073,7 @@ app.post('/api/admin/tickets', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1128,7 +1129,7 @@ app.put('/api/admin/tickets/:id/status', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1173,7 +1174,7 @@ app.get('/api/admin/approvals', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1199,7 +1200,7 @@ app.post('/api/admin/approvals', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1249,7 +1250,7 @@ app.get('/api/admin/deployments', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1275,7 +1276,7 @@ app.post('/api/admin/deployments', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -1325,7 +1326,7 @@ app.get('/api/admin/reports-summary', async (req, res) => {
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), process.env.JWT_SECRET);
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
