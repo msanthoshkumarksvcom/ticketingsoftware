@@ -1,4 +1,24 @@
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure .env is loaded even if imported standalone
+if (!process.env.EMAIL_USER && !process.env.SMTP_USER) {
+  dotenv.config({ path: path.join(__dirname, '..', '.env') });
+}
+
+/**
+ * Returns true if real email credentials are configured in environment
+ */
+export const isEmailConfigured = () => {
+  const hasCustomSmtp = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const hasGmail = Boolean((process.env.EMAIL_USER || process.env.GMAIL_USER) && (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASS || process.env.GMAIL_PASS));
+  return hasCustomSmtp || hasGmail;
+};
 
 /**
  * Creates and returns a configured Nodemailer Transporter
@@ -19,8 +39,9 @@ export const createTransporter = () => {
   }
 
   // Option 2: Gmail with Google App Password
-  const gmailUser = process.env.EMAIL_USER || process.env.GMAIL_USER;
-  const gmailPass = process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASS || process.env.GMAIL_PASS;
+  const gmailUser = (process.env.EMAIL_USER || process.env.GMAIL_USER || '').trim();
+  const gmailPassRaw = (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASS || process.env.GMAIL_PASS || '').trim();
+  const gmailPass = gmailPassRaw.replace(/\s+/g, ''); // strip any spaces in 16-character app password
 
   if (gmailUser && gmailPass) {
     return nodemailer.createTransport({
