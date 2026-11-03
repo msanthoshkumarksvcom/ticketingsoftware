@@ -56,6 +56,41 @@ export const initDatabase = async () => {
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_members INT DEFAULT 4;
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS folder_color VARCHAR(50) DEFAULT 'blue';
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS folder_icon VARCHAR(50) DEFAULT 'folder';
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_lead_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_name VARCHAR(150);
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS lead_assigned_at TIMESTAMP;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS lead_assigned_by VARCHAR(150);
+    `);
+
+    // 2.1 Project Lead Assignments History
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_lead_assignments (
+        id SERIAL PRIMARY KEY,
+        project_id INT REFERENCES projects(id) ON DELETE CASCADE,
+        project_lead_id INT REFERENCES users(id) ON DELETE CASCADE,
+        lead_name VARCHAR(150),
+        lead_email VARCHAR(255),
+        assigned_by VARCHAR(150),
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'Active',
+        notes TEXT
+      );
+    `);
+
+    // 2.2 Project Developer Assignments
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_developer_assignments (
+        id SERIAL PRIMARY KEY,
+        project_id INT REFERENCES projects(id) ON DELETE CASCADE,
+        developer_id INT REFERENCES users(id) ON DELETE CASCADE,
+        developer_name VARCHAR(150),
+        developer_email VARCHAR(255),
+        assigned_by VARCHAR(150),
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'Active',
+        notes TEXT,
+        CONSTRAINT unique_project_developer UNIQUE (project_id, developer_id)
+      );
     `);
 
     // 3. Roles
@@ -89,6 +124,69 @@ export const initDatabase = async () => {
 
     await pool.query(`
       ALTER TABLE tickets ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id) ON DELETE CASCADE;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS test_case_id VARCHAR(100);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS module VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS sub_module VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS test_scenario TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS test_steps TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS test_data TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS expected_result TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS actual_result TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS severity VARCHAR(50) DEFAULT 'Medium';
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Functional Bug';
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS raised_by VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS raised_by_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS raised_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS assigned_developer_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS assigned_developer_name VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS assigned_developer_email VARCHAR(255);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS assigned_by VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolution_description TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS root_cause TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS fix_implemented TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS files_changed TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolution_remarks TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolution_attachments JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_by VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_by_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closed_by VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closed_by_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopened_by VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopen_comments TEXT;
+    `);
+
+    // 4.1 Ticket History (Audit Log)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ticket_history (
+        id SERIAL PRIMARY KEY,
+        ticket_id INT REFERENCES tickets(id) ON DELETE CASCADE,
+        action VARCHAR(100) NOT NULL,
+        previous_status VARCHAR(50),
+        new_status VARCHAR(50),
+        performed_by VARCHAR(150),
+        performed_by_id INT,
+        details TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 4.2 In-App Notifications
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        message TEXT,
+        type VARCHAR(50),
+        link VARCHAR(255),
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // 5. Approvals
@@ -136,28 +234,40 @@ export const initDatabase = async () => {
 
     // ========================
     // DEFAULT SYSTEM USERS
-    // Created automatically on first run (when users table is empty)
     // ========================
-    const userCount = await pool.query('SELECT COUNT(*) FROM users');
-    if (parseInt(userCount.rows[0].count, 10) === 0) {
-      const salt = await bcrypt.genSalt(10);
-      const managerHash = await bcrypt.hash('Kanavu@123', salt);
-      const qaLeadHash = await bcrypt.hash('Kanavu@123', salt);
+    const salt = await bcrypt.genSalt(10);
+    const defaultHash = await bcrypt.hash('Kanavu@123', salt);
 
-      await pool.query(
-        `INSERT INTO users (emp_id, full_name, email, password, department, role, status)
-         VALUES 
-           ('EMP-001', 'Manager', 'manager@gmail.com', $1, 'Quality Assurance', 'Manager', 'Active'),
-           ('EMP-002', 'QA Lead', 'qalead@gmail.com', $2, 'Quality Assurance', 'QA Lead', 'Active')
-         ON CONFLICT (email) DO NOTHING;`,
-        [managerHash, qaLeadHash]
-      );
-      console.log('Default users created: manager@gmail.com, qalead@gmail.com');
-    }
+    // Insert essential role accounts if they don't already exist
+    await pool.query(`
+      INSERT INTO users (emp_id, full_name, email, password, department, role, status)
+      VALUES 
+        ('EMP-001', 'Manager', 'manager@gmail.com', $1, 'Quality Assurance', 'Manager', 'Active'),
+        ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active'),
+        ('EMP-005', 'Project Lead', 'projectlead@gmail.com', $1, 'Engineering', 'Project Lead', 'Active'),
+        ('EMP-006', 'Developer', 'developer@gmail.com', $1, 'Development', 'Developer', 'Active')
+      ON CONFLICT (email) DO NOTHING;
+    `, [defaultHash]);
+
+    // Backfill project_id on existing tickets if matching project_code
+    await pool.query(`
+      UPDATE tickets t
+      SET project_id = p.id
+      FROM projects p
+      WHERE t.project_code = p.project_code AND t.project_id IS NULL;
+    `);
+
+    // Link lead_name to project_lead_id if project_lead_id is null
+    await pool.query(`
+      UPDATE projects p
+      SET project_lead_id = u.id
+      FROM users u
+      WHERE (LOWER(p.lead_name) = LOWER(u.full_name) OR LOWER(p.lead_name) = LOWER(u.email))
+        AND p.project_lead_id IS NULL;
+    `);
 
     // ========================
     // DEFAULT ROLES
-    // Created automatically on first run (when roles table is empty)
     // ========================
     const roleCount = await pool.query('SELECT COUNT(*) FROM roles');
     if (parseInt(roleCount.rows[0].count, 10) === 0) {

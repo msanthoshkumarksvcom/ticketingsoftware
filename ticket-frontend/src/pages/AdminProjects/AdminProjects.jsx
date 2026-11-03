@@ -39,8 +39,11 @@ const initialProjectForm = {
   project_code: '',
   name: '',
   description: '',
-  lead_name: 'Manikandan',
-  department: 'Operations',
+  client_name: '',
+  project_lead_id: '',
+  lead_name: '',
+  priority: 'Medium',
+  department: 'Quality Assurance',
   status: 'In Progress',
   start_date: new Date().toISOString().split('T')[0],
   team_members: 4,
@@ -69,6 +72,19 @@ function AdminProjects() {
   const [editId, setEditId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [projectLeads, setProjectLeads] = useState([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    axios.get('http://localhost:5000/api/admin/project-leads', {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((res) => {
+      setProjectLeads(Array.isArray(res.data) ? res.data : []);
+    }).catch((err) => {
+      console.warn('Could not fetch project leads:', err.message);
+    });
+  }, []);
 
   // Dropdown context menu state
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -215,7 +231,10 @@ function AdminProjects() {
       project_code: project.project_code || '',
       name: project.name || '',
       description: project.description || '',
-      lead_name: project.lead_name || 'Manikandan',
+      client_name: project.client_name || '',
+      project_lead_id: project.project_lead_id || '',
+      lead_name: project.lead_name || '',
+      priority: project.priority || 'Medium',
       department: project.department || 'Operations',
       status: project.status || 'Active',
       start_date: project.start_date ? project.start_date.split('T')[0] : '2026-10-12',
@@ -1039,14 +1058,52 @@ function AdminProjects() {
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Project Lead</label>
+                    <label>Client Name</label>
                     <input
                       type="text"
-                      name="lead_name"
-                      placeholder="e.g. Manikandan"
-                      value={formData.lead_name}
+                      name="client_name"
+                      placeholder="e.g. Acme Health Corp"
+                      value={formData.client_name || ''}
                       onChange={handleInputChange}
                     />
+                  </div>
+
+                  <div className="pj-form-group">
+                    <label>Project Lead</label>
+                    <select
+                      name="project_lead_id"
+                      value={formData.project_lead_id || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const leadObj = projectLeads.find((l) => String(l.id) === String(val));
+                        setFormData((prev) => ({
+                          ...prev,
+                          project_lead_id: val,
+                          lead_name: leadObj ? leadObj.full_name : ''
+                        }));
+                      }}
+                    >
+                      <option value="">-- Select Project Lead (Optional) --</option>
+                      {projectLeads.map((lead) => (
+                        <option key={lead.id} value={lead.id}>
+                          {lead.full_name} ({lead.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="pj-form-group">
+                    <label>Priority</label>
+                    <select
+                      name="priority"
+                      value={formData.priority || 'Medium'}
+                      onChange={handleInputChange}
+                    >
+                      <option value="Critical">Critical</option>
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
                   </div>
 
                   <div className="pj-form-group">
