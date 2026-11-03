@@ -32,129 +32,8 @@ import ProjectSpreadsheetView from './ProjectSpreadsheetView';
 import '../../styles/admin.css';
 import './AdminProjects.css';
 
-// Exact mock projects matching the UI reference screenshot
-const EXACT_DEFAULT_PROJECTS = [
-  {
-    id: 1,
-    project_code: 'PRJ-PORTAL-03',
-    name: 'Customer Support Portal',
-    department: 'Operations',
-    lead_name: 'Manikandan',
-    status: 'Active',
-    start_date: '2026-10-12',
-    team_members: 5,
-    test_cases: 24,
-    documents: 8,
-    tickets_count: 6,
-    folder_color: 'blue',
-    folder_icon: 'CS'
-  },
-  {
-    id: 2,
-    project_code: 'PRJ-CORE-02',
-    name: 'Ticketing API Service',
-    department: 'Engineering',
-    lead_name: 'Karthikeyan',
-    status: 'In Progress',
-    start_date: '2026-10-10',
-    team_members: 4,
-    test_cases: 18,
-    documents: 5,
-    tickets_count: 12,
-    folder_color: 'purple',
-    folder_icon: 'API'
-  },
-  {
-    id: 3,
-    project_code: 'PRJ-QA-01',
-    name: 'Automation Test Suite V2',
-    department: 'Quality Assurance',
-    lead_name: 'Santhosh',
-    status: 'Planning',
-    start_date: '2026-10-09',
-    team_members: 3,
-    test_cases: 10,
-    documents: 5,
-    tickets_count: 13,
-    folder_color: 'amber',
-    folder_icon: 'settings'
-  },
-  {
-    id: 4,
-    project_code: 'PRJ-VENDOR-04',
-    name: 'Vendor Management System',
-    department: 'Operations',
-    lead_name: 'Deepak Kumar',
-    status: 'Active',
-    start_date: '2026-10-08',
-    team_members: 6,
-    test_cases: 32,
-    documents: 11,
-    tickets_count: 9,
-    folder_color: 'pink',
-    folder_icon: 'cart'
-  },
-  {
-    id: 5,
-    project_code: 'PRJ-HR-05',
-    name: 'HR Management',
-    department: 'Human Resources',
-    lead_name: 'Pavishek',
-    status: 'Not Started',
-    start_date: '2026-10-06',
-    team_members: 4,
-    test_cases: 0,
-    documents: 3,
-    tickets_count: 0,
-    folder_color: 'teal',
-    folder_icon: 'graduation'
-  },
-  {
-    id: 6,
-    project_code: 'PRJ-FIN-07',
-    name: 'Finance Management',
-    department: 'Finance',
-    lead_name: 'Varhun',
-    status: 'In Progress',
-    start_date: '2026-10-04',
-    team_members: 4,
-    test_cases: 8,
-    documents: 6,
-    tickets_count: 5,
-    folder_color: 'violet',
-    folder_icon: 'building'
-  },
-  {
-    id: 7,
-    project_code: 'PRJ-SEC-06',
-    name: 'Cloud Security Gateway',
-    department: 'Engineering',
-    lead_name: 'Arun Kumar',
-    status: 'In Progress',
-    start_date: '2026-10-02',
-    team_members: 5,
-    test_cases: 15,
-    documents: 7,
-    tickets_count: 4,
-    folder_color: 'blue',
-    folder_icon: 'shield'
-  },
-  {
-    id: 8,
-    project_code: 'PRJ-CRM-08',
-    name: 'Enterprise CRM Migration',
-    department: 'Operations',
-    lead_name: 'Priya Raj',
-    status: 'Completed',
-    start_date: '2026-09-15',
-    team_members: 6,
-    test_cases: 42,
-    documents: 14,
-    tickets_count: 1,
-    folder_color: 'emerald',
-    folder_icon: 'check'
-  }
-];
+// Default empty projects array
+const EXACT_DEFAULT_PROJECTS = [];
 
 const initialProjectForm = {
   project_code: '',
@@ -174,7 +53,7 @@ const initialProjectForm = {
 
 function AdminProjects() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState(EXACT_DEFAULT_PROJECTS);
+  const [projects, setProjects] = useState([]);
   const [, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [headerSearchQuery, setHeaderSearchQuery] = useState('');
@@ -198,9 +77,9 @@ function AdminProjects() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // User Profile
-  const [userEmail] = useState(() => localStorage.getItem('userEmail') || 'admin1@gmail.com');
-  const displayName = userEmail ? userEmail.split('@')[0] : 'admin1';
-  const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
+  const [userEmail] = useState(() => localStorage.getItem('userEmail') || 'manager@gmail.com');
+  const displayName = userEmail ? userEmail.split('@')[0] : 'manager';
+  const currentUserRole = localStorage.getItem('userRole') || 'Manager';
   const isQAMember = currentUserRole === 'QA Member';
 
   // Fetch projects from backend
@@ -213,11 +92,11 @@ function AdminProjects() {
       const response = await axios.get('http://localhost:5000/api/admin/projects', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (Array.isArray(response.data) && response.data.length > 0) {
+      if (Array.isArray(response.data)) {
         setProjects(response.data);
       }
     } catch (error) {
-      console.warn('Backend unavailable, utilizing exact seeded dataset:', error.message);
+      console.warn('Backend unavailable:', error.message);
     } finally {
       setLoading(false);
     }
