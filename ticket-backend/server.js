@@ -13,7 +13,7 @@ import { registerWorkflowRoutes, getUserFromReq } from './services/leadDevWorkfl
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -246,24 +246,86 @@ app.post('/api/admin/users', async (req, res) => {
     const newUser = result.rows[0];
 
     // Trigger welcome email with role, department, and generated password via Nodemailer
-    sendWelcomeEmail({
-      to: newUser.email,
-      fullName: newUser.full_name,
-      empId: newUser.emp_id,
-      role: newUser.role,
-      department: newUser.department,
-      password: generatedPlainPassword
-    }).catch((emailErr) => {
+    let emailStatus = { success: false, simulated: false };
+    try {
+      emailStatus = await sendWelcomeEmail({
+        to: newUser.email,
+        fullName: newUser.full_name,
+        empId: newUser.emp_id,
+        role: newUser.role,
+        department: newUser.department,
+        password: generatedPlainPassword
+      });
+    } catch (emailErr) {
       console.error('Welcome email dispatch error:', emailErr);
-    });
+      emailStatus = { success: false, error: emailErr.message };
+    }
 
     res.status(201).json({
-      message: 'User created successfully and welcome email sent',
-      user: newUser
+      message: emailStatus.success
+        ? (emailStatus.simulated ? 'User created. Credentials logged to server console (live SMTP not configured).' : 'User created and credentials email successfully delivered!')
+        : 'User created, but email delivery failed: ' + (emailStatus.error || 'Unknown error'),
+      user: newUser,
+      email_status: emailStatus
     });
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ error: 'Failed to create user in database.' });
+  }
+});
+
+// Admin Users: Resend Invitation & Credentials Email
+app.post('/api/admin/users/:id/resend-invite', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+  try {
+    const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUser = userRes.rows[0];
+    const temporaryPassword = generateTemporaryPassword();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(temporaryPassword, salt);
+
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, id]);
+
+    const emailStatus = await sendWelcomeEmail({
+      to: targetUser.email,
+      fullName: targetUser.full_name,
+      empId: targetUser.emp_id,
+      role: targetUser.role,
+      department: targetUser.department,
+      password: temporaryPassword
+    });
+
+    if (emailStatus.success) {
+      return res.json({
+        message: emailStatus.simulated
+          ? 'Credentials generated and logged to console (SMTP unconfigured).'
+          : 'Credentials email successfully resent to ' + targetUser.email,
+        email_status: emailStatus
+      });
+    } else {
+      return res.status(500).json({
+        error: 'Failed to deliver credentials email: ' + (emailStatus.error || 'SMTP delivery error'),
+        email_status: emailStatus
+      });
+    }
+  } catch (err) {
+    console.error('Error resending invite:', err);
+    res.status(500).json({ error: 'Failed to resend credentials: ' + err.message });
   }
 });
 
