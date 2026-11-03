@@ -6,6 +6,12 @@ import jwt from 'jsonwebtoken';
 import pool from './db.js';
 import { sendWelcomeEmail, generateTemporaryPassword } from './services/emailService.js';
 import { initDatabase } from './init-db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { registerWorkflowRoutes, getUserFromReq } from './services/leadDevWorkflow.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -19,7 +25,9 @@ const DEFAULT_USER_PASSWORD = 'Welcome@123';
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Basic test route
 app.get('/api/test', async (req, res) => {
@@ -378,31 +386,40 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   }
 });
 
-// Admin Projects: Get all projects
+// Admin Projects: Get all projects (Role-filtered)
 app.get('/api/admin/projects', async (req, res) => {
-  const authorization = req.headers.authorization;
-  if (!authorization?.startsWith('Bearer ')) {
+  const user = await getUserFromReq(req);
+  if (!user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
+    let query = `
+      SELECT p.id, p.project_code, p.name, p.description, p.lead_name, p.project_lead_id, p.client_name,
+             p.department, p.status, p.priority, p.progress, p.start_date, p.end_date, p.created_at,
+             COALESCE(p.test_cases, 0) as test_cases,
+             COALESCE(p.documents, 0) as documents,
+             COALESCE(p.tickets_count, 0) as tickets_count,
+             COALESCE(p.team_members, 4) as team_members,
+             COALESCE(p.folder_color, 'blue') as folder_color,
+             COALESCE(p.folder_icon, 'folder') as folder_icon,
+             COALESCE((SELECT COUNT(*) FROM project_developer_assignments WHERE project_id = p.id AND status = 'Active'), 0) as assigned_devs_count
+      FROM projects p
+    `;
+    const params = [];
 
-  try {
-    const result = await pool.query(
-      `SELECT id, project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date, created_at,
-              COALESCE(test_cases, 0) as test_cases,
-              COALESCE(documents, 0) as documents,
-              COALESCE(tickets_count, 0) as tickets_count,
-              COALESCE(team_members, 4) as team_members,
-              COALESCE(folder_color, 'blue') as folder_color,
-              COALESCE(folder_icon, 'folder') as folder_icon
-       FROM projects 
-       ORDER BY id ASC`
-    );
+    if (user.role === 'Project Lead') {
+      params.push(user.id);
+      params.push(user.full_name);
+      query += ` WHERE (p.project_lead_id = $1 OR LOWER(p.lead_name) = LOWER($2))`;
+    } else if (user.role === 'Developer') {
+      params.push(user.id);
+      query += ` WHERE p.id IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $1 AND status = 'Active')`;
+    }
+
+    query += ` ORDER BY p.id ASC`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -423,7 +440,7 @@ app.post('/api/admin/projects', async (req, res) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const { project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date } = req.body;
+  const { project_code, name, description, lead_name, project_lead_id, client_name, department, status, priority, progress, start_date, end_date } = req.body;
 
   if (!project_code || !name) {
     return res.status(400).json({ error: 'Project Code and Project Name are required.' });
@@ -451,15 +468,33 @@ app.post('/api/admin/projects', async (req, res) => {
       ? end_date.toString().trim()
       : null;
 
+    let resolvedLeadName = lead_name || 'Admin User';
+    let leadAssignedAt = null;
+    let leadAssignedBy = null;
+    let leadId = project_lead_id ? parseInt(project_lead_id, 10) : null;
+
+    if (leadId) {
+      const leadUserRes = await pool.query('SELECT full_name, email FROM users WHERE id = $1', [leadId]);
+      if (leadUserRes.rows.length > 0) {
+        resolvedLeadName = leadUserRes.rows[0].full_name || resolvedLeadName;
+        leadAssignedAt = new Date();
+        leadAssignedBy = 'Admin';
+      }
+    }
+
     const result = await pool.query(
-      `INSERT INTO projects (project_code, name, description, lead_name, department, status, priority, progress, start_date, end_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO projects (project_code, name, description, lead_name, project_lead_id, client_name, lead_assigned_at, lead_assigned_by, department, status, priority, progress, start_date, end_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         project_code.trim(),
         name.trim(),
         description || '',
-        lead_name || 'Admin User',
+        resolvedLeadName,
+        leadId,
+        client_name || '',
+        leadAssignedAt,
+        leadAssignedBy,
         department || 'Quality Assurance',
         status || 'In Progress',
         priority || 'Medium',
@@ -469,9 +504,32 @@ app.post('/api/admin/projects', async (req, res) => {
       ]
     );
 
+    const createdProject = result.rows[0];
+
+    if (leadId) {
+      try {
+        const leadUserRes = await pool.query('SELECT full_name, email FROM users WHERE id = $1', [leadId]);
+        const leadUser = leadUserRes.rows[0];
+        await pool.query(
+          `INSERT INTO project_lead_assignments (project_id, project_lead_id, project_lead_name, project_lead_email, assigned_by, notes)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            createdProject.id,
+            leadId,
+            leadUser?.full_name || resolvedLeadName,
+            leadUser?.email || '',
+            'Admin',
+            'Assigned during project creation'
+          ]
+        );
+      } catch (histErr) {
+        console.warn('Could not record initial lead assignment history:', histErr.message);
+      }
+    }
+
     res.status(201).json({
       message: 'Project created successfully',
-      project: result.rows[0]
+      project: createdProject
     });
   } catch (error) {
     console.error('Error creating project:', error);
@@ -782,6 +840,14 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
 
   const { id } = req.params;
 
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  // RBAC: Developers are strictly restricted from full test sheets
+  if (user.role === 'Developer') {
+    return res.status(403).json({ error: 'Developers are restricted from accessing complete test case sheets. You can view your assigned bug tickets.' });
+  }
+
   try {
     // 1. Check if project exists
     const projRes = await pool.query('SELECT * FROM projects WHERE id = $1', [id]);
@@ -1036,29 +1102,64 @@ const generateTicketCode = async () => {
   return `${prefix}-${String(number).padStart(4, '0')}`;
 };
 
-// Admin Tickets: Get all tickets
+// Admin Tickets: Get all tickets (Role-filtered)
 app.get('/api/admin/tickets', async (req, res) => {
-  const authorization = req.headers.authorization;
-  if (!authorization?.startsWith('Bearer ')) {
+  const user = await getUserFromReq(req);
+  if (!user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  try {
-    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
+  const { project_id, status } = req.query;
 
   try {
-    const result = await pool.query(
-      `SELECT id, ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter, attachments, created_at
-       FROM tickets 
-       ORDER BY id DESC`
-    );
-    res.json(result.rows.map((row) => ({
-      ...row,
-      attachments: Array.isArray(row.attachments) ? row.attachments : []
-    })));
+    let query = `
+      SELECT t.*, 
+             p.name as project_name, p.lead_name as project_lead_name, p.project_lead_id
+      FROM tickets t
+      LEFT JOIN projects p ON p.id = t.project_id OR p.project_code = t.project_code
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (user.role === 'Developer') {
+      params.push(user.id);
+      params.push(user.full_name);
+      params.push(user.email);
+      query += ` AND (t.assigned_developer_id = $1 OR LOWER(t.assigned_to) = LOWER($2) OR LOWER(t.assigned_to) = LOWER($3))`;
+    } else if (user.role === 'Project Lead') {
+      params.push(user.id);
+      params.push(user.full_name);
+      query += ` AND (p.project_lead_id = $1 OR LOWER(p.lead_name) = LOWER($2))`;
+    }
+
+    if (project_id) {
+      params.push(project_id);
+      query += ` AND t.project_id = ${params.length}`;
+    }
+
+    if (status) {
+      params.push(status);
+      query += ` AND t.status = ${params.length}`;
+    }
+
+    query += ` ORDER BY t.id DESC`;
+
+    const result = await pool.query(query, params);
+    res.json(result.rows.map((row) => {
+      let atts = [];
+      try {
+        atts = typeof row.attachments === 'string' ? JSON.parse(row.attachments) : (row.attachments || []);
+      } catch (e) { atts = []; }
+      let resAtts = [];
+      try {
+        resAtts = typeof row.resolution_attachments === 'string' ? JSON.parse(row.resolution_attachments) : (row.resolution_attachments || []);
+      } catch (e) { resAtts = []; }
+      return {
+        ...row,
+        attachments: Array.isArray(atts) ? atts : [],
+        resolution_attachments: Array.isArray(resAtts) ? resAtts : []
+      };
+    }));
   } catch (error) {
     console.error('Error fetching tickets:', error);
     res.status(500).json({ error: 'Failed to fetch tickets from database.' });
@@ -1350,6 +1451,9 @@ app.get('/api/admin/reports-summary', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate report summaries.' });
   }
 });
+
+// Register Project Lead Management, Developer Assignment & Bug Ticket Automation Routes
+registerWorkflowRoutes(app);
 
 app.listen(PORT, async () => {
   await initDatabase();

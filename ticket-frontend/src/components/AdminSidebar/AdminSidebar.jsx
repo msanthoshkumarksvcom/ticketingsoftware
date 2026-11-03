@@ -40,6 +40,21 @@ export const QA_MEMBER_NAV = [
   { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
 
+export const PROJECT_LEAD_NAV = [
+  { label: 'Dashboard', to: '/project-lead', icon: LayoutDashboard, end: true },
+  { label: 'Projects', to: '/admin/projects', icon: FolderKanban },
+  { label: 'Bug Tickets', to: '/admin/tickets', icon: Ticket },
+  { label: 'Reports', to: '/admin/reports', icon: BarChart3 },
+  { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
+];
+
+export const DEVELOPER_NAV = [
+  { label: 'Dashboard', to: '/developer', icon: LayoutDashboard, end: true },
+  { label: 'Assigned Tickets', to: '/admin/tickets', icon: Ticket },
+  { label: 'My Projects', to: '/admin/projects', icon: FolderKanban },
+  { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
+];
+
 export const SmallCubeLogo = () => (
   <svg viewBox="0 0 100 100" className="sidebar-logo" aria-hidden="true">
     <g transform="translate(50, 50)">
@@ -158,8 +173,6 @@ function AdminSidebar({
               to={to}
               onClick={() => {
                 setMobileOpen(false);
-                window.localStorage.setItem('workspaceSidebarCollapsed', 'true');
-                setCollapsed(true);
               }}
             >
               <Icon className="nav-icon" /> <span className="nav-label">{label}</span>
