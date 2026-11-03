@@ -725,3 +725,4 @@ export default function TicketDetailModal({
     </div>
   );
 }
+
