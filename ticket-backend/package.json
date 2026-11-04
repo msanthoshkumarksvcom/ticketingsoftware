@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "db:reset-prod": "node reset-prod-db.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
