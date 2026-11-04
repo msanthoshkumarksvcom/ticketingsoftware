@@ -50,8 +50,7 @@ const initialProjectForm = {
   test_cases: 0,
   documents: 0,
   tickets_count: 0,
-  folder_color: 'blue',
-  folder_icon: 'folder'
+  end_date: ''
 };
 
 function AdminProjects() {
@@ -242,8 +241,7 @@ function AdminProjects() {
       test_cases: project.test_cases || 0,
       documents: project.documents || 0,
       tickets_count: project.tickets_count || 0,
-      folder_color: project.folder_color || 'blue',
-      folder_icon: project.folder_icon || 'folder'
+      end_date: project.end_date ? project.end_date.split('T')[0] : ''
     });
     setFormError('');
     setIsModalOpen(true);
@@ -775,13 +773,14 @@ function AdminProjects() {
                 >
                   {/* Top: Folder Graphic + Status Badge + Actions */}
                   <div className="pj-card-top">
-                    <FolderEmblem
-                      color={project.folder_color || 'blue'}
-                      icon={project.folder_icon || 'folder'}
-                      label={project.name}
-                    />
+                    <FolderEmblem code={project.project_code} label={project.name} />
 
                     <div className="pj-card-top-right">
+                      {project.priority && (
+                        <span className={`pj-priority-badge ${project.priority.toLowerCase()}`}>
+                          {project.priority}
+                        </span>
+                      )}
                       <span className={`pj-status-badge ${getStatusClass(project.status)}`}>
                         {project.status || 'Active'}
                       </span>
@@ -914,6 +913,34 @@ function AdminProjects() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Card Quick Actions Bar */}
+                  <div className="pj-card-actions-bar">
+                    <button
+                      type="button"
+                      className="pj-card-action-btn sheet"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/admin/projects/${project.id}/sheet`);
+                      }}
+                      title="Open Test Case Execution Sheet"
+                    >
+                      <FileSpreadsheet size={14} />
+                      <span>Test Sheet</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="pj-card-action-btn workspace"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openProjectWorkspace(project);
+                      }}
+                      title="Open Project Workspace"
+                    >
+                      <Folder size={14} />
+                      <span>Workspace</span>
+                    </button>
+                  </div>
                 </article>
               ))}
             </section>
@@ -1007,7 +1034,12 @@ function AdminProjects() {
         >
           <div className="pj-modal-card">
             <div className="pj-modal-header">
-              <h3>{isEditing ? 'Edit Project' : 'Create New Project'}</h3>
+              <div>
+                <h3>{isEditing ? 'Edit Project Specifications' : 'Create New Project'}</h3>
+                <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#64748B' }}>
+                  {isEditing ? 'Update project scope, lead assignment, and timelines.' : 'Fill in project details and configure workspace access.'}
+                </p>
+              </div>
               <button
                 className="pj-modal-close-btn"
                 onClick={() => setIsModalOpen(false)}
@@ -1151,39 +1183,13 @@ function AdminProjects() {
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Folder Color Theme</label>
-                    <select
-                      name="folder_color"
-                      value={formData.folder_color}
+                    <label>Target End Date</label>
+                    <input
+                      type="date"
+                      name="end_date"
+                      value={formData.end_date || ''}
                       onChange={handleInputChange}
-                    >
-                      <option value="blue">Blue (Portal / Gateway)</option>
-                      <option value="purple">Purple (API Services)</option>
-                      <option value="amber">Amber (Automation / Tools)</option>
-                      <option value="pink">Pink (Vendor / Commerce)</option>
-                      <option value="teal">Teal (HR / Academy)</option>
-                      <option value="violet">Violet (Finance / Office)</option>
-                      <option value="emerald">Emerald (Migration / CRM)</option>
-                    </select>
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Folder Emblem Badge</label>
-                    <select
-                      name="folder_icon"
-                      value={formData.folder_icon}
-                      onChange={handleInputChange}
-                    >
-                      <option value="CS">"CS" Text Badge</option>
-                      <option value="API">"API" Text Badge</option>
-                      <option value="settings">Gear / Settings Icon</option>
-                      <option value="cart">Shopping Cart Icon</option>
-                      <option value="graduation">Graduation Cap Icon</option>
-                      <option value="building">Office Building Icon</option>
-                      <option value="shield">Security Shield Icon</option>
-                      <option value="check">Checkmark Icon</option>
-                      <option value="folder">Standard Folder Icon</option>
-                    </select>
+                    />
                   </div>
 
                   <div className="pj-form-group">
