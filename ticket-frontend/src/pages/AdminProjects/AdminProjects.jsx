@@ -190,7 +190,7 @@ function AdminProjects() {
     });
   }, [projects, searchQuery, headerSearchQuery, departmentFilter, statusFilter, sortBy]);
 
-  // Compute Stats - Exact reference matches: Total 8, In Progress 5, Not Started 2, Completed 1
+  // Compute Stats from real database records (0 when empty)
   const stats = useMemo(() => {
     const total = projects.length;
     const inProgress = projects.filter(
@@ -202,10 +202,10 @@ function AdminProjects() {
     const completed = projects.filter((p) => p.status === 'Completed').length;
 
     return {
-      total: total || 8,
-      inProgress: inProgress || 5,
-      notStarted: notStarted || 2,
-      completed: completed || 1
+      total,
+      inProgress,
+      notStarted,
+      completed
     };
   }, [projects]);
 
@@ -732,7 +732,26 @@ function AdminProjects() {
           </section>
 
           {/* 4. Projects Display: Sheet View, Grid View or List View */}
-          {viewMode === 'sheet' ? (
+          {filteredProjects.length === 0 && viewMode !== 'sheet' ? (
+            <div className="pj-empty-state" style={{
+              background: '#FFFFFF',
+              border: '1.5px dashed #CBD5E1',
+              borderRadius: '16px',
+              padding: '48px 24px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px',
+              margin: '20px 0'
+            }}>
+              <Folder size={42} color="#94A3B8" />
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>No Projects Created Yet</h3>
+              <p style={{ margin: 0, fontSize: '14px', color: '#64748B', maxWidth: '440px' }}>
+                Your production workspace is clean and ready. Click the "+ Create Project" button above to initiate your first QA project.
+              </p>
+            </div>
+          ) : viewMode === 'sheet' ? (
             <ProjectSpreadsheetView
               projects={projects}
               onUpdateProject={handleUpdateProjectCell}

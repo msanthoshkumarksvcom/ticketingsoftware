@@ -58,7 +58,7 @@ export default function QAMemberDashboard() {
         }).catch(() => null),
         axios.get('http://localhost:5000/api/admin/dashboard-stats', {
           headers: { Authorization: `Bearer ${token}` }
-        }).catch(() => ({ data: { totalProjects: 8, totalTickets: 25, totalUsers: 3, pendingApprovals: 0 } })),
+        }).catch(() => ({ data: { totalProjects: 0, totalTickets: 0, totalUsers: 0, pendingApprovals: 0 } })),
         axios.get('http://localhost:5000/api/admin/tickets', {
           headers: { Authorization: `Bearer ${token}` }
         }).catch(() => ({ data: [] }))
