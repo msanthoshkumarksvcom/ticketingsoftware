@@ -76,12 +76,32 @@ function AdminSidebar({
 }) {
   const currentRole = typeof window !== 'undefined' ? (window.localStorage.getItem('userRole') || '') : '';
   const isQAMember = currentRole === 'QA Member';
+  const isProjectLead = currentRole === 'Project Lead';
+  const isDeveloper = currentRole === 'Developer';
 
-  const effectiveHomeRoute = homeRoute || (isQAMember ? '/qa-member' : '/admin');
-  const effectiveWorkspaceRole = workspaceRole || (isQAMember ? 'QA Member console' : 'Admin console');
+  let roleHomeRoute = '/admin';
+  let roleWorkspaceRole = 'Admin console';
+  let roleNavItems = mainMenuNav;
+
+  if (isProjectLead) {
+    roleHomeRoute = '/project-lead';
+    roleWorkspaceRole = 'Project Lead console';
+    roleNavItems = PROJECT_LEAD_NAV;
+  } else if (isDeveloper) {
+    roleHomeRoute = '/developer';
+    roleWorkspaceRole = 'Developer console';
+    roleNavItems = DEVELOPER_NAV;
+  } else if (isQAMember) {
+    roleHomeRoute = '/qa-member';
+    roleWorkspaceRole = 'QA Member console';
+    roleNavItems = QA_MEMBER_NAV;
+  }
+
+  const effectiveHomeRoute = homeRoute || roleHomeRoute;
+  const effectiveWorkspaceRole = workspaceRole || roleWorkspaceRole;
   const effectiveNavItems = (navItems && navItems !== mainMenuNav)
     ? navItems
-    : (isQAMember ? QA_MEMBER_NAV : mainMenuNav);
+    : roleNavItems;
   const [collapsed, setCollapsed] = useState(() => {
     const savedState = window.localStorage.getItem('workspaceSidebarCollapsed');
     return defaultCollapsed || (savedState !== null

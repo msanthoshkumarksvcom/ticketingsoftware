@@ -24,6 +24,7 @@ import {
   X
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import '../AdminProjects/AdminProjects.css';
@@ -58,6 +59,10 @@ function AdminTickets() {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
+  const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
+  const isDeveloper = currentUserRole === 'Developer';
+  const isProjectLead = currentUserRole === 'Project Lead';
   const [userEmail] = useState(() => localStorage.getItem('userEmail') || '');
 
   const fetchData = useCallback(async () => {
@@ -244,6 +249,20 @@ function AdminTickets() {
 
   return (
     <div className="admin-layout tickets-page">
+      {/* Enhanced Defect Resolution & Inspection Modal */}
+      {selectedTicketId && (
+        <TicketDetailModal
+          isOpen={Boolean(selectedTicketId)}
+          ticketId={selectedTicketId}
+          userRole={currentUserRole}
+          onClose={() => {
+            setSelectedTicketId(null);
+            fetchData();
+          }}
+          onTicketUpdated={() => fetchData()}
+        />
+      )}
+
       {showLogoutModal && (
         <div
           className="modal-overlay"
@@ -304,21 +323,23 @@ function AdminTickets() {
           <div className="projects-layout">
             <div className="projects-header-row">
               <div className="projects-header-info">
-                <h2>Tickets Workspace</h2>
-                <p>Track, assign, prioritize, and resolve QA issues and bug reports.</p>
+                <h2>{isDeveloper ? 'Assigned Defects & Project Tickets' : isProjectLead ? 'Project Defect Tickets' : 'Tickets Workspace'}</h2>
+                <p>{isDeveloper ? 'Investigate defects, apply code fixes, and submit resolution reports for QA signoff.' : 'Track, assign, prioritize, and resolve QA issues and bug reports.'}</p>
               </div>
-              <div className="users-header-actions">
-                <button
-                  className="btn-primary-action"
-                  onClick={() => {
-                    setSelectedTicket(null);
-                    setIsModalOpen(true);
-                  }}
-                >
-                  <Plus size={18} />
-                  <span>Raise Ticket</span>
-                </button>
-              </div>
+              {!isDeveloper && (
+                <div className="users-header-actions">
+                  <button
+                    className="btn-primary-action"
+                    onClick={() => {
+                      setSelectedTicket(null);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    <Plus size={18} />
+                    <span>Raise Ticket</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="tickets-overview">
@@ -416,14 +437,12 @@ function AdminTickets() {
                         key={t.id}
                         className="ticket-table-row"
                         onClick={() => {
-                          setSelectedTicket(t);
-                          setDetailError('');
+                          setSelectedTicketId(t.id);
                         }}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            setSelectedTicket(t);
-                            setDetailError('');
+                            setSelectedTicketId(t.id);
                           }
                         }}
                         tabIndex={0}
@@ -504,8 +523,7 @@ function AdminTickets() {
                             className="ticket-view-button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              setSelectedTicket(t);
-                              setDetailError('');
+                              setSelectedTicketId(t.id);
                             }}
                             aria-label={`View details for ${t.ticket_code}`}
                           >

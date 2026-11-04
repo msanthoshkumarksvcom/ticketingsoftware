@@ -1187,11 +1187,20 @@ app.get('/api/admin/tickets', async (req, res) => {
       params.push(user.id);
       params.push(user.full_name);
       params.push(user.email);
-      query += ` AND (t.assigned_developer_id = $1 OR LOWER(t.assigned_to) = LOWER($2) OR LOWER(t.assigned_to) = LOWER($3))`;
+      query += ` AND (
+        t.assigned_developer_id = $1 
+        OR LOWER(t.assigned_to) = LOWER($2) 
+        OR LOWER(t.assigned_to) = LOWER($3)
+        OR t.project_id IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $1)
+      )`;
     } else if (user.role === 'Project Lead') {
       params.push(user.id);
       params.push(user.full_name);
-      query += ` AND (p.project_lead_id = $1 OR LOWER(p.lead_name) = LOWER($2))`;
+      query += ` AND (
+        p.project_lead_id = $1 
+        OR LOWER(p.lead_name) = LOWER($2)
+        OR t.project_id IN (SELECT project_id FROM project_lead_assignments WHERE project_lead_id = $1)
+      )`;
     }
 
     if (project_id) {

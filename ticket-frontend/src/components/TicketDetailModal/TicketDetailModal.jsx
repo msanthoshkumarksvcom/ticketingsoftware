@@ -678,6 +678,8 @@ export default function TicketDetailModal({
                     <div><span>Reported Date:</span> <strong>{new Date(ticket.created_at).toLocaleDateString()}</strong></div>
                     <div><span>Priority:</span> <strong>{ticket.priority || 'Medium'}</strong></div>
                     <div><span>Severity:</span> <strong>{ticket.severity || 'Medium'}</strong></div>
+                    {ticket.resolved_by && <div><span>Resolved By:</span> <strong>{ticket.resolved_by}</strong></div>}
+                    {ticket.resolved_at && <div><span>Resolved Date:</span> <strong>{new Date(ticket.resolved_at).toLocaleDateString()}</strong></div>}
                     {ticket.closed_by && <div><span>Closed By:</span> <strong>{ticket.closed_by}</strong></div>}
                   </div>
                 </div>

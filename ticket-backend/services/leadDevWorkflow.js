@@ -761,8 +761,17 @@ export function registerWorkflowRoutes(app) {
 
       const prevStatus = ticket.status;
       const updateRes = await pool.query(
-        `UPDATE tickets SET status = 'In Progress' WHERE id = $1 RETURNING *`,
-        [ticketId]
+        `UPDATE tickets 
+         SET status = 'In Progress',
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $2),
+             assigned_developer_id = COALESCE(assigned_developer_id, $3),
+             assigned_developer_name = COALESCE(assigned_developer_name, $2),
+             assigned_developer_email = COALESCE(assigned_developer_email, $4),
+             assigned_by = COALESCE(assigned_by, $2),
+             assigned_at = COALESCE(assigned_at, CURRENT_TIMESTAMP)
+         WHERE id = $1 
+         RETURNING *`,
+        [ticketId, user.full_name, user.id, user.email]
       );
 
       await logTicketHistory(
@@ -840,7 +849,11 @@ export function registerWorkflowRoutes(app) {
              resolution_attachments = $6,
              resolved_by = $7,
              resolved_by_id = $8,
-             resolved_at = CURRENT_TIMESTAMP
+             resolved_at = CURRENT_TIMESTAMP,
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $7),
+             assigned_developer_id = COALESCE(assigned_developer_id, $8),
+             assigned_developer_name = COALESCE(assigned_developer_name, $7),
+             assigned_developer_email = COALESCE(assigned_developer_email, $10)
          WHERE id = $9
          RETURNING *`,
         [
@@ -852,7 +865,8 @@ export function registerWorkflowRoutes(app) {
           JSON.stringify(processedResAttachments),
           user.full_name,
           user.id,
-          ticketId
+          ticketId,
+          user.email
         ]
       );
 
@@ -1111,14 +1125,15 @@ export function registerWorkflowRoutes(app) {
         [user.id]
       );
 
-      // 2. Tickets assigned to developer
+      // 2. Tickets assigned to developer OR for projects developer is allocated to
       const ticketsRes = await pool.query(
         `SELECT t.*, p.name as project_name
          FROM tickets t
          LEFT JOIN projects p ON p.id = t.project_id OR p.project_code = t.project_code
          WHERE (t.assigned_developer_id = $1 
             OR LOWER(t.assigned_to) = LOWER($2) 
-            OR LOWER(t.assigned_to) = LOWER($3))
+            OR LOWER(t.assigned_to) = LOWER($3)
+            OR t.project_id IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $1))
          ORDER BY t.id DESC`,
         [user.id, user.full_name, user.email]
       );
