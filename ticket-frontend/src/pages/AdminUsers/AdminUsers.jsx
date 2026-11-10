@@ -52,10 +52,12 @@ const AVAILABLE_ROLES = [
 
 const AVAILABLE_DEPARTMENTS = [
   'Quality Assurance',
-  'Development',
-  'Operations',
-  'Support',
-  'Management'
+  'Development'
+];
+
+const CREATE_USER_ROLES = [
+  'QA Member',
+  'Developer'
 ];
 
 const DEPARTMENT_FILTER_OPTIONS = [
@@ -95,7 +97,7 @@ const MODAL_DEPARTMENT_OPTIONS = AVAILABLE_DEPARTMENTS.map((dept) => ({
   icon: <Building2 size={15} color="#2563eb" />
 }));
 
-const MODAL_ROLE_OPTIONS = AVAILABLE_ROLES.map((role) => ({
+const MODAL_ROLE_OPTIONS = CREATE_USER_ROLES.map((role) => ({
   value: role,
   label: role,
   icon: <ShieldCheck size={15} color="#0284c7" />
@@ -1427,10 +1429,17 @@ function AdminUsers() {
                       id="create-department"
                       value={formData.department}
                       onChange={(val) => {
-                        setFormData((prev) => ({ ...prev, department: val }));
+                        let autoRole = formData.role;
+                        if (val === 'Quality Assurance') {
+                          autoRole = 'QA Member';
+                        } else if (val === 'Development') {
+                          autoRole = 'Developer';
+                        }
+                        setFormData((prev) => ({ ...prev, department: val, role: autoRole }));
                         setCreateFieldErrors((prev) => ({
                           ...prev,
-                          department: validateDepartment(val)
+                          department: '',
+                          role: ''
                         }));
                         if (formError) setFormError('');
                       }}
@@ -1455,10 +1464,17 @@ function AdminUsers() {
                       id="create-role"
                       value={formData.role}
                       onChange={(val) => {
-                        setFormData((prev) => ({ ...prev, role: val }));
+                        let autoDept = formData.department;
+                        if (val === 'QA Member') {
+                          autoDept = 'Quality Assurance';
+                        } else if (val === 'Developer') {
+                          autoDept = 'Development';
+                        }
+                        setFormData((prev) => ({ ...prev, role: val, department: autoDept }));
                         setCreateFieldErrors((prev) => ({
                           ...prev,
-                          role: validateRole(val)
+                          role: '',
+                          department: ''
                         }));
                         if (formError) setFormError('');
                       }}
@@ -1713,10 +1729,17 @@ function AdminUsers() {
                       id="edit-department"
                       value={editFormData.department}
                       onChange={(val) => {
-                        setEditFormData((prev) => ({ ...prev, department: val }));
+                        let autoRole = editFormData.role;
+                        if (val === 'Quality Assurance') {
+                          autoRole = 'QA Member';
+                        } else if (val === 'Development') {
+                          autoRole = 'Developer';
+                        }
+                        setEditFormData((prev) => ({ ...prev, department: val, role: autoRole }));
                         setEditFieldErrors((prev) => ({
                           ...prev,
-                          department: validateDepartment(val)
+                          department: '',
+                          role: ''
                         }));
                         if (formError) setFormError('');
                       }}
@@ -1741,10 +1764,17 @@ function AdminUsers() {
                       id="edit-role"
                       value={editFormData.role}
                       onChange={(val) => {
-                        setEditFormData((prev) => ({ ...prev, role: val }));
+                        let autoDept = editFormData.department;
+                        if (val === 'QA Member') {
+                          autoDept = 'Quality Assurance';
+                        } else if (val === 'Developer') {
+                          autoDept = 'Development';
+                        }
+                        setEditFormData((prev) => ({ ...prev, role: val, department: autoDept }));
                         setEditFieldErrors((prev) => ({
                           ...prev,
-                          role: validateRole(val)
+                          role: '',
+                          department: ''
                         }));
                         if (formError) setFormError('');
                       }}
