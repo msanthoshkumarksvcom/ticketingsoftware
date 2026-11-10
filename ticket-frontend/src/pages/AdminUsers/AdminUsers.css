@@ -733,6 +733,74 @@
   margin: auto;
 }
 
+.um-modal-card.um-modal-streamlined {
+  max-width: 480px;
+  border-radius: 18px;
+}
+
+/* Streamlined Avatar Upload */
+.um-avatar-upload-streamlined {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.um-avatar-preview-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.um-avatar-img-sm {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.um-upload-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.um-upload-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.um-remove-link {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 0;
+}
+
+.um-remove-link:hover {
+  text-decoration: underline;
+}
+
+.um-upload-muted {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-left: auto;
+}
+
 @keyframes modalScaleUp {
   from {
     opacity: 0;

@@ -1252,11 +1252,11 @@ function AdminUsers() {
             if (e.target === e.currentTarget) setIsCreateModalOpen(false);
           }}
         >
-          <div className="um-modal-card" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
-            <div className="um-modal-header">
-              <div className="um-modal-header-titles">
-                <h3 id="create-user-title">Create New User</h3>
-                <p>Fill in team member details and configure workspace access.</p>
+          <div className="um-modal-card um-modal-streamlined" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
+            <div className="um-modal-header" style={{ padding: '18px 24px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 id="create-user-title" style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0F172A' }}>Create User</h3>
+                <span className="um-auto-badge" style={{ fontSize: '11px', padding: '2px 8px' }}>{formData.emp_id || 'EMP-AUTO'}</span>
               </div>
               <button
                 className="um-modal-close"
@@ -1268,165 +1268,167 @@ function AdminUsers() {
             </div>
 
             <form onSubmit={handleCreateUser} className="um-modal-form" noValidate>
-              <div className="um-modal-body">
+              <div className="um-modal-body" style={{ padding: '0 24px 20px', gap: '14px' }}>
                 {formError && <div className="um-error-banner">{formError}</div>}
 
-                {/* 1. Avatar Image Upload Section (Compact & sleek) */}
-                <div className="um-avatar-upload-row">
-                  <div className="um-avatar-preview-box">
+                {/* Streamlined Photo Picker */}
+                <div className="um-avatar-upload-streamlined">
+                  <div className="um-avatar-preview-sm">
                     {formData.avatar ? (
-                      <img src={formData.avatar} alt="Avatar Preview" className="um-avatar-preview-img" />
+                      <img src={formData.avatar} alt="Avatar" className="um-avatar-img-sm" />
                     ) : (
-                      <div className="um-avatar-preview-placeholder">
-                        <Camera size={20} />
-                      </div>
+                      <Camera size={16} color="#64748B" />
                     )}
                   </div>
-                  <div className="um-avatar-upload-controls">
-                    <div className="um-avatar-btn-row">
-                      <label className="um-btn-upload">
-                        <Upload size={14} />
-                        <span>{formData.avatar ? 'Change Photo' : 'Select Photo'}</span>
-                        <input
-                          ref={createFileInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          style={{ display: 'none' }}
-                          onChange={(e) => handleAvatarSelect(e, false)}
-                        />
-                      </label>
-                      {formData.avatar && (
-                        <button
-                          type="button"
-                          className="um-btn-remove-avatar"
-                          onClick={() => handleRemoveAvatar(false)}
-                        >
-                          <Trash2 size={13} />
-                          <span>Remove</span>
-                        </button>
-                      )}
-                    </div>
-                    <p className="um-avatar-upload-hint">
-                      Optional: Profile photo (PNG, JPG, up to 2MB).
-                    </p>
-                  </div>
+                  <label className="um-upload-link">
+                    <span>{formData.avatar ? 'Change photo' : 'Upload photo'}</span>
+                    <input
+                      ref={createFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleAvatarSelect(e, false)}
+                    />
+                  </label>
+                  {formData.avatar && (
+                    <button
+                      type="button"
+                      className="um-remove-link"
+                      onClick={() => handleRemoveAvatar(false)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <span className="um-upload-muted">PNG, JPG up to 2MB (optional)</span>
                 </div>
 
-                {/* 2. Basic Info: Full Name & Email Address */}
+                {/* Full Name */}
+                <div className="um-form-group">
+                  <label htmlFor="create-full-name">
+                    Full Name <span className="req-star">*</span>
+                  </label>
+                  <div className={`um-input-box ${createFieldErrors.full_name ? 'um-input-error' : ''}`}>
+                    <UserRound size={16} className="um-field-icon" />
+                    <input
+                      id="create-full-name"
+                      type="text"
+                      name="full_name"
+                      placeholder="e.g. Rahul Sharma"
+                      maxLength={50}
+                      value={formData.full_name}
+                      onChange={handleCreateInputChange}
+                      onKeyDown={handleNameKeyDown}
+                      onBlur={() =>
+                        setCreateFieldErrors((prev) => ({
+                          ...prev,
+                          full_name: validateFullName(formData.full_name, true)
+                        }))
+                      }
+                    />
+                  </div>
+                  {createFieldErrors.full_name && (
+                    <span className="um-field-error">
+                      <AlertCircle size={12} /> {createFieldErrors.full_name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Work Email */}
+                <div className="um-form-group">
+                  <label htmlFor="create-email">
+                    Work Email <span className="req-star">*</span>
+                  </label>
+                  <div className={`um-input-box ${createFieldErrors.email ? 'um-input-error' : ''}`}>
+                    <Mail size={16} className="um-field-icon" />
+                    <input
+                      id="create-email"
+                      type="email"
+                      name="email"
+                      placeholder="e.g. rahul.sharma@company.com"
+                      value={formData.email}
+                      onChange={handleCreateInputChange}
+                      onBlur={() =>
+                        setCreateFieldErrors((prev) => ({
+                          ...prev,
+                          email: validateEmail(formData.email)
+                        }))
+                      }
+                    />
+                  </div>
+                  {createFieldErrors.email && (
+                    <span className="um-field-error">
+                      <AlertCircle size={12} /> {createFieldErrors.email}
+                    </span>
+                  )}
+                </div>
+
+                {/* Mobile Number */}
+                <div className="um-form-group">
+                  <label htmlFor="create-phone">
+                    Mobile Number <span className="req-star">*</span>
+                  </label>
+                  <div className={`um-input-box ${createFieldErrors.phone ? 'um-input-error' : ''}`}>
+                    <span className="um-country-prefix">IN +91</span>
+                    <input
+                      id="create-phone"
+                      type="tel"
+                      name="phone"
+                      placeholder="98765 43210"
+                      maxLength={10}
+                      value={formData.phone}
+                      onChange={handleCreateInputChange}
+                      onBlur={() =>
+                        setCreateFieldErrors((prev) => ({
+                          ...prev,
+                          phone: validatePhone(formData.phone)
+                        }))
+                      }
+                    />
+                  </div>
+                  {createFieldErrors.phone && (
+                    <span className="um-field-error">
+                      <AlertCircle size={12} /> {createFieldErrors.phone}
+                    </span>
+                  )}
+                </div>
+
+                {/* Role & Department (Balanced 2-Column Row) */}
                 <div className="um-form-grid-2">
                   <div className="um-form-group">
-                    <label htmlFor="create-full-name">
-                      Full Name <span className="req-star">*</span>
+                    <label htmlFor="create-role">
+                      Role <span className="req-star">*</span>
                     </label>
-                    <div className={`um-input-box ${createFieldErrors.full_name ? 'um-input-error' : ''}`}>
-                      <UserRound size={17} className="um-field-icon" />
-                      <input
-                        id="create-full-name"
-                        type="text"
-                        name="full_name"
-                        placeholder="e.g. Rahul Sharma"
-                        maxLength={50}
-                        value={formData.full_name}
-                        onChange={handleCreateInputChange}
-                        onKeyDown={handleNameKeyDown}
-                        onBlur={() =>
-                          setCreateFieldErrors((prev) => ({
-                            ...prev,
-                            full_name: validateFullName(formData.full_name, true)
-                          }))
+                    <CustomSelect
+                      id="create-role"
+                      value={formData.role}
+                      onChange={(val) => {
+                        let autoDept = formData.department;
+                        if (val === 'QA Member' || val === 'Project Lead') {
+                          autoDept = 'Quality Assurance';
+                        } else if (val === 'Developer') {
+                          autoDept = 'Development';
                         }
-                      />
-                    </div>
-                    {createFieldErrors.full_name && (
+                        setFormData((prev) => ({ ...prev, role: val, department: autoDept }));
+                        setCreateFieldErrors((prev) => ({
+                          ...prev,
+                          role: '',
+                          department: ''
+                        }));
+                        if (formError) setFormError('');
+                      }}
+                      options={MODAL_ROLE_OPTIONS}
+                      placeholder="Select Role"
+                      icon={<ShieldCheck size={16} color="#64748b" />}
+                      variant="form"
+                      error={createFieldErrors.role}
+                    />
+                    {createFieldErrors.role && (
                       <span className="um-field-error">
-                        <AlertCircle size={12} /> {createFieldErrors.full_name}
+                        <AlertCircle size={12} /> {createFieldErrors.role}
                       </span>
                     )}
                   </div>
 
-                  <div className="um-form-group">
-                    <label htmlFor="create-email">
-                      Email Address <span className="req-star">*</span>
-                    </label>
-                    <div className={`um-input-box ${createFieldErrors.email ? 'um-input-error' : ''}`}>
-                      <Mail size={17} className="um-field-icon" />
-                      <input
-                        id="create-email"
-                        type="email"
-                        name="email"
-                        placeholder="e.g. rahul.sharma@company.com"
-                        value={formData.email}
-                        onChange={handleCreateInputChange}
-                        onBlur={() =>
-                          setCreateFieldErrors((prev) => ({
-                            ...prev,
-                            email: validateEmail(formData.email)
-                          }))
-                        }
-                      />
-                    </div>
-                    {createFieldErrors.email && (
-                      <span className="um-field-error">
-                        <AlertCircle size={12} /> {createFieldErrors.email}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Contact & Identity: Mobile Number & Employee ID */}
-                <div className="um-form-grid-2">
-                  <div className="um-form-group">
-                    <label htmlFor="create-phone">
-                      Mobile Number <span className="req-star">*</span>
-                    </label>
-                    <div className={`um-input-box ${createFieldErrors.phone ? 'um-input-error' : ''}`}>
-                      <span className="um-country-prefix">IN +91</span>
-                      <input
-                        id="create-phone"
-                        type="tel"
-                        name="phone"
-                        placeholder="98765 43210"
-                        maxLength={10}
-                        value={formData.phone}
-                        onChange={handleCreateInputChange}
-                        onBlur={() =>
-                          setCreateFieldErrors((prev) => ({
-                            ...prev,
-                            phone: validatePhone(formData.phone)
-                          }))
-                        }
-                      />
-                    </div>
-                    {createFieldErrors.phone && (
-                      <span className="um-field-error">
-                        <AlertCircle size={12} /> {createFieldErrors.phone}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="um-form-group">
-                    <div className="um-form-label-row">
-                      <label htmlFor="create-emp-id">Employee ID</label>
-                      <span className="um-auto-badge">Auto-generated</span>
-                    </div>
-                    <div className="um-input-box um-input-box-disabled" title="Auto-generated by system and cannot be edited">
-                      <IdCard size={17} className="um-field-icon" />
-                      <input
-                        id="create-emp-id"
-                        type="text"
-                        name="emp_id"
-                        value={formData.emp_id}
-                        readOnly
-                        disabled
-                        tabIndex={-1}
-                      />
-                      <Lock size={14} className="um-field-lock" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Work Info: Department & Role (Balanced 2-Column Layout) */}
-                <div className="um-form-grid-2">
                   <div className="um-form-group">
                     <label htmlFor="create-department">
                       Department <span className="req-star">*</span>
@@ -1460,41 +1462,6 @@ function AdminUsers() {
                     {createFieldErrors.department && (
                       <span className="um-field-error">
                         <AlertCircle size={12} /> {createFieldErrors.department}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="um-form-group">
-                    <label htmlFor="create-role">
-                      Role <span className="req-star">*</span>
-                    </label>
-                    <CustomSelect
-                      id="create-role"
-                      value={formData.role}
-                      onChange={(val) => {
-                        let autoDept = formData.department;
-                        if (val === 'QA Member' || val === 'Project Lead') {
-                          autoDept = 'Quality Assurance';
-                        } else if (val === 'Developer') {
-                          autoDept = 'Development';
-                        }
-                        setFormData((prev) => ({ ...prev, role: val, department: autoDept }));
-                        setCreateFieldErrors((prev) => ({
-                          ...prev,
-                          role: '',
-                          department: ''
-                        }));
-                        if (formError) setFormError('');
-                      }}
-                      options={MODAL_ROLE_OPTIONS}
-                      placeholder="Select Role"
-                      icon={<ShieldCheck size={16} color="#64748b" />}
-                      variant="form"
-                      error={createFieldErrors.role}
-                    />
-                    {createFieldErrors.role && (
-                      <span className="um-field-error">
-                        <AlertCircle size={12} /> {createFieldErrors.role}
                       </span>
                     )}
                   </div>
