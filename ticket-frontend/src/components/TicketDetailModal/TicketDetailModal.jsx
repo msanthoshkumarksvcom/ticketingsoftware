@@ -82,25 +82,24 @@ export default function TicketDetailModal({
   const socketRef = useRef(null);
   const typingTimerRef = useRef(null);
 
-  const currentUserRole = userRole || (typeof window !== 'undefined' ? localStorage.getItem('userRole') : '');
+  const currentUserRole = String(userRole || (typeof window !== 'undefined' ? localStorage.getItem('userRole') : '') || '').trim();
   const currentUserId = Number(localStorage.getItem('userId')) || null;
   const currentUserName = localStorage.getItem('userName') || 'Developer';
-  const isDeveloper = currentUserRole === 'Developer';
-  const isProjectLead = currentUserRole === 'Project Lead';
-  const isQA = ['QA Member', 'QA Lead', 'Manager', 'Super Admin'].includes(currentUserRole);
-
-  const isLockedByOther = Boolean(
-    ticket?.locked_by &&
-    ticket?.locked_by_id &&
-    Number(ticket.locked_by_id) !== currentUserId &&
-    ticket?.locked_at &&
-    (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000)
-  );
+  const isDeveloper = currentUserRole.toLowerCase() === 'developer';
+  const isProjectLead = currentUserRole.toLowerCase() === 'project lead';
+  const isQA = ['qa member', 'qa lead', 'manager', 'super admin', 'admin', 'administrator'].includes(currentUserRole.toLowerCase());
 
   const isLockedByMe = Boolean(
     ticket?.locked_by &&
-    ticket?.locked_by_id &&
-    Number(ticket.locked_by_id) === currentUserId
+    ((ticket.locked_by_id && currentUserId && Number(ticket.locked_by_id) === Number(currentUserId)) ||
+     (currentUserName && ticket.locked_by?.trim().toLowerCase() === currentUserName?.trim().toLowerCase()))
+  );
+
+  const isLockedByOther = Boolean(
+    ticket?.locked_by &&
+    !isLockedByMe &&
+    ticket?.locked_at &&
+    (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000)
   );
 
   useEffect(() => {
@@ -111,7 +110,11 @@ export default function TicketDetailModal({
       }
 
       // Connect to Socket.IO for real-time developer lock & intimation
-      const socket = io('http://localhost:5000', { transports: ['websocket', 'polling'] });
+      const socket = io('http://localhost:5000', {
+        transports: ['polling', 'websocket'],
+        reconnection: true,
+        timeout: 5000
+      });
       socketRef.current = socket;
 
       socket.emit('join_ticket_room', {
@@ -373,13 +376,32 @@ export default function TicketDetailModal({
     }
   };
 
+  const handleSafeClose = async () => {
+    if (showResolutionForm && isLockedByMe) {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post(
+          `http://localhost:5000/api/admin/tickets/${ticketId}/unlock`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('ticket_resolving_release', { ticketId });
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const attachmentsList = Array.isArray(ticket?.attachments) ? ticket.attachments : [];
   const resolutionAttachmentsList = Array.isArray(ticket?.resolution_attachments) ? ticket.resolution_attachments : [];
 
   return (
-    <div className="tdm-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="tdm-overlay" onMouseDown={(e) => e.target === e.currentTarget && handleSafeClose()}>
       <div className="tdm-card">
         {/* Modal Top Header */}
         <div className="tdm-header">
@@ -392,7 +414,7 @@ export default function TicketDetailModal({
               {ticket?.severity || 'Medium'} Severity
             </span>
           </div>
-          <button type="button" className="tdm-close-btn" onClick={onClose} aria-label="Close dialog">
+          <button type="button" className="tdm-close-btn" onClick={handleSafeClose} aria-label="Close dialog">
             <X size={18} />
           </button>
         </div>
@@ -889,6 +911,36 @@ export default function TicketDetailModal({
                       <div className="tdm-status-notice closed">
                         <CheckCircle2 size={16} color="#16A34A" />
                         <span>This defect is verified and closed{ticket.closed_by ? ` by ${ticket.closed_by}` : ''}{ticket.closed_at ? ` on ${new Date(ticket.closed_at).toLocaleDateString()}` : ''}.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2b. Non-Developer View: Read-only Defect Status Notice */}
+                {!isDeveloper && (
+                  <div className="tdm-side-card">
+                    <h3>Defect Status</h3>
+                    {ticket.status === 'Open' ? (
+                      <div className="tdm-status-notice">
+                        <Clock size={16} color="#2563EB" />
+                        <span>Pending Developer Pickup. Only assigned developers can resolve this defect.</span>
+                      </div>
+                    ) : ticket.status === 'In Progress' ? (
+                      <div className="tdm-status-notice">
+                        <Clock size={16} color="#D97706" />
+                        <span>
+                          {ticket.locked_by ? `Developer ${ticket.locked_by} is actively resolving this defect.` : 'Developer is actively working on resolution.'}
+                        </span>
+                      </div>
+                    ) : ticket.status === 'Resolved' ? (
+                      <div className="tdm-status-notice">
+                        <CheckCircle2 size={16} color="#16A34A" />
+                        <span>Resolved by {ticket.resolved_by || 'Developer'}. Ready for QA re-testing &amp; verification.</span>
+                      </div>
+                    ) : (
+                      <div className="tdm-status-notice closed">
+                        <CheckCircle2 size={16} color="#16A34A" />
+                        <span>This defect is verified and closed{ticket.closed_by ? ` by ${ticket.closed_by}` : ''}.</span>
                       </div>
                     )}
                   </div>

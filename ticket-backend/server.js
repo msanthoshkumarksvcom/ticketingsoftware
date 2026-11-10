@@ -22,8 +22,11 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-  }
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  },
+  transports: ['polling', 'websocket'],
+  allowEIO3: true
 });
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey_change_in_production';
@@ -1578,19 +1581,19 @@ app.post('/api/admin/tickets', async (req, res) => {
 
 // Admin Tickets: Update ticket status
 app.put('/api/admin/tickets/:id/status', async (req, res) => {
-  const authorization = req.headers.authorization;
-  if (!authorization?.startsWith('Bearer ')) {
+  const user = await getUserFromReq(req);
+  if (!user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  try {
-    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  const { status } = req.body;
+  if (status === 'Resolved') {
+    return res.status(403).json({
+      error: 'Defect tickets can only be resolved by the Development team via the mandatory defect resolution workflow.'
+    });
   }
 
-  const { status } = req.body;
-  const allowedStatuses = ['Open', 'In Progress', 'Resolved', 'Closed'];
+  const allowedStatuses = ['Open', 'In Progress', 'Closed'];
   if (!allowedStatuses.includes(status)) {
     return res.status(400).json({ error: 'Choose a valid ticket status.' });
   }

@@ -910,13 +910,24 @@ export function registerWorkflowRoutes(app, io) {
 
       const ticket = ticketRes.rows[0];
 
-      // Developer permission check: Developer can only view tickets assigned to them
+      // Developer permission check: Developer can only view tickets assigned to them or their assigned projects
       if (user.role === 'Developer') {
         const isAssigned = ticket.assigned_developer_id === user.id ||
                            ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
                            ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
-        if (!isAssigned) {
-          return res.status(403).json({ error: 'You are only authorized to view tickets assigned to you.' });
+        let isProjectDev = false;
+        if (!isAssigned && ticket.project_id) {
+          const devProjCheck = await pool.query(
+            `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
+            [ticket.project_id, user.id]
+          );
+          if (devProjCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
+            isProjectDev = true;
+          }
+        }
+
+        if (!isAssigned && !isProjectDev) {
+          return res.status(403).json({ error: 'You are only authorized to view tickets in your assigned projects.' });
         }
       }
 
@@ -1049,6 +1060,11 @@ export function registerWorkflowRoutes(app, io) {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
+    // Strict RBAC: Only the Development team can start work on bug tickets
+    if (user.role !== 'Developer') {
+      return res.status(403).json({ error: 'Access denied: Only members of the Development team can mark tickets In Progress.' });
+    }
+
     const ticketId = req.params.id;
 
     try {
@@ -1060,11 +1076,11 @@ export function registerWorkflowRoutes(app, io) {
       const updateRes = await pool.query(
         `UPDATE tickets 
          SET status = 'In Progress',
-             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $2),
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $2::varchar),
              assigned_developer_id = COALESCE(assigned_developer_id, $3),
-             assigned_developer_name = COALESCE(assigned_developer_name, $2),
-             assigned_developer_email = COALESCE(assigned_developer_email, $4),
-             assigned_by = COALESCE(assigned_by, $2),
+             assigned_developer_name = COALESCE(assigned_developer_name, $2::varchar),
+             assigned_developer_email = COALESCE(assigned_developer_email, $4::varchar),
+             assigned_by = COALESCE(assigned_by, $2::varchar),
              assigned_at = COALESCE(assigned_at, CURRENT_TIMESTAMP)
          WHERE id = $1 
          RETURNING *`,
@@ -1099,6 +1115,28 @@ export function registerWorkflowRoutes(app, io) {
       if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found.' });
       const ticket = ticketRes.rows[0];
 
+      // Strict RBAC: Only members of the Development team can claim locks to resolve bugs
+      if (user.role !== 'Developer') {
+        return res.status(403).json({ error: 'Access denied: Only members of the Development team can lock and resolve defect tickets.' });
+      }
+
+      const isDirect = ticket.assigned_developer_id === user.id ||
+                       ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
+                       ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
+      let isProjDev = false;
+      if (!isDirect && ticket.project_id) {
+        const projCheck = await pool.query(
+          `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
+          [ticket.project_id, user.id]
+        );
+        if (projCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
+          isProjDev = true;
+        }
+      }
+      if (!isDirect && !isProjDev) {
+        return res.status(403).json({ error: 'You are only authorized to lock tickets in your assigned projects.' });
+      }
+
       // If already locked by ANOTHER developer within the last 15 minutes, prevent collision
       const isLockedByOther = ticket.locked_by_id && 
                               Number(ticket.locked_by_id) !== Number(user.id) && 
@@ -1117,13 +1155,17 @@ export function registerWorkflowRoutes(app, io) {
       // Lock ticket for this developer and move to In Progress if currently Open
       const updateRes = await pool.query(
         `UPDATE tickets 
-         SET locked_by = $1, 
+         SET locked_by = $1::varchar, 
              locked_by_id = $2, 
              locked_at = CURRENT_TIMESTAMP,
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Project Team'), $1::varchar),
+             assigned_developer_id = COALESCE(assigned_developer_id, $2),
+             assigned_developer_name = COALESCE(assigned_developer_name, $1::varchar),
+             assigned_developer_email = COALESCE(assigned_developer_email, $3::varchar),
              status = CASE WHEN status = 'Open' THEN 'In Progress' ELSE status END
-         WHERE id = $3
+         WHERE id = $4
          RETURNING *`,
-        [user.full_name, user.id, ticketId]
+        [user.full_name, user.id, user.email, ticketId]
       );
 
       const lockedTicket = updateRes.rows[0];
@@ -1137,6 +1179,7 @@ export function registerWorkflowRoutes(app, io) {
           locked_at: lockedTicket.locked_at,
           status: lockedTicket.status
         });
+        io.emit('ticket_updated', lockedTicket);
       }
 
       res.json({
@@ -1185,6 +1228,11 @@ export function registerWorkflowRoutes(app, io) {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
+    // Strict RBAC: Only members of the Development team can resolve bug tickets
+    if (user.role !== 'Developer') {
+      return res.status(403).json({ error: 'Access denied: Only members of the Development team can resolve bug tickets.' });
+    }
+
     const ticketId = req.params.id;
     const {
       resolution_description,
@@ -1213,6 +1261,35 @@ export function registerWorkflowRoutes(app, io) {
       if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
       const ticket = ticketRes.rows[0];
 
+      // Verify that this developer belongs to this project or ticket
+      const isDirect = ticket.assigned_developer_id === user.id ||
+                       ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
+                       ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
+      let isProjDev = false;
+      if (!isDirect && ticket.project_id) {
+        const projCheck = await pool.query(
+          `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
+          [ticket.project_id, user.id]
+        );
+        if (projCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
+          isProjDev = true;
+        }
+      }
+      if (!isDirect && !isProjDev) {
+        return res.status(403).json({ error: 'You are only authorized to resolve tickets in your assigned projects.' });
+      }
+
+      // If locked by another developer, prevent collision
+      const isLockedByOther = ticket.locked_by_id && 
+                              Number(ticket.locked_by_id) !== Number(user.id) && 
+                              ticket.locked_at && 
+                              (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000);
+      if (isLockedByOther) {
+        return res.status(423).json({
+          error: `Ticket is currently being resolved by ${ticket.locked_by}. You cannot submit resolution while locked by another developer.`
+        });
+      }
+
       // Save resolution attachments if any
       let processedResAttachments = [];
       if (Array.isArray(resolution_attachments)) {
@@ -1236,13 +1313,13 @@ export function registerWorkflowRoutes(app, io) {
              files_changed = $4,
              resolution_remarks = $5,
              resolution_attachments = $6,
-             resolved_by = $7,
+             resolved_by = $7::varchar,
              resolved_by_id = $8,
              resolved_at = CURRENT_TIMESTAMP,
-             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $7),
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $7::varchar),
              assigned_developer_id = COALESCE(assigned_developer_id, $8),
-             assigned_developer_name = COALESCE(assigned_developer_name, $7),
-             assigned_developer_email = COALESCE(assigned_developer_email, $10),
+             assigned_developer_name = COALESCE(assigned_developer_name, $7::varchar),
+             assigned_developer_email = COALESCE(assigned_developer_email, $10::varchar),
              locked_by = NULL,
              locked_by_id = NULL,
              locked_at = NULL
@@ -1262,6 +1339,52 @@ export function registerWorkflowRoutes(app, io) {
         ]
       );
 
+      const resolvedTicket = updateRes.rows[0];
+
+      // Automatically update corresponding test case row in project_sheets!
+      let updatedSheets = [];
+      if (ticket.project_id) {
+        try {
+          const sheetQuery = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [ticket.project_id]);
+          for (const s of sheetQuery.rows) {
+            if (Array.isArray(s.rows)) {
+              let changed = false;
+              const updatedRows = s.rows.map(r => {
+                const kCol = String(r.col_id || '').trim().toLowerCase();
+                const kId = String(r.id || '').trim().toLowerCase();
+                const kTicket = String(r.ticket_code || '').trim().toLowerCase();
+                const targetTc = String(ticket.test_case_id || '').trim().toLowerCase();
+                const targetCode = String(ticket.ticket_code || '').trim().toLowerCase();
+                const targetId = String(ticket.id).trim().toLowerCase();
+
+                const matchesTicket =
+                  (targetCode && kTicket === targetCode) ||
+                  (r.ticket_id && String(r.ticket_id) === targetId) ||
+                  (!kTicket && !r.ticket_id && targetTc && targetTc !== 'tc-gen' && (kCol === targetTc || kId === targetTc));
+
+                if (matchesTicket) {
+                  changed = true;
+                  return {
+                    ...r,
+                    ticket_status: 'Resolved',
+                    resolved_by: user.full_name,
+                    resolved_at: new Date().toISOString()
+                  };
+                }
+                return r;
+              });
+
+              if (changed) {
+                await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                updatedSheets.push({ id: s.id, rows: updatedRows });
+              }
+            }
+          }
+        } catch (sheetErr) {
+          console.warn('Failed to update project sheet on ticket resolution:', sheetErr.message);
+        }
+      }
+
       if (io) {
         io.emit('ticket_lock_changed', {
           ticketId,
@@ -1269,6 +1392,13 @@ export function registerWorkflowRoutes(app, io) {
           locked_by_id: null,
           locked_at: null,
           status: 'Resolved'
+        });
+        io.emit('ticket_updated', resolvedTicket);
+        io.emit('sheet_data_synced', {
+          projectId: ticket.project_id,
+          message: `Ticket ${resolvedTicket.ticket_code} resolved by ${user.full_name}. Sheet updated.`,
+          updatedBy: user.full_name,
+          updatedSheets
         });
       }
 
@@ -1306,7 +1436,7 @@ export function registerWorkflowRoutes(app, io) {
       res.json({
         message: 'Resolution submitted successfully. Ticket is now pending QA verification.',
         ticket: {
-          ...updateRes.rows[0],
+          ...resolvedTicket,
           resolution_attachments: processedResAttachments
         }
       });
@@ -1354,6 +1484,62 @@ export function registerWorkflowRoutes(app, io) {
           [user.full_name, user.id, ticketId]
         );
 
+        const closedTicket = updateRes.rows[0];
+
+        // Update corresponding test case row in project_sheets to Closed
+        let updatedSheets = [];
+        if (ticket.project_id) {
+          try {
+            const sheetQuery = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [ticket.project_id]);
+            for (const s of sheetQuery.rows) {
+              if (Array.isArray(s.rows)) {
+                let changed = false;
+                const updatedRows = s.rows.map(r => {
+                  const kCol = String(r.col_id || '').trim().toLowerCase();
+                  const kId = String(r.id || '').trim().toLowerCase();
+                  const kTicket = String(r.ticket_code || '').trim().toLowerCase();
+                  const targetTc = String(ticket.test_case_id || '').trim().toLowerCase();
+                  const targetCode = String(ticket.ticket_code || '').trim().toLowerCase();
+                  const targetId = String(ticket.id).trim().toLowerCase();
+
+                  const matchesTicket =
+                    (targetCode && kTicket === targetCode) ||
+                    (r.ticket_id && String(r.ticket_id) === targetId) ||
+                    (!kTicket && !r.ticket_id && targetTc && targetTc !== 'tc-gen' && (kCol === targetTc || kId === targetTc));
+
+                  if (matchesTicket) {
+                    changed = true;
+                    return {
+                      ...r,
+                      ticket_status: 'Closed',
+                      closed_by: user.full_name,
+                      closed_at: new Date().toISOString()
+                    };
+                  }
+                  return r;
+                });
+
+                if (changed) {
+                  await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                  updatedSheets.push({ id: s.id, rows: updatedRows });
+                }
+              }
+            }
+          } catch (sheetErr) {
+            console.warn('Failed to update project sheet on ticket close:', sheetErr.message);
+          }
+        }
+
+        if (io) {
+          io.emit('ticket_updated', closedTicket);
+          io.emit('sheet_data_synced', {
+            projectId: ticket.project_id,
+            message: `Ticket ${closedTicket.ticket_code} verified and closed by QA ${user.full_name}.`,
+            updatedBy: user.full_name,
+            updatedSheets
+          });
+        }
+
         await logTicketHistory(
           ticketId,
           'Closed',
@@ -1375,7 +1561,7 @@ export function registerWorkflowRoutes(app, io) {
           );
         }
 
-        res.json({ message: 'Ticket successfully verified and closed.', ticket: updateRes.rows[0] });
+        res.json({ message: 'Ticket successfully verified and closed.', ticket: closedTicket });
       } else {
         // Reopen
         const updateRes = await pool.query(
@@ -1388,6 +1574,60 @@ export function registerWorkflowRoutes(app, io) {
            RETURNING *`,
           [user.full_name, reopen_comments.trim(), ticketId]
         );
+
+        const reopenedTicket = updateRes.rows[0];
+
+        // Update corresponding test case row in project_sheets to Reopened
+        let updatedSheets = [];
+        if (ticket.project_id) {
+          try {
+            const sheetQuery = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [ticket.project_id]);
+            for (const s of sheetQuery.rows) {
+              if (Array.isArray(s.rows)) {
+                let changed = false;
+                const updatedRows = s.rows.map(r => {
+                  const kCol = String(r.col_id || '').trim().toLowerCase();
+                  const kId = String(r.id || '').trim().toLowerCase();
+                  const kTicket = String(r.ticket_code || '').trim().toLowerCase();
+                  const targetTc = String(ticket.test_case_id || '').trim().toLowerCase();
+                  const targetCode = String(ticket.ticket_code || '').trim().toLowerCase();
+                  const targetId = String(ticket.id).trim().toLowerCase();
+
+                  const matchesTicket =
+                    (targetCode && kTicket === targetCode) ||
+                    (r.ticket_id && String(r.ticket_id) === targetId) ||
+                    (!kTicket && !r.ticket_id && targetTc && targetTc !== 'tc-gen' && (kCol === targetTc || kId === targetTc));
+
+                  if (matchesTicket) {
+                    changed = true;
+                    return {
+                      ...r,
+                      ticket_status: 'Reopened'
+                    };
+                  }
+                  return r;
+                });
+
+                if (changed) {
+                  await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                  updatedSheets.push({ id: s.id, rows: updatedRows });
+                }
+              }
+            }
+          } catch (sheetErr) {
+            console.warn('Failed to update project sheet on ticket reopen:', sheetErr.message);
+          }
+        }
+
+        if (io) {
+          io.emit('ticket_updated', reopenedTicket);
+          io.emit('sheet_data_synced', {
+            projectId: ticket.project_id,
+            message: `Ticket ${reopenedTicket.ticket_code} reopened by QA ${user.full_name}.`,
+            updatedBy: user.full_name,
+            updatedSheets
+          });
+        }
 
         await logTicketHistory(
           ticketId,
@@ -1410,7 +1650,7 @@ export function registerWorkflowRoutes(app, io) {
           );
         }
 
-        res.json({ message: 'Ticket has been reopened and returned to developer.', ticket: updateRes.rows[0] });
+        res.json({ message: 'Ticket has been reopened and returned to developer.', ticket: reopenedTicket });
       }
     } catch (err) {
       console.error('Error during QA verification:', err);

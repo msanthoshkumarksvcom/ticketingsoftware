@@ -2233,7 +2233,7 @@
 
 .pjs-cell-ticket-badge.resolved {
   background: #f0fdf4 !important;
-  border-color: #bbf7d0 !important;
+  border-color: #86efac !important;
   color: #15803d !important;
 }
 
@@ -2242,26 +2242,51 @@
   flex-shrink: 0;
 }
 
-.pjs-badge-raised-tag {
+.pjs-cell-ticket-badge.resolved .pjs-badge-raised-tag {
   color: #166534;
   font-weight: 800;
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
-.pjs-badge-code {
-  color: #1d4ed8;
-  font-weight: 700;
-}
-
-.pjs-cell-ticket-status-pill {
+.pjs-cell-ticket-badge.resolved .pjs-cell-ticket-status-pill {
   background: #dcfce7;
   color: #15803d;
 }
 
+.pjs-badge-resolver {
+  font-size: 9.5px;
+  color: #166534;
+  font-weight: 600;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pjs-cell-ticket-badge.in-progress {
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+
+.pjs-cell-ticket-badge.in-progress .pjs-badge-check-icon {
+  color: #d97706;
+}
+
+.pjs-cell-ticket-badge.in-progress .pjs-badge-raised-tag {
+  color: #92400e;
+  font-weight: 800;
+  font-size: 10px;
+}
+
+.pjs-cell-ticket-badge.in-progress .pjs-cell-ticket-status-pill {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .pjs-cell-ticket-badge.closed {
-  background: #f1f5f9 !important;
+  background: #f8fafc !important;
   border-color: #cbd5e1 !important;
   color: #475569 !important;
 }
@@ -2271,22 +2296,37 @@
   flex-shrink: 0;
 }
 
-.pjs-badge-raised-tag {
-  color: #166534;
+.pjs-cell-ticket-badge.closed .pjs-badge-raised-tag {
+  color: #475569;
   font-weight: 800;
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
 }
 
-.pjs-badge-code {
-  color: #1d4ed8;
-  font-weight: 700;
-}
-
-.pjs-cell-ticket-status-pill {
+.pjs-cell-ticket-badge.closed .pjs-cell-ticket-status-pill {
   background: #e2e8f0;
   color: #475569;
+}
+
+.pjs-cell-ticket-badge.reopened {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+  color: #b91c1c !important;
+}
+
+.pjs-cell-ticket-badge.reopened .pjs-badge-check-icon {
+  color: #dc2626;
+}
+
+.pjs-cell-ticket-badge.reopened .pjs-badge-raised-tag {
+  color: #991b1b;
+  font-weight: 800;
+  font-size: 10px;
+}
+
+.pjs-cell-ticket-badge.reopened .pjs-cell-ticket-status-pill {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .pjs-dev-blocked-card {

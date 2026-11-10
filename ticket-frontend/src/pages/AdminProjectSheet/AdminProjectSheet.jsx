@@ -580,7 +580,9 @@ export default function AdminProjectSheet() {
                     ...row,
                     ticket_code: t.ticket_code,
                     ticket_id: t.id,
-                    ticket_status: t.status
+                    ticket_status: t.status,
+                    resolved_by: t.resolved_by || row.resolved_by,
+                    resolved_at: t.resolved_at || row.resolved_at
                   };
                 }
                 return row;
@@ -618,7 +620,9 @@ export default function AdminProjectSheet() {
     if (!projectId) return;
 
     const socket = io('http://localhost:5000', {
-      transports: ['websocket', 'polling']
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      timeout: 5000
     });
     socketRef.current = socket;
 
@@ -663,11 +667,56 @@ export default function AdminProjectSheet() {
     });
 
     socket.on('sheet_data_synced', (data) => {
-      if (Array.isArray(data?.sheets)) {
-        setSheets(data.sheets);
-        if (data.updatedBy) {
-          showLiveNotification(`Sheet synchronized by ${data.updatedBy}`);
+      if (data?.projectId && String(data.projectId) === String(projectId)) {
+        if (Array.isArray(data?.updatedSheets) && data.updatedSheets.length > 0) {
+          setSheets((prev) => {
+            const next = prev.map((s) => {
+              const matched = data.updatedSheets.find((us) => String(us.id) === String(s.id));
+              return matched ? { ...s, rows: matched.rows } : s;
+            });
+            const localKey = `pjs_sheets_${projectId}`;
+            localStorage.setItem(localKey, JSON.stringify(next));
+            return next;
+          });
+        } else if (Array.isArray(data?.sheets)) {
+          setSheets(data.sheets);
+        } else {
+          loadProjectSheets();
         }
+        if (data.updatedBy) {
+          showLiveNotification(data.message || `Sheet synchronized by ${data.updatedBy}`);
+        }
+      } else if (Array.isArray(data?.sheets)) {
+        setSheets(data.sheets);
+      }
+    });
+
+    socket.on('ticket_updated', (updatedTicket) => {
+      if (updatedTicket && (String(updatedTicket.project_id) === String(projectId) || updatedTicket.project_code === project?.project_code)) {
+        setSheets((prev) => {
+          const next = prev.map((s) => {
+            if (!Array.isArray(s.rows)) return s;
+            const updatedRows = s.rows.map((r) => {
+              const matchesTicket =
+                (r.ticket_code && r.ticket_code === updatedTicket.ticket_code) ||
+                (r.ticket_id && String(r.ticket_id) === String(updatedTicket.id)) ||
+                (updatedTicket.test_case_id && (r.col_id === updatedTicket.test_case_id || r.id === updatedTicket.test_case_id));
+              if (matchesTicket) {
+                return {
+                  ...r,
+                  ticket_status: updatedTicket.status,
+                  resolved_by: updatedTicket.resolved_by || r.resolved_by,
+                  resolved_at: updatedTicket.resolved_at || r.resolved_at
+                };
+              }
+              return r;
+            });
+            return { ...s, rows: updatedRows };
+          });
+          const localKey = `pjs_sheets_${projectId}`;
+          localStorage.setItem(localKey, JSON.stringify(next));
+          return next;
+        });
       }
     });
 
@@ -3076,12 +3125,45 @@ export default function AdminProjectSheet() {
                                       e.stopPropagation();
                                       setSelectedTicketId(row.ticket_id || row.ticket_code);
                                     }}
-                                    title={`Defect Ticket Raised: ${row.ticket_code} (${row.ticket_status || 'Open'}) - Click to view ticket & full evidence`}
+                                    title={`Defect Ticket: ${row.ticket_code} [Status: ${row.ticket_status || 'Open'}${row.resolved_by ? `, Resolved by: ${row.resolved_by}` : ''}] - Click to view ticket & full evidence`}
                                   >
-                                    <CheckCircle2 size={11} className="pjs-badge-check-icon" />
-                                    <span className="pjs-badge-raised-tag">Raised:</span>
-                                    <span className="pjs-badge-code">{row.ticket_code}</span>
-                                    <span className="pjs-cell-ticket-status-pill">{row.ticket_status || 'Open'}</span>
+                                    {row.ticket_status === 'Resolved' ? (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon resolved" />
+                                        <span className="pjs-badge-raised-tag resolved">Resolved:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        {row.resolved_by && <span className="pjs-badge-resolver">by {row.resolved_by.split(' ')[0]}</span>}
+                                        <span className="pjs-cell-ticket-status-pill resolved">Ready QA</span>
+                                      </>
+                                    ) : row.ticket_status === 'Closed' ? (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon closed" />
+                                        <span className="pjs-badge-raised-tag closed">Closed:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill closed">Verified ✓</span>
+                                      </>
+                                    ) : row.ticket_status === 'In Progress' ? (
+                                      <>
+                                        <Clock size={11} className="pjs-badge-check-icon in-progress" />
+                                        <span className="pjs-badge-raised-tag in-progress">Dev Fixing:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill in-progress">In Progress</span>
+                                      </>
+                                    ) : row.ticket_status === 'Reopened' ? (
+                                      <>
+                                        <RotateCcw size={11} className="pjs-badge-check-icon reopened" />
+                                        <span className="pjs-badge-raised-tag reopened">Reopened:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill reopened">Fix Rejected</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon" />
+                                        <span className="pjs-badge-raised-tag">Raised:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill">{row.ticket_status || 'Open'}</span>
+                                      </>
+                                    )}
                                   </button>
                                 ) : isFailOrRecRow ? (
                                   <button
@@ -3739,10 +3821,15 @@ export default function AdminProjectSheet() {
                 const tSheet = { ...next[activeSheetIndex] };
                 if (Array.isArray(tSheet.rows)) {
                   tSheet.rows = tSheet.rows.map(r => {
-                    if (r.ticket_code === updatedTicket.ticket_code || String(r.ticket_id) === String(updatedTicket.id)) {
+                    const matches = (r.ticket_code && r.ticket_code === updatedTicket.ticket_code) ||
+                                    (r.ticket_id && String(r.ticket_id) === String(updatedTicket.id)) ||
+                                    (updatedTicket.test_case_id && (r.col_id === updatedTicket.test_case_id || r.id === updatedTicket.test_case_id));
+                    if (matches) {
                       return {
                         ...r,
-                        ticket_status: updatedTicket.status
+                        ticket_status: updatedTicket.status,
+                        resolved_by: updatedTicket.resolved_by || r.resolved_by,
+                        resolved_at: updatedTicket.resolved_at || r.resolved_at
                       };
                     }
                     return r;
