@@ -13,7 +13,7 @@ export const initDatabase = async () => {
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
         emp_id VARCHAR(50) UNIQUE,
         full_name VARCHAR(150),
         department VARCHAR(100),
