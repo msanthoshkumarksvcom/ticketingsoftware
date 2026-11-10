@@ -101,6 +101,7 @@ function Login() {
 
       localStorage.setItem('token', response.data.token);
       if (response.data.user) {
+        localStorage.setItem('userId', response.data.user.id || '');
         localStorage.setItem('userEmail', response.data.user.email || '');
         localStorage.setItem('userName', response.data.user.full_name || '');
         localStorage.setItem('userRole', response.data.user.role || 'QA Member');

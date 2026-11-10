@@ -448,7 +448,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   }
 });
 
-// Admin Projects: Get potential project leads (all active users except admin/manager)
+// Admin Projects: Get potential project leads (all active users except manager, qa member, admin)
 app.get('/api/admin/project-leads', async (req, res) => {
   const authorization = req.headers.authorization;
   if (!authorization?.startsWith('Bearer ')) {
@@ -465,7 +465,7 @@ app.get('/api/admin/project-leads', async (req, res) => {
     const result = await pool.query(
       `SELECT id, emp_id, full_name, email, department, role 
        FROM users 
-       WHERE LOWER(role) NOT IN ('admin', 'manager', 'super admin')
+       WHERE LOWER(role) NOT IN ('admin', 'manager', 'super admin', 'qa member')
          AND LOWER(email) NOT LIKE '%admin%'
          AND LOWER(email) != 'manager@gmail.com'
          AND status = 'Active'
@@ -492,7 +492,7 @@ app.get('/api/admin/projects', async (req, res) => {
              COALESCE(p.test_cases, 0) as test_cases,
              COALESCE(p.documents, 0) as documents,
              COALESCE(p.tickets_count, 0) as tickets_count,
-             COALESCE(p.team_members, 4) as team_members,
+             COALESCE(p.team_members, 0) as team_members,
              COALESCE(p.folder_color, 'blue') as folder_color,
              COALESCE(p.folder_icon, 'folder') as folder_icon,
              COALESCE((SELECT COUNT(*) FROM project_developer_assignments WHERE project_id = p.id AND status = 'Active'), 0) as assigned_devs_count
@@ -608,8 +608,8 @@ app.post('/api/admin/projects', async (req, res) => {
         const leadUserRes = await pool.query('SELECT full_name, email FROM users WHERE id = $1', [leadId]);
         const leadUser = leadUserRes.rows[0];
         await pool.query(
-          `INSERT INTO project_lead_assignments (project_id, project_lead_id, project_lead_name, project_lead_email, assigned_by, notes)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+          `INSERT INTO project_lead_assignments (project_id, project_lead_id, lead_name, lead_email, project_lead_name, project_lead_email, assigned_by, notes)
+           VALUES ($1, $2, $3, $4, $3, $4, $5, $6)`,
           [
             createdProject.id,
             leadId,
@@ -642,8 +642,9 @@ app.put('/api/admin/projects/:id', async (req, res) => {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
+  let decodedUser = null;
   try {
-    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+    decodedUser = jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
@@ -653,6 +654,8 @@ app.put('/api/admin/projects/:id', async (req, res) => {
     name,
     description,
     lead_name,
+    project_lead_id,
+    client_name,
     department,
     status,
     priority,
@@ -674,44 +677,112 @@ app.put('/api/admin/projects/:id', async (req, res) => {
     }
 
     const cur = projCheck.rows[0];
+
+    // Clean dates safely: convert empty string "" or null to null for optional end_date
+    const cleanStartDate = (start_date !== undefined && start_date !== null && String(start_date).trim() !== '')
+      ? String(start_date).trim()
+      : cur.start_date;
+
+    const cleanEndDate = end_date !== undefined
+      ? (end_date !== null && String(end_date).trim() !== '' ? String(end_date).trim() : null)
+      : cur.end_date;
+
+    // Clean project lead id and lead name
+    let leadId = cur.project_lead_id;
+    if (project_lead_id !== undefined) {
+      leadId = (project_lead_id !== null && String(project_lead_id).trim() !== '')
+        ? parseInt(project_lead_id, 10)
+        : null;
+    }
+
+    let resolvedLeadName = lead_name !== undefined ? (lead_name ? String(lead_name).trim() : '') : cur.lead_name;
+    if (leadId && (!resolvedLeadName || resolvedLeadName.trim() === '')) {
+      const leadUserRes = await pool.query('SELECT full_name, email FROM users WHERE id = $1', [leadId]);
+      if (leadUserRes.rows.length > 0) {
+        resolvedLeadName = leadUserRes.rows[0].full_name || leadUserRes.rows[0].email;
+      }
+    }
+
+    const cleanClientName = client_name !== undefined
+      ? (client_name ? String(client_name).trim() : '')
+      : cur.client_name;
+
+    const cleanTeamMembers = (team_members !== undefined && team_members !== null && String(team_members).trim() !== '' && !isNaN(parseInt(team_members, 10)))
+      ? Math.min(Math.max(1, parseInt(team_members, 10)), 9)
+      : cur.team_members;
+
+    const cleanProgress = progress !== undefined && progress !== null && !isNaN(parseInt(progress, 10))
+      ? parseInt(progress, 10)
+      : cur.progress;
+
     const updated = await pool.query(
       `UPDATE projects SET 
         name = COALESCE($1, name),
         description = COALESCE($2, description),
         lead_name = COALESCE($3, lead_name),
-        department = COALESCE($4, department),
-        status = COALESCE($5, status),
-        priority = COALESCE($6, priority),
-        progress = COALESCE($7, progress),
-        start_date = COALESCE($8, start_date),
-        end_date = COALESCE($9, end_date),
-        test_cases = COALESCE($10, test_cases),
-        documents = COALESCE($11, documents),
-        tickets_count = COALESCE($12, tickets_count),
-        team_members = COALESCE($13, team_members),
-        folder_color = COALESCE($14, folder_color),
-        folder_icon = COALESCE($15, folder_icon)
-       WHERE id = $16
+        project_lead_id = $4,
+        client_name = COALESCE($5, client_name),
+        department = COALESCE($6, department),
+        status = COALESCE($7, status),
+        priority = COALESCE($8, priority),
+        progress = COALESCE($9, progress),
+        start_date = COALESCE($10, start_date),
+        end_date = $11,
+        test_cases = COALESCE($12, test_cases),
+        documents = COALESCE($13, documents),
+        tickets_count = COALESCE($14, tickets_count),
+        team_members = COALESCE($15, team_members),
+        folder_color = COALESCE($16, folder_color),
+        folder_icon = COALESCE($17, folder_icon)
+       WHERE id = $18
        RETURNING *`,
       [
-        name ?? cur.name,
-        description ?? cur.description,
-        lead_name ?? cur.lead_name,
-        department ?? cur.department,
-        status ?? cur.status,
-        priority ?? cur.priority,
-        progress !== undefined ? parseInt(progress, 10) : cur.progress,
-        start_date ?? cur.start_date,
-        end_date ?? cur.end_date,
+        name !== undefined ? (name ? name.trim() : cur.name) : cur.name,
+        description !== undefined ? description : cur.description,
+        resolvedLeadName || cur.lead_name,
+        leadId,
+        cleanClientName,
+        department !== undefined ? (department ? department.trim() : cur.department) : cur.department,
+        status !== undefined ? (status ? status.trim() : cur.status) : cur.status,
+        priority !== undefined ? (priority ? priority.trim() : cur.priority) : cur.priority,
+        cleanProgress,
+        cleanStartDate,
+        cleanEndDate,
         test_cases !== undefined ? parseInt(test_cases, 10) : cur.test_cases,
         documents !== undefined ? parseInt(documents, 10) : cur.documents,
         tickets_count !== undefined ? parseInt(tickets_count, 10) : cur.tickets_count,
-        team_members !== undefined ? parseInt(team_members, 10) : cur.team_members,
+        cleanTeamMembers,
         folder_color ?? cur.folder_color,
         folder_icon ?? cur.folder_icon,
         id
       ]
     );
+
+    // If project lead changed, log assignment in project_lead_assignments
+    if (leadId && leadId !== cur.project_lead_id) {
+      try {
+        const leadUserRes = await pool.query('SELECT full_name, email FROM users WHERE id = $1', [leadId]);
+        const leadUser = leadUserRes.rows[0];
+        const assignedByName = decodedUser?.full_name || decodedUser?.email || 'Admin';
+        await pool.query(
+          `INSERT INTO project_lead_assignments (project_id, project_lead_id, lead_name, lead_email, project_lead_name, project_lead_email, assigned_by)
+           VALUES ($1, $2, $3, $4, $3, $4, $5)`,
+          [
+            id,
+            leadId,
+            leadUser?.full_name || resolvedLeadName,
+            leadUser?.email || '',
+            assignedByName
+          ]
+        );
+        await pool.query(
+          `UPDATE projects SET lead_assigned_at = CURRENT_TIMESTAMP, lead_assigned_by = $1 WHERE id = $2`,
+          [assignedByName, id]
+        );
+      } catch (leadAssignErr) {
+        console.warn('Could not record lead assignment history during project update:', leadAssignErr.message);
+      }
+    }
 
     res.json({
       message: 'Project updated successfully',
@@ -1110,6 +1181,172 @@ app.delete('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
   } catch (error) {
     console.error('Error deleting sheet:', error);
     res.status(500).json({ error: 'Failed to delete sheet.' });
+  }
+});
+
+// GET /api/admin/projects/:id/documents - Get project documents
+app.get('/api/admin/projects/:id/documents', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { id } = req.params;
+
+  try {
+    const projRes = await pool.query(
+      'SELECT id FROM projects WHERE id::text = $1 OR project_code = $1',
+      [id]
+    );
+    if (projRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+    const projId = projRes.rows[0].id;
+
+    const docsRes = await pool.query(
+      `SELECT id, project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at 
+       FROM project_documents 
+       WHERE project_id = $1 
+       ORDER BY uploaded_at DESC`,
+      [projId]
+    );
+    res.json(docsRes.rows);
+  } catch (error) {
+    console.error('Error fetching project documents:', error);
+    res.status(500).json({ error: 'Failed to fetch project documents.' });
+  }
+});
+
+// POST /api/admin/projects/:id/documents - Upload document (Manager & assigned Project Lead only)
+app.post('/api/admin/projects/:id/documents', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { id } = req.params;
+  const { name, file_url, file_size, file_type } = req.body;
+
+  if (!name || !file_url) {
+    return res.status(400).json({ error: 'Document name and file data are required.' });
+  }
+
+  const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx'];
+  const fileExt = name.split('.').pop()?.toLowerCase();
+  if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
+    return res.status(400).json({ error: 'Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX.' });
+  }
+
+  try {
+    const projRes = await pool.query(
+      'SELECT id, project_lead_id, lead_name FROM projects WHERE id::text = $1 OR project_code = $1',
+      [id]
+    );
+    if (projRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+    const proj = projRes.rows[0];
+    const projId = proj.id;
+
+    const isManager = ['Manager', 'Super Admin', 'Admin'].includes(user.role);
+    const isAssignedLead = Boolean(
+      (proj.project_lead_id && String(proj.project_lead_id) === String(user.id)) ||
+      (proj.lead_name && user.full_name && proj.lead_name.trim().toLowerCase() === user.full_name.trim().toLowerCase()) ||
+      (proj.lead_name && user.email && proj.lead_name.trim().toLowerCase() === user.email.trim().toLowerCase())
+    );
+
+    if (!isManager && !isAssignedLead) {
+      return res.status(403).json({ error: 'Access denied. Document upload is restricted to the Manager and the assigned Project Lead.' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO project_documents (project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        projId,
+        name.trim(),
+        file_url,
+        file_size || 'Unknown',
+        file_type || fileExt.toUpperCase(),
+        user.full_name || 'Admin',
+        user.id
+      ]
+    );
+
+    // Sync projects.documents count
+    await pool.query(
+      `UPDATE projects 
+       SET documents = (SELECT COUNT(*) FROM project_documents WHERE project_id = $1)
+       WHERE id = $1`,
+      [projId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    res.status(500).json({ error: 'Failed to upload document.' });
+  }
+});
+
+// DELETE /api/admin/projects/:id/documents/:docId - Delete document (Manager & assigned Project Lead only)
+app.delete('/api/admin/projects/:id/documents/:docId', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { id, docId } = req.params;
+
+  try {
+    const projRes = await pool.query(
+      'SELECT id, project_lead_id, lead_name FROM projects WHERE id::text = $1 OR project_code = $1',
+      [id]
+    );
+    if (projRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+    const proj = projRes.rows[0];
+    const projId = proj.id;
+
+    const isManager = ['Manager', 'Super Admin', 'Admin'].includes(user.role);
+    const isAssignedLead = Boolean(
+      (proj.project_lead_id && String(proj.project_lead_id) === String(user.id)) ||
+      (proj.lead_name && user.full_name && proj.lead_name.trim().toLowerCase() === user.full_name.trim().toLowerCase()) ||
+      (proj.lead_name && user.email && proj.lead_name.trim().toLowerCase() === user.email.trim().toLowerCase())
+    );
+
+    if (!isManager && !isAssignedLead) {
+      return res.status(403).json({ error: 'Access denied. Only the Manager and the assigned Project Lead can delete documents.' });
+    }
+
+    const delRes = await pool.query(
+      'DELETE FROM project_documents WHERE id = $1 AND project_id = $2 RETURNING id',
+      [docId, projId]
+    );
+
+    if (delRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Document not found.' });
+    }
+
+    // Sync projects.documents count
+    await pool.query(
+      `UPDATE projects 
+       SET documents = (SELECT COUNT(*) FROM project_documents WHERE project_id = $1)
+       WHERE id = $1`,
+      [projId]
+    );
+
+    res.json({ message: 'Document deleted successfully', deletedId: docId });
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    res.status(500).json({ error: 'Failed to delete document.' });
   }
 });
 

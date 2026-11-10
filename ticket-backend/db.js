@@ -1,8 +1,14 @@
 import pkg from 'pg';
-const { Pool } = pkg;
+const { Pool, types } = pkg;
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Force node-postgres to return DATE (OID 1082) columns as raw string 'YYYY-MM-DD'
+// to avoid local/UTC timezone offset shifting dates back by one day.
+if (types && types.setTypeParser) {
+  types.setTypeParser(1082, (str) => str);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

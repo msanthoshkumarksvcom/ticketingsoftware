@@ -73,6 +73,19 @@ export const getTodayDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
+export const toLocalDateInputString = (dateVal) => {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
+    return dateVal.trim();
+  }
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const getMinTargetDate = (startDateStr) => {
   const baseStr = startDateStr || getTodayDateString();
   const parts = baseStr.split('-');
@@ -130,7 +143,11 @@ function AdminProjects() {
       headers: { Authorization: `Bearer ${token}` }
     }).then((res) => {
       if (Array.isArray(res.data) && res.data.length > 0) {
-        setProjectLeads(res.data);
+        const filteredLeads = res.data.filter((u) => {
+          const r = (u.role || '').toLowerCase();
+          return r !== 'qa member' && r !== 'manager' && !r.includes('admin');
+        });
+        setProjectLeads(filteredLeads);
       } else {
         throw new Error('No leads from dedicated route, fallback to users');
       }
@@ -143,7 +160,7 @@ function AdminProjects() {
           const nonAdminUsers = usersRes.data.filter((u) => {
             const r = (u.role || '').toLowerCase();
             const e = (u.email || '').toLowerCase();
-            return !r.includes('admin') && r !== 'manager' && !e.includes('admin') && e !== 'manager@gmail.com';
+            return !r.includes('admin') && r !== 'manager' && r !== 'qa member' && !e.includes('admin') && e !== 'manager@gmail.com';
           });
           setProjectLeads(nonAdminUsers);
         }
@@ -200,15 +217,19 @@ function AdminProjects() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Format date as DD-MM-YYYY
+  // Format date to Indian Standard (DD/MM/YYYY)
   const formatDate = (dateStr) => {
-    if (!dateStr) return '12-10-2026';
+    if (!dateStr) return 'Not set';
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr.trim())) {
+      const [y, m, d] = dateStr.trim().split('-');
+      return `${d}/${m}/${y}`;
+    }
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return String(dateStr);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    return `${day}-${month}-${year}`;
+    return `${day}/${month}/${year}`;
   };
 
   const openProjectWorkspace = (project) => {
@@ -346,14 +367,14 @@ function AdminProjects() {
       name: project.name || '',
       description: project.description || '',
       client_name: project.client_name || '',
-      project_lead_id: project.project_lead_id || '',
+      project_lead_id: project.project_lead_id ? String(project.project_lead_id) : '',
       lead_name: project.lead_name || '',
       priority: project.priority || 'Medium',
       department: project.department || 'Website',
       status: project.status || 'In Progress',
-      start_date: project.start_date ? project.start_date.split('T')[0] : getTodayDateString(),
+      start_date: toLocalDateInputString(project.start_date) || getTodayDateString(),
       team_members: project.team_members !== undefined && project.team_members !== null ? project.team_members : '',
-      end_date: project.end_date ? project.end_date.split('T')[0] : ''
+      end_date: toLocalDateInputString(project.end_date)
     });
     setFormError('');
     setIsModalOpen(true);
@@ -414,13 +435,13 @@ function AdminProjects() {
       return;
     }
 
-    // 8. Start Date validation (present or future date)
+    // 8. Start Date validation (present or future date for new projects only)
     const todayStr = getTodayDateString();
     if (!formData.start_date) {
       setFormError('Please select a Start Date.');
       return;
     }
-    if (formData.start_date < todayStr) {
+    if (!isEditing && formData.start_date < todayStr) {
       setFormError('Start Date must be today or a future date.');
       return;
     }
@@ -452,18 +473,18 @@ function AdminProjects() {
     try {
       if (isEditing && editId) {
         // Update Project
-        try {
-          if (token) {
-            await axios.put(`http://localhost:5000/api/admin/projects/${editId}`, formData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+        let updatedProject = { ...formData, id: editId };
+        if (token) {
+          const res = await axios.put(`http://localhost:5000/api/admin/projects/${editId}`, formData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data?.project) {
+            updatedProject = res.data.project;
           }
-        } catch (apiErr) {
-          console.warn('API update failed, updating local state:', apiErr.message);
         }
 
         setProjects((prev) =>
-          prev.map((p) => (p.id === editId ? { ...p, ...formData, id: editId } : p))
+          prev.map((p) => (p.id === editId ? { ...p, ...updatedProject } : p))
         );
       } else {
         // Create Project
@@ -472,17 +493,13 @@ function AdminProjects() {
           id: Date.now()
         };
 
-        try {
-          if (token) {
-            const res = await axios.post('http://localhost:5000/api/admin/projects', formData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.data?.project) {
-              newProject = res.data.project;
-            }
+        if (token) {
+          const res = await axios.post('http://localhost:5000/api/admin/projects', formData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data?.project) {
+            newProject = res.data.project;
           }
-        } catch (apiErr) {
-          console.warn('API create failed, adding to local state:', apiErr.message);
         }
 
         setProjects((prev) => [newProject, ...prev]);
@@ -1179,7 +1196,7 @@ function AdminProjects() {
                           </span>
                         </td>
                         <td>{formatDate(project.start_date)}</td>
-                        <td>{project.team_members || 4} Members</td>
+                        <td>{project.team_members ?? 0} Members</td>
                         <td style={{ fontWeight: 700, color: '#16a34a' }}>{project.test_cases ?? 0}</td>
                         <td style={{ fontWeight: 700, color: '#2563eb' }}>{project.documents ?? 0}</td>
                         <td style={{ fontWeight: 700, color: '#ea580c' }}>{project.tickets_count ?? 0}</td>
@@ -1400,7 +1417,7 @@ function AdminProjects() {
                       type="date"
                       name="start_date"
                       value={formData.start_date}
-                      min={getTodayDateString()}
+                      min={isEditing ? undefined : getTodayDateString()}
                       onChange={handleInputChange}
                       required
                     />
