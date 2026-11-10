@@ -12,7 +12,6 @@ import {
   Menu,
   Rocket,
   Settings,
-  ShieldCheck,
   Ticket,
   Users,
   X
@@ -23,7 +22,6 @@ const mainMenuNav = [
   { label: 'Dashboard', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Projects', to: '/admin/projects', icon: FolderKanban },
   { label: 'Users', to: '/admin/users', icon: Users, end: true },
-  { label: 'Roles & Permissions', to: '/admin/roles-permissions', icon: ShieldCheck },
   { label: 'Tickets', to: '/admin/tickets', icon: Ticket },
   { label: 'Reports', to: '/admin/reports', icon: BarChart3 },
   { label: 'Approvals & Requests', to: '/admin/approvals', icon: CheckSquare },
