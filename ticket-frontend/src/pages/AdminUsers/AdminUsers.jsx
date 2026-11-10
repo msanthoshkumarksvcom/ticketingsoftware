@@ -52,13 +52,10 @@ const AVAILABLE_ROLES = [
 
 const AVAILABLE_DEPARTMENTS = [
   'Quality Assurance',
-  'Development'
-];
-
-const CREATE_USER_ROLES = [
-  'QA Member',
-  'Developer',
-  'Project Lead'
+  'Development',
+  'Operations',
+  'Support',
+  'Management'
 ];
 
 const DEPARTMENT_FILTER_OPTIONS = [
@@ -98,23 +95,18 @@ const MODAL_DEPARTMENT_OPTIONS = AVAILABLE_DEPARTMENTS.map((dept) => ({
   icon: <Building2 size={15} color="#2563eb" />
 }));
 
-const MODAL_ROLE_OPTIONS = CREATE_USER_ROLES.map((role) => {
-  let icon = <ShieldCheck size={15} color="#0284c7" />;
-  if (role === 'Developer') icon = <Code2 size={15} color="#2563eb" />;
-  if (role === 'Project Lead') icon = <Briefcase size={15} color="#7c3aed" />;
-  return {
-    value: role,
-    label: role,
-    icon
-  };
-});
+const MODAL_ROLE_OPTIONS = AVAILABLE_ROLES.map((role) => ({
+  value: role,
+  label: role,
+  icon: <ShieldCheck size={15} color="#0284c7" />
+}));
 
 const MODAL_STATUS_OPTIONS = [
   { value: 'Active', label: 'Active', dotColor: '#10b981' },
   { value: 'Inactive', label: 'Inactive', dotColor: '#ef4444' }
 ];
 
-// Default to standard QA Member and Quality Assurance department
+// No default selections - must be selected by the user, status defaults to Active
 const initialFormData = {
   emp_id: '',
   full_name: '',
@@ -293,7 +285,7 @@ function AdminUsers() {
     }
   };
 
-  // Open Create Modal with auto-generated ID & default QA Member / Quality Assurance
+  // Open Create Modal with auto-generated ID & default Active status
   const handleOpenCreateModal = () => {
     setFormError('');
     setCreateFieldErrors({});
@@ -1252,16 +1244,11 @@ function AdminUsers() {
             if (e.target === e.currentTarget) setIsCreateModalOpen(false);
           }}
         >
-          <div className="um-modal-card um-modal-curved" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
+          <div className="um-modal-card" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
             <div className="um-modal-header">
-              <div className="um-modal-header-left">
-                <div className="um-modal-header-icon">
-                  <UserPlus size={20} />
-                </div>
-                <div className="um-modal-header-titles">
-                  <h3 id="create-user-title">Create New User</h3>
-                  <p>Add a team member and configure workspace access.</p>
-                </div>
+              <div className="um-modal-header-titles">
+                <h3 id="create-user-title">Create New User</h3>
+                <p>Fill in team member details and configure workspace access.</p>
               </div>
               <button
                 className="um-modal-close"
@@ -1276,20 +1263,22 @@ function AdminUsers() {
               <div className="um-modal-body">
                 {formError && <div className="um-error-banner">{formError}</div>}
 
-                {/* 1. Profile Photo Strip (Curved & Compact) */}
-                <div className="um-avatar-upload-curved">
+                {/* 1. Avatar Image Upload Section (User picks optionally, not forced) */}
+                <div className="um-avatar-upload-row">
                   <div className="um-avatar-preview-box">
                     {formData.avatar ? (
-                      <img src={formData.avatar} alt="Avatar" className="um-avatar-preview-img" />
+                      <img src={formData.avatar} alt="Avatar Preview" className="um-avatar-preview-img" />
                     ) : (
-                      <Camera size={20} color="#64748B" />
+                      <div className="um-avatar-preview-placeholder">
+                        <Camera size={22} />
+                      </div>
                     )}
                   </div>
-                  <div className="um-avatar-upload-info">
+                  <div className="um-avatar-upload-controls">
                     <div className="um-avatar-btn-row">
                       <label className="um-btn-upload">
-                        <Upload size={13} />
-                        <span>{formData.avatar ? 'Change Photo' : 'Upload Photo'}</span>
+                        <Upload size={14} />
+                        <span>{formData.avatar ? 'Change Photo' : 'Select Photo'}</span>
                         <input
                           ref={createFileInputRef}
                           type="file"
@@ -1304,23 +1293,45 @@ function AdminUsers() {
                           className="um-btn-remove-avatar"
                           onClick={() => handleRemoveAvatar(false)}
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} />
                           <span>Remove</span>
                         </button>
                       )}
                     </div>
-                    <span className="um-avatar-hint">Optional: JPG or PNG under 2MB</span>
+                    <p className="um-avatar-upload-hint">
+                      Optional: Select a profile image (PNG, JPG, up to 2MB). If unselected, a colored initial avatar is used.
+                    </p>
                   </div>
                 </div>
 
-                {/* 2. Personal Info: Full Name & Work Email */}
+                {/* 2. Basic Info: Emp ID (Auto-generated & Non-editable) and Full Name */}
                 <div className="um-form-grid-2">
+                  <div className="um-form-group">
+                    <div className="um-form-label-row">
+                      <label htmlFor="create-emp-id">Employee ID</label>
+                      <span className="um-auto-badge">Auto-generated</span>
+                    </div>
+                    <div className="um-input-box um-input-box-disabled" title="Auto-generated by system and cannot be edited">
+                      <IdCard size={17} className="um-field-icon" />
+                      <input
+                        id="create-emp-id"
+                        type="text"
+                        name="emp_id"
+                        value={formData.emp_id}
+                        readOnly
+                        disabled
+                        tabIndex={-1}
+                      />
+                      <Lock size={14} className="um-field-lock" />
+                    </div>
+                  </div>
+
                   <div className="um-form-group">
                     <label htmlFor="create-full-name">
                       Full Name <span className="req-star">*</span>
                     </label>
                     <div className={`um-input-box ${createFieldErrors.full_name ? 'um-input-error' : ''}`}>
-                      <UserRound size={16} className="um-field-icon" />
+                      <UserRound size={17} className="um-field-icon" />
                       <input
                         id="create-full-name"
                         type="text"
@@ -1344,18 +1355,21 @@ function AdminUsers() {
                       </span>
                     )}
                   </div>
+                </div>
 
+                {/* 3. Contact Info: Email & Indian Mobile Number */}
+                <div className="um-form-grid-2">
                   <div className="um-form-group">
                     <label htmlFor="create-email">
-                      Work Email <span className="req-star">*</span>
+                      Email Address <span className="req-star">*</span>
                     </label>
                     <div className={`um-input-box ${createFieldErrors.email ? 'um-input-error' : ''}`}>
-                      <Mail size={16} className="um-field-icon" />
+                      <Mail size={17} className="um-field-icon" />
                       <input
                         id="create-email"
                         type="email"
                         name="email"
-                        placeholder="e.g. rahul@company.com"
+                        placeholder="e.g. rahul.sharma@company.com"
                         value={formData.email}
                         onChange={handleCreateInputChange}
                         onBlur={() =>
@@ -1372,10 +1386,7 @@ function AdminUsers() {
                       </span>
                     )}
                   </div>
-                </div>
 
-                {/* 3. Contact & ID: Mobile Number & Employee ID */}
-                <div className="um-form-grid-2">
                   <div className="um-form-group">
                     <label htmlFor="create-phone">
                       Mobile Number <span className="req-star">*</span>
@@ -1404,65 +1415,59 @@ function AdminUsers() {
                       </span>
                     )}
                   </div>
-
-                  <div className="um-form-group">
-                    <div className="um-form-label-row">
-                      <label htmlFor="create-emp-id">Employee ID</label>
-                      <span className="um-auto-badge">Auto-generated</span>
-                    </div>
-                    <div className="um-input-box um-input-box-disabled" title="Auto-generated by system">
-                      <IdCard size={16} className="um-field-icon" />
-                      <input
-                        id="create-emp-id"
-                        type="text"
-                        name="emp_id"
-                        value={formData.emp_id}
-                        readOnly
-                        disabled
-                        tabIndex={-1}
-                      />
-                      <Lock size={13} className="um-field-lock" />
-                    </div>
-                  </div>
                 </div>
 
-                {/* 4. Assignment: Role & Department (Curved Selectors, 100% visible options, unselected default) */}
-                <div className="um-form-grid-2">
+                {/* 4. Work Info: Department, Role & Account Status in 3-column layout */}
+                <div className="um-form-grid-3">
+                  <div className="um-form-group">
+                    <label htmlFor="create-department">
+                      Department <span className="req-star">*</span>
+                    </label>
+                    <CustomSelect
+                      id="create-department"
+                      value={formData.department}
+                      onChange={(val) => {
+                        setFormData((prev) => ({ ...prev, department: val }));
+                        setCreateFieldErrors((prev) => ({
+                          ...prev,
+                          department: validateDepartment(val)
+                        }));
+                        if (formError) setFormError('');
+                      }}
+                      options={MODAL_DEPARTMENT_OPTIONS}
+                      placeholder="Select Department"
+                      icon={<Building2 size={16} color="#64748b" />}
+                      variant="form"
+                      error={createFieldErrors.department}
+                    />
+                    {createFieldErrors.department && (
+                      <span className="um-field-error">
+                        <AlertCircle size={12} /> {createFieldErrors.department}
+                      </span>
+                    )}
+                  </div>
+
                   <div className="um-form-group">
                     <label htmlFor="create-role">
                       Role <span className="req-star">*</span>
                     </label>
-                    <div className={`um-select-box ${createFieldErrors.role ? 'um-select-error' : ''}`}>
-                      <ShieldCheck size={16} className="um-field-icon" color="#2563EB" />
-                      <select
-                        id="create-role"
-                        name="role"
-                        className={`um-native-select ${!formData.role ? 'is-placeholder' : ''}`}
-                        value={formData.role}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          let autoDept = formData.department;
-                          if (val === 'QA Member' || val === 'Project Lead') {
-                            autoDept = 'Quality Assurance';
-                          } else if (val === 'Developer') {
-                            autoDept = 'Development';
-                          }
-                          setFormData((prev) => ({ ...prev, role: val, department: autoDept }));
-                          setCreateFieldErrors((prev) => ({
-                            ...prev,
-                            role: '',
-                            department: ''
-                          }));
-                          if (formError) setFormError('');
-                        }}
-                      >
-                        <option value="">Select Role</option>
-                        <option value="QA Member">QA Member</option>
-                        <option value="Project Lead">Project Lead</option>
-                        <option value="Developer">Developer</option>
-                      </select>
-                      <ChevronDown size={15} className="um-select-chevron" />
-                    </div>
+                    <CustomSelect
+                      id="create-role"
+                      value={formData.role}
+                      onChange={(val) => {
+                        setFormData((prev) => ({ ...prev, role: val }));
+                        setCreateFieldErrors((prev) => ({
+                          ...prev,
+                          role: validateRole(val)
+                        }));
+                        if (formError) setFormError('');
+                      }}
+                      options={MODAL_ROLE_OPTIONS}
+                      placeholder="Select Role"
+                      icon={<ShieldCheck size={16} color="#64748b" />}
+                      variant="form"
+                      error={createFieldErrors.role}
+                    />
                     {createFieldErrors.role && (
                       <span className="um-field-error">
                         <AlertCircle size={12} /> {createFieldErrors.role}
@@ -1471,46 +1476,29 @@ function AdminUsers() {
                   </div>
 
                   <div className="um-form-group">
-                    <label htmlFor="create-department">
-                      Department <span className="req-star">*</span>
+                    <label htmlFor="create-status">
+                      Account Status
                     </label>
-                    <div className={`um-select-box ${createFieldErrors.department ? 'um-select-error' : ''}`}>
-                      <Building2 size={16} className="um-field-icon" color="#2563EB" />
-                      <select
-                        id="create-department"
-                        name="department"
-                        className={`um-native-select ${!formData.department ? 'is-placeholder' : ''}`}
-                        value={formData.department}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          let autoRole = formData.role;
-                          if (val === 'Quality Assurance') {
-                            if (autoRole !== 'Project Lead') {
-                              autoRole = 'QA Member';
-                            }
-                          } else if (val === 'Development') {
-                            autoRole = 'Developer';
-                          }
-                          setFormData((prev) => ({ ...prev, department: val, role: autoRole }));
-                          setCreateFieldErrors((prev) => ({
-                            ...prev,
-                            department: '',
-                            role: ''
-                          }));
-                          if (formError) setFormError('');
-                        }}
-                      >
-                        <option value="">Select Department</option>
-                        <option value="Quality Assurance">Quality Assurance</option>
-                        <option value="Development">Development</option>
-                      </select>
-                      <ChevronDown size={15} className="um-select-chevron" />
+                    <div className="um-status-readonly-box" title="New accounts are automatically activated upon creation">
+                      <div className="um-status-readonly-left">
+                        <span className="um-status-dot-sm dot-active" />
+                        <span className="um-status-readonly-text">Active</span>
+                      </div>
+                      <span className="um-status-readonly-badge">Default</span>
                     </div>
-                    {createFieldErrors.department && (
-                      <span className="um-field-error">
-                        <AlertCircle size={12} /> {createFieldErrors.department}
-                      </span>
-                    )}
+                  </div>
+                </div>
+
+                {/* 6. Password Delivery Notice Note */}
+                <div className="um-password-notice-banner">
+                  <div className="um-notice-icon-box">
+                    <Mail size={16} />
+                  </div>
+                  <div className="um-notice-text">
+                    <span className="um-notice-title">Password will be sent through email</span>
+                    <span className="um-notice-desc">
+                      A secure login password will be automatically generated and delivered to the user's registered email address upon account creation.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1528,17 +1516,8 @@ function AdminUsers() {
                   className="um-btn-primary"
                   disabled={submitting}
                 >
-                  {submitting ? (
-                    <>
-                      <RefreshCw size={15} className="um-spinner-icon" />
-                      <span>Creating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={16} />
-                      <span>Create User</span>
-                    </>
-                  )}
+                  <UserPlus size={16} />
+                  {submitting ? 'Creating User...' : 'Create User'}
                 </button>
               </div>
             </form>
@@ -1727,86 +1706,57 @@ function AdminUsers() {
                 {/* Work Info: Department, Role & Status in 3-column layout */}
                 <div className="um-form-grid-3">
                   <div className="um-form-group">
-                    <label htmlFor="edit-role">
-                      Role <span className="req-star">*</span>
+                    <label htmlFor="edit-department">
+                      Department <span className="req-star">*</span>
                     </label>
-                    <div className={`um-select-box ${editFieldErrors.role ? 'um-select-error' : ''}`}>
-                      <ShieldCheck size={16} className="um-field-icon" color="#2563EB" />
-                      <select
-                        id="edit-role"
-                        name="role"
-                        className={`um-native-select ${!editFormData.role ? 'is-placeholder' : ''}`}
-                        value={editFormData.role}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          let autoDept = editFormData.department;
-                          if (val === 'QA Member' || val === 'Project Lead') {
-                            autoDept = 'Quality Assurance';
-                          } else if (val === 'Developer') {
-                            autoDept = 'Development';
-                          }
-                          setEditFormData((prev) => ({ ...prev, role: val, department: autoDept }));
-                          setEditFieldErrors((prev) => ({
-                            ...prev,
-                            role: '',
-                            department: ''
-                          }));
-                          if (formError) setFormError('');
-                        }}
-                      >
-                        <option value="">Select Role</option>
-                        <option value="QA Member">QA Member</option>
-                        <option value="Project Lead">Project Lead</option>
-                        <option value="Developer">Developer</option>
-                      </select>
-                      <ChevronDown size={15} className="um-select-chevron" />
-                    </div>
-                    {editFieldErrors.role && (
+                    <CustomSelect
+                      id="edit-department"
+                      value={editFormData.department}
+                      onChange={(val) => {
+                        setEditFormData((prev) => ({ ...prev, department: val }));
+                        setEditFieldErrors((prev) => ({
+                          ...prev,
+                          department: validateDepartment(val)
+                        }));
+                        if (formError) setFormError('');
+                      }}
+                      options={MODAL_DEPARTMENT_OPTIONS}
+                      placeholder="Select Department"
+                      icon={<Building2 size={16} color="#64748b" />}
+                      variant="form"
+                      error={editFieldErrors.department}
+                    />
+                    {editFieldErrors.department && (
                       <span className="um-field-error">
-                        <AlertCircle size={12} /> {editFieldErrors.role}
+                        <AlertCircle size={12} /> {editFieldErrors.department}
                       </span>
                     )}
                   </div>
 
                   <div className="um-form-group">
-                    <label htmlFor="edit-department">
-                      Department <span className="req-star">*</span>
+                    <label htmlFor="edit-role">
+                      Role <span className="req-star">*</span>
                     </label>
-                    <div className={`um-select-box ${editFieldErrors.department ? 'um-select-error' : ''}`}>
-                      <Building2 size={16} className="um-field-icon" color="#2563EB" />
-                      <select
-                        id="edit-department"
-                        name="department"
-                        className={`um-native-select ${!editFormData.department ? 'is-placeholder' : ''}`}
-                        value={editFormData.department}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          let autoRole = editFormData.role;
-                          if (val === 'Quality Assurance') {
-                            if (autoRole !== 'Project Lead') {
-                              autoRole = 'QA Member';
-                            }
-                          } else if (val === 'Development') {
-                            autoRole = 'Developer';
-                          }
-                          setEditFormData((prev) => ({ ...prev, department: val, role: autoRole }));
-                          setEditFieldErrors((prev) => ({
-                            ...prev,
-                            department: '',
-                            role: ''
-                          }));
-                          if (formError) setFormError('');
-                        }}
-                      >
-                        <option value="">Select Department</option>
-                        <option value="Quality Assurance">Quality Assurance</option>
-                        <option value="Development">Development</option>
-                      </select>
-                      <ChevronDown size={15} className="um-select-chevron" />
-                    </div>
-                    {editFieldErrors.department && (
+                    <CustomSelect
+                      id="edit-role"
+                      value={editFormData.role}
+                      onChange={(val) => {
+                        setEditFormData((prev) => ({ ...prev, role: val }));
+                        setEditFieldErrors((prev) => ({
+                          ...prev,
+                          role: validateRole(val)
+                        }));
+                        if (formError) setFormError('');
+                      }}
+                      options={MODAL_ROLE_OPTIONS}
+                      placeholder="Select Role"
+                      icon={<ShieldCheck size={16} color="#64748b" />}
+                      variant="form"
+                      error={editFieldErrors.role}
+                    />
+                    {editFieldErrors.role && (
                       <span className="um-field-error">
-                        <AlertCircle size={12} /> {editFieldErrors.department}
+                        <AlertCircle size={12} /> {editFieldErrors.role}
                       </span>
                     )}
                   </div>
