@@ -20,7 +20,11 @@ import {
   CheckCircle2,
   X,
   Eye,
-  Check
+  Check,
+  Upload,
+  Download,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
@@ -49,8 +53,48 @@ export default function AdminProjectWorkspace() {
 
   // User info & Role
   const currentUserRole = localStorage.getItem('userRole') || 'Manager';
+  const currentUserId = localStorage.getItem('userId');
+  const currentUserEmail = (localStorage.getItem('userEmail') || '').trim().toLowerCase();
+  const currentUserName = (localStorage.getItem('userName') || '').trim().toLowerCase();
+
   const isDeveloper = currentUserRole === 'Developer';
   const isProjectLead = currentUserRole === 'Project Lead';
+  const isManager = currentUserRole === 'Manager' || currentUserRole === 'Super Admin' || currentUserRole === 'Admin';
+
+  // Access rules: Only Manager & QA Lead (plus Super Admin, Admin) can assign Project Leads & Developers
+  const canAssignLeadAndDevs = ['Manager', 'QA Lead', 'Super Admin', 'Admin'].includes(currentUserRole);
+
+  const activeProject = project || {
+    id: projectId,
+    project_code: `PRJ-${projectId}`,
+    name: 'QA Project Workspace',
+    lead_name: 'Unassigned',
+    department: 'Website',
+    status: 'In Progress',
+    team_members: 0
+  };
+
+  const isAssignedProjectLead = useMemo(() => {
+    if (!activeProject) return false;
+    if (currentUserId && activeProject.project_lead_id && String(currentUserId) === String(activeProject.project_lead_id)) {
+      return true;
+    }
+    const leadEmail = (activeProject.lead_email || '').trim().toLowerCase();
+    if (currentUserEmail && leadEmail && leadEmail === currentUserEmail) {
+      return true;
+    }
+    const leadName = (activeProject.lead_name || '').trim().toLowerCase();
+    if (currentUserEmail && leadName && leadName === currentUserEmail) {
+      return true;
+    }
+    if (currentUserName && leadName && leadName === currentUserName) {
+      return true;
+    }
+    return false;
+  }, [activeProject, currentUserId, currentUserEmail, currentUserName]);
+
+  // Access rule: Only Manager and the assigned Project Lead for this project can upload/delete documents
+  const canUploadDocuments = isManager || isAssignedProjectLead;
 
   // Lead Assignment State
   const [leadHistory, setLeadHistory] = useState([]);
@@ -60,6 +104,7 @@ export default function AdminProjectWorkspace() {
   const [leadAssignNotes, setLeadAssignNotes] = useState('');
   const [leadAssignLoading, setLeadAssignLoading] = useState(false);
   const [leadAssignMsg, setLeadAssignMsg] = useState({ text: '', type: '' });
+  const [showLeadHistory, setShowLeadHistory] = useState(false);
 
   // Developer Assignment State
   const [assignedDevs, setAssignedDevs] = useState([]);
@@ -70,6 +115,51 @@ export default function AdminProjectWorkspace() {
   const [devAssignNotes, setDevAssignNotes] = useState('');
   const [devAssignLoading, setDevAssignLoading] = useState(false);
   const [devAssignMsg, setDevAssignMsg] = useState({ text: '', type: '' });
+  const [showDevHistory, setShowDevHistory] = useState(false);
+
+  // Documents State
+  const [documents, setDocuments] = useState([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [docUploadLoading, setDocUploadLoading] = useState(false);
+  const [docError, setDocError] = useState('');
+  const [docSuccess, setDocSuccess] = useState('');
+  const [previewDoc, setPreviewDoc] = useState(null);
+
+  const isImage = (filename = '') => /\.(png|jpe?g|gif|webp|svg)$/i.test(filename);
+  const isPdf = (filename = '') => /\.pdf$/i.test(filename);
+
+  const dataUrlToBlobUrl = (dataUrl) => {
+    try {
+      if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+      const [header, base64] = dataUrl.split(',');
+      const mimeMatch = header.match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+      const binary = atob(base64);
+      const array = [];
+      for (let i = 0; i < binary.length; i++) {
+        array.push(binary.charCodeAt(i));
+      }
+      const blob = new Blob([new Uint8Array(array)], { type: mime });
+      return URL.createObjectURL(blob);
+    } catch (e) {
+      console.warn('Error converting data URL to blob:', e);
+      return dataUrl;
+    }
+  };
+
+  const handleViewDocument = (doc) => {
+    const blobUrl = doc.file_url?.startsWith('data:') ? dataUrlToBlobUrl(doc.file_url) : doc.file_url;
+    setPreviewDoc({ ...doc, blobUrl });
+  };
+
+  const handleDownloadDocument = (doc) => {
+    const link = document.createElement('a');
+    link.href = doc.file_url;
+    link.setAttribute('download', doc.name);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Ticket Preview Modal
   const [selectedTicketId, setSelectedTicketId] = useState(null);
@@ -102,7 +192,12 @@ export default function AdminProjectWorkspace() {
         axios.get('http://localhost:5000/api/admin/project-leads', { headers: { Authorization: `Bearer ${token}` } }),
         axios.get(`http://localhost:5000/api/admin/projects/${projectId}/lead-history`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] }))
       ]);
-      setAvailableLeads(Array.isArray(leadsRes.data) ? leadsRes.data : []);
+      const rawLeads = Array.isArray(leadsRes.data) ? leadsRes.data : [];
+      const filteredLeads = rawLeads.filter((u) => {
+        const r = (u.role || '').toLowerCase();
+        return r !== 'qa member' && r !== 'manager' && !r.includes('admin');
+      });
+      setAvailableLeads(filteredLeads);
       setLeadHistory(Array.isArray(histRes.data) ? histRes.data : []);
     } catch (err) {
       console.warn('Failed to load lead data:', err.message);
@@ -139,6 +234,118 @@ export default function AdminProjectWorkspace() {
     }
   };
 
+  const fetchDocuments = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || !projectId) return;
+    setDocumentsLoading(true);
+    try {
+      const { data } = await axios.get(`http://localhost:5000/api/admin/projects/${projectId}/documents`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDocuments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Could not load project documents:', err.message);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!canUploadDocuments) {
+      setDocError('Access Denied: Only Manager and the assigned Project Lead are permitted to upload project documents.');
+      return;
+    }
+
+    const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx'];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
+      setDocError('Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setDocError('File is too large. Maximum allowed size is 25 MB.');
+      event.target.value = '';
+      return;
+    }
+
+    setDocError('');
+    setDocSuccess('');
+    setDocUploadLoading(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result;
+        const fileSizeStr = file.size > 1024 * 1024 
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+
+        const token = localStorage.getItem('token');
+        try {
+          const res = await axios.post(
+            `http://localhost:5000/api/admin/projects/${projectId}/documents`,
+            {
+              name: file.name,
+              file_url: base64Data,
+              file_size: fileSizeStr,
+              file_type: fileExt.toUpperCase()
+            },
+            {
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          );
+          setDocuments((prev) => [res.data, ...prev]);
+          setDocSuccess(`Document "${file.name}" uploaded successfully!`);
+          fetchProjectData();
+          setTimeout(() => setDocSuccess(''), 4000);
+        } catch (apiErr) {
+          setDocError(apiErr.response?.data?.error || 'Failed to upload document. Please try again.');
+        } finally {
+          setDocUploadLoading(false);
+          event.target.value = '';
+        }
+      };
+
+      reader.onerror = () => {
+        setDocError('Failed to read file from local disk.');
+        setDocUploadLoading(false);
+        event.target.value = '';
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setDocError('An error occurred during file upload.');
+      setDocUploadLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleDeleteDocument = async (docId, docName) => {
+    if (!canUploadDocuments) {
+      setDocError('Access Denied: Only Manager and the assigned Project Lead can delete documents.');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete "${docName}"?`)) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      await axios.delete(`http://localhost:5000/api/admin/projects/${projectId}/documents/${docId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+      setDocSuccess(`Document deleted successfully.`);
+      fetchProjectData();
+      setTimeout(() => setDocSuccess(''), 3000);
+    } catch (err) {
+      setDocError(err.response?.data?.error || 'Failed to delete document.');
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -151,7 +358,8 @@ export default function AdminProjectWorkspace() {
       fetchProjectData(),
       fetchLeadsAndHistory(),
       fetchDevsAndHistory(),
-      fetchTickets()
+      fetchTickets(),
+      fetchDocuments()
     ]).finally(() => setLoading(false));
   }, [projectId]);
 
@@ -164,11 +372,18 @@ export default function AdminProjectWorkspace() {
       navigate(`/admin/projects/${projectId}/sheet`, { state: { project: project || { id: projectId, project_code: `PRJ-${projectId}` } } });
       return;
     }
+    if (folderId === 'documents') {
+      fetchDocuments();
+    }
     setActiveFolder(folderId);
   };
 
   const handleAssignProjectLead = async (e) => {
     e.preventDefault();
+    if (!canAssignLeadAndDevs) {
+      setLeadAssignMsg({ text: 'Access Denied: Only Manager and QA Lead can assign a Project Lead.', type: 'error' });
+      return;
+    }
     if (!selectedLeadId) {
       setLeadAssignMsg({ text: 'Please select a Project Lead.', type: 'error' });
       return;
@@ -180,7 +395,7 @@ export default function AdminProjectWorkspace() {
       const token = localStorage.getItem('token');
       await axios.post(
         `http://localhost:5000/api/admin/projects/${projectId}/lead`,
-        { project_lead_id: selectedLeadId, notes: leadAssignNotes },
+        { project_lead_id: selectedLeadId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -199,6 +414,10 @@ export default function AdminProjectWorkspace() {
 
   const handleAssignDevelopers = async (e) => {
     e.preventDefault();
+    if (!canAssignLeadAndDevs) {
+      setDevAssignMsg({ text: 'Access Denied: Only Manager and QA Lead can assign developers.', type: 'error' });
+      return;
+    }
     if (selectedDevIds.length === 0) {
       setDevAssignMsg({ text: 'Please select at least one developer.', type: 'error' });
       return;
@@ -210,14 +429,13 @@ export default function AdminProjectWorkspace() {
       const token = localStorage.getItem('token');
       await axios.post(
         `http://localhost:5000/api/admin/projects/${projectId}/developers`,
-        { developer_ids: selectedDevIds, notes: devAssignNotes },
+        { developer_ids: selectedDevIds },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       setDevAssignMsg({ text: 'Developers assigned successfully!', type: 'success' });
       await Promise.all([fetchDevsAndHistory(), fetchProjectData()]);
       setSelectedDevIds([]);
-      setDevAssignNotes('');
       setTimeout(() => {
         setIsDevModalOpen(false);
         setDevAssignMsg({ text: '', type: '' });
@@ -230,6 +448,10 @@ export default function AdminProjectWorkspace() {
   };
 
   const handleRemoveDeveloper = async (developerId) => {
+    if (!canAssignLeadAndDevs) {
+      alert('Access Denied: Only Manager and QA Lead can remove developers.');
+      return;
+    }
     if (!window.confirm('Are you sure you want to remove this developer from the project?')) return;
     try {
       const token = localStorage.getItem('token');
@@ -248,23 +470,24 @@ export default function AdminProjectWorkspace() {
     );
   };
 
+  // Format date to Indian Standard (DD/MM/YYYY)
   const formatDate = (value) => {
     if (!value) return 'Not set';
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+      const [y, m, d] = value.trim().split('-');
+      return `${d}/${m}/${y}`;
+    }
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+    if (Number.isNaN(date.getTime())) return String(value);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const confirmLogout = () => {
     localStorage.clear();
     navigate('/', { replace: true });
-  };
-
-  const activeProject = project || {
-    id: projectId,
-    project_code: `PRJ-${projectId}`,
-    name: 'QA Project Workspace',
-    department: 'Quality Assurance',
-    status: 'In Progress'
   };
 
   return (
@@ -430,7 +653,7 @@ export default function AdminProjectWorkspace() {
             <section className="project-workspace-content">
               <div className="project-content-heading">
                 <div><span>PROJECT LEAD MANAGEMENT</span><h2>Project Lead Allocation</h2></div>
-                {!isDeveloper && (
+                {canAssignLeadAndDevs && (
                   <button
                     className="pw-btn-action-primary"
                     onClick={() => {
@@ -439,7 +662,7 @@ export default function AdminProjectWorkspace() {
                     }}
                   >
                     <UserCheck size={15} />
-                    <span>{activeProject.project_lead_id ? 'Change Project Lead' : 'Assign Project Lead'}</span>
+                    <span>Add Project lead</span>
                   </button>
                 )}
               </div>
@@ -453,10 +676,8 @@ export default function AdminProjectWorkspace() {
                   <span className="pw-eyebrow-tag">CURRENT PROJECT LEAD</span>
                   <h3>{activeProject.lead_name || 'No Project Lead Assigned'}</h3>
                   <div className="pw-lead-details-row">
-                    <span>Project Code: <strong>{activeProject.project_code}</strong></span>
-                    <span>Status: <strong>{activeProject.status || 'Active'}</strong></span>
                     {activeProject.lead_assigned_at && (
-                      <span>Assigned on: <strong>{new Date(activeProject.lead_assigned_at).toLocaleDateString()}</strong></span>
+                      <span>Assigned on: <strong>{formatDate(activeProject.lead_assigned_at)}</strong></span>
                     )}
                     {activeProject.lead_assigned_by && (
                       <span>Assigned by: <strong>{activeProject.lead_assigned_by}</strong></span>
@@ -465,36 +686,48 @@ export default function AdminProjectWorkspace() {
                 </div>
               </div>
 
-              {/* Lead Assignment History */}
-              <div className="pw-section-sub">
-                <h3><History size={15} /> Assignment History</h3>
-                {leadHistory.length === 0 ? (
-                  <p className="project-workspace-empty">No previous lead assignment history recorded for this project.</p>
-                ) : (
-                  <div className="pw-table-wrap">
-                    <table className="pw-table">
-                      <thead>
-                        <tr>
-                          <th>Project Lead</th>
-                          <th>Email</th>
-                          <th>Assigned By</th>
-                          <th>Assigned Date</th>
-                          <th>Notes</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {leadHistory.map((h) => (
-                          <tr key={h.id}>
-                            <td><strong>{h.project_lead_name}</strong></td>
-                            <td>{h.project_lead_email}</td>
-                            <td>{h.assigned_by}</td>
-                            <td>{new Date(h.assigned_at).toLocaleDateString()}</td>
-                            <td>{h.notes || '—'}</td>
+              {/* Lead Assignment History (Collapsible) */}
+              <div className="pw-section-sub" style={{ marginTop: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showLeadHistory ? 12 : 0 }}>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <History size={15} /> Assignment History ({leadHistory.length})
+                  </h3>
+                  <button
+                    type="button"
+                    className="pw-history-toggle-btn"
+                    onClick={() => setShowLeadHistory((prev) => !prev)}
+                  >
+                    {showLeadHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    <span>{showLeadHistory ? 'Hide History' : 'View History'}</span>
+                  </button>
+                </div>
+                {showLeadHistory && (
+                  leadHistory.length === 0 ? (
+                    <p className="project-workspace-empty" style={{ marginTop: 12 }}>No previous lead assignment history recorded for this project.</p>
+                  ) : (
+                    <div className="pw-table-wrap" style={{ marginTop: 12 }}>
+                      <table className="pw-table">
+                        <thead>
+                          <tr>
+                            <th>Project Lead</th>
+                            <th>Email</th>
+                            <th>Assigned By</th>
+                            <th>Assigned Date</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {leadHistory.map((h) => (
+                            <tr key={h.id}>
+                              <td><strong>{h.project_lead_name || h.lead_name || 'Project Lead'}</strong></td>
+                              <td>{h.project_lead_email || h.lead_email || '—'}</td>
+                              <td>{h.assigned_by || 'Admin'}</td>
+                              <td>{formatDate(h.assigned_at)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
                 )}
               </div>
             </section>
@@ -505,7 +738,7 @@ export default function AdminProjectWorkspace() {
             <section className="project-workspace-content">
               <div className="project-content-heading">
                 <div><span>ENGINEERING ALLOCATION</span><h2>Assigned Developers</h2></div>
-                {!isDeveloper && (
+                {canAssignLeadAndDevs && (
                   <button
                     className="pw-btn-action-primary"
                     onClick={() => {
@@ -514,7 +747,7 @@ export default function AdminProjectWorkspace() {
                     }}
                   >
                     <UserPlus size={15} />
-                    <span>Assign Developer</span>
+                    <span>Add Developers</span>
                   </button>
                 )}
               </div>
@@ -535,9 +768,9 @@ export default function AdminProjectWorkspace() {
                       <div className="pw-dev-info">
                         <strong>{d.developer_name}</strong>
                         <span>{d.emp_id || 'EMP'} &bull; {d.developer_email}</span>
-                        <small>Assigned by {d.assigned_by} on {new Date(d.assigned_at).toLocaleDateString()}</small>
+                        <small>Assigned by {d.assigned_by} on {formatDate(d.assigned_at)}</small>
                       </div>
-                      {!isDeveloper && (
+                      {canAssignLeadAndDevs && (
                         <button
                           type="button"
                           className="pw-btn-remove"
@@ -552,40 +785,52 @@ export default function AdminProjectWorkspace() {
                 </div>
               )}
 
-              {/* Developer Assignment History */}
+              {/* Developer Assignment History (Collapsible) */}
               <div className="pw-section-sub" style={{ marginTop: 24 }}>
-                <h3><History size={15} /> Developer Assignment History</h3>
-                {devHistory.length === 0 ? (
-                  <p className="project-workspace-empty">No developer assignment history recorded yet.</p>
-                ) : (
-                  <div className="pw-table-wrap">
-                    <table className="pw-table">
-                      <thead>
-                        <tr>
-                          <th>Developer</th>
-                          <th>Email</th>
-                          <th>Status</th>
-                          <th>Assigned By</th>
-                          <th>Assigned Date</th>
-                          <th>Notes</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {devHistory.map((h) => (
-                          <tr key={h.id}>
-                            <td><strong>{h.developer_name}</strong></td>
-                            <td>{h.developer_email}</td>
-                            <td>
-                              <span className={`pw-status-pill ${h.status.toLowerCase()}`}>{h.status}</span>
-                            </td>
-                            <td>{h.assigned_by}</td>
-                            <td>{new Date(h.assigned_at).toLocaleDateString()}</td>
-                            <td>{h.notes || '—'}</td>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showDevHistory ? 12 : 0 }}>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <History size={15} /> Developer Assignment History ({devHistory.length})
+                  </h3>
+                  <button
+                    type="button"
+                    className="pw-history-toggle-btn"
+                    onClick={() => setShowDevHistory((prev) => !prev)}
+                  >
+                    {showDevHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    <span>{showDevHistory ? 'Hide History' : 'View History'}</span>
+                  </button>
+                </div>
+                {showDevHistory && (
+                  devHistory.length === 0 ? (
+                    <p className="project-workspace-empty" style={{ marginTop: 12 }}>No developer assignment history recorded yet.</p>
+                  ) : (
+                    <div className="pw-table-wrap" style={{ marginTop: 12 }}>
+                      <table className="pw-table">
+                        <thead>
+                          <tr>
+                            <th>Developer</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Assigned By</th>
+                            <th>Assigned Date</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {devHistory.map((h) => (
+                            <tr key={h.id}>
+                              <td><strong>{h.developer_name}</strong></td>
+                              <td>{h.developer_email}</td>
+                              <td>
+                                <span className={`pw-status-pill ${h.status.toLowerCase()}`}>{h.status}</span>
+                              </td>
+                              <td>{h.assigned_by}</td>
+                              <td>{formatDate(h.assigned_at)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
                 )}
               </div>
             </section>
@@ -595,10 +840,181 @@ export default function AdminProjectWorkspace() {
           {activeFolder === 'documents' && (
             <section className="project-workspace-content">
               <div className="project-content-heading">
-                <div><span>PROJECT CONTENTS</span><h2>Documents</h2></div>
-                <strong>{activeProject.documents || 0} tracked</strong>
+                <div>
+                  <span>PROJECT CONTENTS</span>
+                  <h2>Project Documents</h2>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <strong>{documents.length} document{documents.length === 1 ? '' : 's'} tracked</strong>
+
+                  {/* Document upload is strictly restricted to Manager and assigned Project Lead */}
+                  {canUploadDocuments && (
+                    <label className="pw-btn-upload-doc">
+                      <Upload size={16} color="#FFFFFF" />
+                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Documents'}</span>
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        disabled={docUploadLoading}
+                        style={{ display: 'none' }}
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.ppt,.pptx"
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
-              <p className="project-workspace-empty">This project tracks {activeProject.documents || 0} documents. Individual document files are not available in the current project data.</p>
+
+              {/* Status Notifications */}
+              {docSuccess && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  color: '#065F46',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  marginBottom: '16px'
+                }}>
+                  <CheckCircle2 size={16} color="#10B981" />
+                  <span>{docSuccess}</span>
+                </div>
+              )}
+
+              {docError && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  color: '#991B1B',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  marginBottom: '16px'
+                }}>
+                  <AlertCircle size={16} color="#EF4444" />
+                  <span>{docError}</span>
+                </div>
+              )}
+
+              {/* Content view */}
+              {documentsLoading ? (
+                <div style={{ padding: '36px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>
+                  Loading project documents...
+                </div>
+              ) : documents.length === 0 ? (
+                <div style={{
+                  padding: '48px 24px',
+                  textAlign: 'center',
+                  background: '#FFFFFF',
+                  borderRadius: '12px',
+                  border: '1px dashed #CBD5E1',
+                  margin: '12px 0'
+                }}>
+                  <FileText size={42} color="#94A3B8" style={{ marginBottom: '12px' }} />
+                  <h4 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: 600, color: '#1E293B' }}>
+                    No Documents Uploaded Yet
+                  </h4>
+                  <p style={{ margin: '0 auto 16px', fontSize: '13px', color: '#64748B', maxWidth: '440px' }}>
+                    {canUploadDocuments
+                      ? 'Upload product specifications, test plans, architecture diagrams, or contract files for this project.'
+                      : 'No documents have been uploaded for this project yet.'}
+                  </p>
+                  {canUploadDocuments && (
+                    <label className="pw-btn-upload-doc">
+                      <Upload size={16} color="#FFFFFF" />
+                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Documents'}</span>
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        disabled={docUploadLoading}
+                        style={{ display: 'none' }}
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.ppt,.pptx"
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', marginTop: '12px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', textAlign: 'left' }}>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Document Name</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Type</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Size</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Uploaded By</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Upload Date</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {documents.map((doc) => (
+                        <tr key={doc.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <FileText size={18} color="#2563EB" />
+                              <span style={{ fontWeight: 600, color: '#0F172A' }}>{doc.name}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#64748B' }}>
+                            <span style={{
+                              background: '#EFF6FF',
+                              color: '#1D4ED8',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11.5px',
+                              fontWeight: 600
+                            }}>
+                              {doc.file_type || 'FILE'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#64748B' }}>{doc.file_size || '—'}</td>
+                          <td style={{ padding: '12px 16px', color: '#334155', fontWeight: 500 }}>{doc.uploaded_by || 'Admin'}</td>
+                          <td style={{ padding: '12px 16px', color: '#64748B' }}>
+                            {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleViewDocument(doc)}
+                                className="pw-btn-doc-view"
+                                title="View document"
+                              >
+                                <Eye size={13} />
+                                <span>View</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadDocument(doc)}
+                                className="pw-btn-doc-download"
+                                title="Download document"
+                              >
+                                <Download size={13} />
+                                <span>Download</span>
+                              </button>
+                              {canUploadDocuments && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                                  className="pw-btn-doc-delete"
+                                  title="Delete document"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
           )}
 
@@ -609,10 +1025,10 @@ export default function AdminProjectWorkspace() {
               <dl className="project-details-grid">
                 <div><dt>Project code</dt><dd>{activeProject.project_code || 'Not set'}</dd></div>
                 <div><dt>Project lead</dt><dd>{activeProject.lead_name || 'Not assigned'}</dd></div>
-                <div><dt>Department</dt><dd>{activeProject.department || 'Not set'}</dd></div>
+                <div><dt>Project Type</dt><dd>{activeProject.department || 'Not set'}</dd></div>
                 <div><dt>Status</dt><dd>{activeProject.status || 'Not set'}</dd></div>
                 <div><dt>Start date</dt><dd><CalendarDays size={15} />{formatDate(activeProject.start_date)}</dd></div>
-                <div><dt>Team members</dt><dd><Users size={15} />{activeProject.team_members ?? 0}</dd></div>
+                <div><dt>Team members</dt><dd><Users size={15} />{(activeProject.team_members !== undefined && activeProject.team_members !== null && activeProject.team_members !== 0) ? activeProject.team_members : (assignedDevs.length || activeProject.team_members || 0)}</dd></div>
                 <div className="project-details-description"><dt>Description</dt><dd>{activeProject.description || 'No description has been added.'}</dd></div>
               </dl>
             </section>
@@ -625,7 +1041,7 @@ export default function AdminProjectWorkspace() {
         <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setIsLeadModalOpen(false)}>
           <div className="pw-modal-box">
             <div className="pw-modal-header">
-              <h3>Assign Project Lead</h3>
+              <h3>Add Project Lead</h3>
               <button className="pw-modal-close" onClick={() => setIsLeadModalOpen(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleAssignProjectLead}>
@@ -647,20 +1063,10 @@ export default function AdminProjectWorkspace() {
                     <option value="">-- Choose Project Lead --</option>
                     {availableLeads.map((lead) => (
                       <option key={lead.id} value={lead.id}>
-                        {lead.full_name} ({lead.email}) {lead.emp_id ? `[${lead.emp_id}]` : ''}
+                        {lead.full_name} ({lead.email}) {lead.emp_id ? `[${lead.emp_id}]` : ''} - {lead.role || 'Member'}
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="pw-form-group">
-                  <label>Assignment Notes (Optional)</label>
-                  <textarea
-                    className="pw-textarea"
-                    placeholder="Provide any context or reason for this lead assignment..."
-                    value={leadAssignNotes}
-                    onChange={(e) => setLeadAssignNotes(e.target.value)}
-                    rows={3}
-                  />
                 </div>
               </div>
               <div className="pw-modal-footer">
@@ -668,7 +1074,7 @@ export default function AdminProjectWorkspace() {
                   Cancel
                 </button>
                 <button type="submit" className="pw-btn-primary" disabled={leadAssignLoading || !selectedLeadId}>
-                  {leadAssignLoading ? 'Assigning...' : 'Confirm Assignment'}
+                  {leadAssignLoading ? 'Assigning...' : 'Add Project Lead'}
                 </button>
               </div>
             </form>
@@ -681,7 +1087,7 @@ export default function AdminProjectWorkspace() {
         <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setIsDevModalOpen(false)}>
           <div className="pw-modal-box" style={{ maxWidth: 580 }}>
             <div className="pw-modal-header">
-              <h3>Assign Developers to Project</h3>
+              <h3>Add Developers to Project</h3>
               <button className="pw-modal-close" onClick={() => setIsDevModalOpen(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleAssignDevelopers}>
@@ -715,26 +1121,151 @@ export default function AdminProjectWorkspace() {
                     );
                   })}
                 </div>
-                <div className="pw-form-group" style={{ marginTop: 14 }}>
-                  <label>Assignment Notes (Optional)</label>
-                  <input
-                    type="text"
-                    className="pw-input"
-                    placeholder="e.g. Assigned to frontend bug triage"
-                    value={devAssignNotes}
-                    onChange={(e) => setDevAssignNotes(e.target.value)}
-                  />
-                </div>
               </div>
               <div className="pw-modal-footer">
                 <button type="button" className="pw-btn-secondary" onClick={() => setIsDevModalOpen(false)}>
                   Cancel
                 </button>
                 <button type="submit" className="pw-btn-primary" disabled={devAssignLoading || selectedDevIds.length === 0}>
-                  {devAssignLoading ? 'Assigning...' : `Assign ${selectedDevIds.length} Developer(s)`}
+                  {devAssignLoading ? 'Adding...' : `Add Developers (${selectedDevIds.length})`}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Document Preview / View */}
+      {previewDoc && (
+        <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setPreviewDoc(null)}>
+          <div className="pw-modal-box" style={{ maxWidth: 860, width: '92%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="pw-modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                <FileText size={22} color="#2563EB" />
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {previewDoc.name}
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#64748B' }}>
+                    {previewDoc.file_size} &bull; Uploaded by {previewDoc.uploaded_by || 'Admin'} on {previewDoc.uploaded_at ? new Date(previewDoc.uploaded_at).toLocaleDateString() : 'Recent'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <a
+                  href={previewDoc.blobUrl || previewDoc.file_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    background: '#EFF6FF',
+                    color: '#2563EB',
+                    textDecoration: 'none',
+                    border: '1px solid #BFDBFE'
+                  }}
+                  title="Open in new window"
+                >
+                  <ExternalLink size={14} />
+                  <span>Open in Tab</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDocument(previewDoc)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    background: '#2563EB',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Download size={14} />
+                  <span>Download</span>
+                </button>
+                <button className="pw-modal-close" onClick={() => setPreviewDoc(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="pw-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', minHeight: '360px' }}>
+              {isImage(previewDoc.name) ? (
+                <img
+                  src={previewDoc.file_url}
+                  alt={previewDoc.name}
+                  style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                />
+              ) : isPdf(previewDoc.name) ? (
+                <iframe
+                  src={previewDoc.blobUrl || previewDoc.file_url}
+                  title={previewDoc.name}
+                  style={{ width: '100%', height: '65vh', border: '1px solid #E2E8F0', borderRadius: '8px', background: '#FFFFFF' }}
+                />
+              ) : (
+                <div style={{ textAlign: 'center', padding: '36px 20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', maxWidth: '480px', width: '100%' }}>
+                  <FileText size={48} color="#2563EB" style={{ margin: '0 auto 12px' }} />
+                  <h4 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{previewDoc.name}</h4>
+                  <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B', lineHeight: 1.5 }}>
+                    This document format ({previewDoc.file_type || previewDoc.name.split('.').pop()?.toUpperCase()}) can be opened in a browser tab or downloaded to your device for viewing with compatible software.
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                    <a
+                      href={previewDoc.blobUrl || previewDoc.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        background: '#EFF6FF',
+                        color: '#2563EB',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        textDecoration: 'none',
+                        border: '1px solid #BFDBFE'
+                      }}
+                    >
+                      <ExternalLink size={15} />
+                      <span>Open in Browser Tab</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadDocument(previewDoc)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 16px',
+                        background: '#2563EB',
+                        color: '#FFFFFF',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Download size={15} />
+                      <span>Download File</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

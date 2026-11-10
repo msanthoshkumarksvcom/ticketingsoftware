@@ -232,6 +232,21 @@ export const initDatabase = async () => {
       );
     `);
 
+    // 8. Project Documents
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_documents (
+        id SERIAL PRIMARY KEY,
+        project_id INT REFERENCES projects(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        file_url TEXT NOT NULL,
+        file_size VARCHAR(50),
+        file_type VARCHAR(100),
+        uploaded_by VARCHAR(150),
+        uploaded_by_id INT REFERENCES users(id) ON DELETE SET NULL,
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // ========================
     // DEFAULT SYSTEM USERS
     // ========================

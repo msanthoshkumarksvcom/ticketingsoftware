@@ -157,8 +157,8 @@ export function registerWorkflowRoutes(app) {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-    // Permissions: Only Super Admin, Manager, QA Lead can assign Project Lead
-    const allowedRoles = ['Manager', 'QA Lead', 'Super Admin'];
+    // Permissions: Only Manager and QA Lead (plus Super Admin, Admin) can assign Project Lead
+    const allowedRoles = ['Manager', 'QA Lead', 'Super Admin', 'Admin'];
     if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({ error: 'Only Managers and QA Leads can assign or reassign a Project Lead.' });
     }
@@ -203,10 +203,10 @@ export function registerWorkflowRoutes(app) {
         [projectId]
       );
 
-      // Record new assignment in history
+      // Record new assignment in history with both column sets for guaranteed backwards compatibility
       await pool.query(
-        `INSERT INTO project_lead_assignments (project_id, project_lead_id, lead_name, lead_email, assigned_by, status, notes)
-         VALUES ($1, $2, $3, $4, $5, 'Active', $6)`,
+        `INSERT INTO project_lead_assignments (project_id, project_lead_id, lead_name, lead_email, project_lead_name, project_lead_email, assigned_by, status, notes)
+         VALUES ($1, $2, $3, $4, $3, $4, $5, 'Active', $6)`,
         [projectId, leadUser.id, leadUser.full_name, leadUser.email, user.full_name, notes || 'Assigned by management']
       );
 
@@ -245,10 +245,16 @@ export function registerWorkflowRoutes(app) {
 
     try {
       const result = await pool.query(
-        `SELECT id, project_id, project_lead_id, lead_name, lead_email, assigned_by, assigned_at, status, notes
-         FROM project_lead_assignments
-         WHERE project_id = $1
-         ORDER BY assigned_at DESC`,
+        `SELECT pla.id, pla.project_id, pla.project_lead_id,
+                COALESCE(u.full_name, pla.project_lead_name, pla.lead_name) as project_lead_name,
+                COALESCE(u.full_name, pla.project_lead_name, pla.lead_name) as lead_name,
+                COALESCE(u.email, pla.project_lead_email, pla.lead_email) as project_lead_email,
+                COALESCE(u.email, pla.project_lead_email, pla.lead_email) as lead_email,
+                pla.assigned_by, pla.assigned_at, pla.status, pla.notes
+         FROM project_lead_assignments pla
+         LEFT JOIN users u ON u.id = pla.project_lead_id
+         WHERE pla.project_id = $1
+         ORDER BY pla.assigned_at DESC`,
         [req.params.id]
       );
       res.json(result.rows);
@@ -323,13 +329,10 @@ export function registerWorkflowRoutes(app) {
       }
       const project = projRes.rows[0];
 
-      // Permission check: Project Lead must be assigned to this project (or Manager/QA Lead/Admin)
-      if (user.role === 'Project Lead') {
-        if (project.project_lead_id !== user.id && project.lead_name?.toLowerCase() !== user.full_name?.toLowerCase()) {
-          return res.status(403).json({ error: 'You can only assign developers to projects assigned to you.' });
-        }
-      } else if (!['Manager', 'QA Lead', 'Super Admin'].includes(user.role)) {
-        return res.status(403).json({ error: 'Not authorized to assign developers to this project.' });
+      // Permission check: Only Manager and QA Lead (plus Super Admin, Admin) can assign developers
+      const allowedRoles = ['Manager', 'QA Lead', 'Super Admin', 'Admin'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ error: 'Only Managers and QA Leads can assign developers to this project.' });
       }
 
       const assignedDevs = [];
@@ -345,7 +348,7 @@ export function registerWorkflowRoutes(app) {
            ON CONFLICT (project_id, developer_id) 
            DO UPDATE SET status = 'Active', assigned_at = CURRENT_TIMESTAMP, assigned_by = $5, notes = $6
            RETURNING *`,
-          [projectId, devUser.id, devUser.full_name, devUser.email, user.full_name, notes || 'Assigned by Project Lead']
+          [projectId, devUser.id, devUser.full_name, devUser.email, user.full_name, notes || 'Assigned by management']
         );
         assignedDevs.push(insertRes.rows[0]);
 
@@ -358,13 +361,6 @@ export function registerWorkflowRoutes(app) {
           `/developer`
         );
       }
-
-      // Update team_members count on project
-      const countRes = await pool.query(
-        `SELECT COUNT(*) FROM project_developer_assignments WHERE project_id = $1 AND status = 'Active'`,
-        [projectId]
-      );
-      await pool.query('UPDATE projects SET team_members = $1 WHERE id = $2', [parseInt(countRes.rows[0].count, 10), projectId]);
 
       res.status(201).json({
         message: `Successfully assigned ${assignedDevs.length} developer(s) to project.`,
@@ -388,12 +384,10 @@ export function registerWorkflowRoutes(app) {
       if (projRes.rows.length === 0) return res.status(404).json({ error: 'Project not found.' });
       const project = projRes.rows[0];
 
-      if (user.role === 'Project Lead') {
-        if (project.project_lead_id !== user.id && project.lead_name?.toLowerCase() !== user.full_name?.toLowerCase()) {
-          return res.status(403).json({ error: 'You can only manage developers for projects assigned to you.' });
-        }
-      } else if (!['Manager', 'QA Lead', 'Super Admin'].includes(user.role)) {
-        return res.status(403).json({ error: 'Not authorized.' });
+      // Permission check: Only Manager and QA Lead (plus Super Admin, Admin) can remove developers
+      const allowedRoles = ['Manager', 'QA Lead', 'Super Admin', 'Admin'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ error: 'Only Managers and QA Leads can remove developers from this project.' });
       }
 
       await pool.query(
@@ -402,13 +396,6 @@ export function registerWorkflowRoutes(app) {
          WHERE project_id = $1 AND developer_id = $2`,
         [projectId, developerId]
       );
-
-      // Update team_members count
-      const countRes = await pool.query(
-        `SELECT COUNT(*) FROM project_developer_assignments WHERE project_id = $1 AND status = 'Active'`,
-        [projectId]
-      );
-      await pool.query('UPDATE projects SET team_members = $1 WHERE id = $2', [parseInt(countRes.rows[0].count, 10), projectId]);
 
       res.json({ message: 'Developer removed from project successfully.' });
     } catch (err) {
