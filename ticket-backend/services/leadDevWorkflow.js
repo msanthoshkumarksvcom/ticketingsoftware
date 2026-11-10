@@ -520,13 +520,13 @@ export function registerWorkflowRoutes(app) {
           ticket_code, title, description, project_id, project_code,
           test_case_id, module, sub_module, test_scenario, test_steps, test_data,
           expected_result, actual_result, severity, priority, category,
-          type, status, reporter, raised_by, raised_by_id, raised_at, attachments
+          type, status, reporter, raised_by, raised_by_id, raised_at, assigned_to, attachments
         )
         VALUES (
           $1, $2, $3, $4, $5,
           $6, $7, $8, $9, $10, $11,
           $12, $13, $14, $15, $16,
-          'Bug', 'Open', $17, $17, $18, CURRENT_TIMESTAMP, $19
+          'Bug', 'Open', $17, $17, $18, CURRENT_TIMESTAMP, 'Project Team', $19
         )
         RETURNING *`,
         [
@@ -589,6 +589,204 @@ export function registerWorkflowRoutes(app) {
     } catch (err) {
       console.error('Error creating ticket from test case:', err);
       res.status(500).json({ error: 'Failed to create bug ticket.' });
+    }
+  });
+
+  // ========================================================
+  // 4.1 BULK FAILED & RECOMMENDATION TEST CASES -> PROJECT TICKETS
+  // ========================================================
+  app.post('/api/admin/tickets/bulk-from-sheet', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const {
+      project_id,
+      sheet_id,
+      sheet_name,
+      test_cases
+    } = req.body;
+
+    if (!project_id) {
+      return res.status(400).json({ error: 'Project ID is required.' });
+    }
+
+    try {
+      // 1. Fetch project info
+      const projRes = await pool.query('SELECT * FROM projects WHERE id = $1', [project_id]);
+      if (projRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Project does not exist.' });
+      }
+      const project = projRes.rows[0];
+
+      // 2. Either use provided test_cases array, or read from project_sheets if sheet_id provided
+      let candidateRows = Array.isArray(test_cases) ? test_cases : [];
+      if (candidateRows.length === 0 && sheet_id) {
+        const sheetRes = await pool.query('SELECT rows FROM project_sheets WHERE id = $1 AND project_id = $2', [sheet_id, project_id]);
+        if (sheetRes.rows.length > 0 && Array.isArray(sheetRes.rows[0].rows)) {
+          candidateRows = sheetRes.rows[0].rows;
+        }
+      }
+
+      // Filter candidate rows where status is 'fail', 'failed', or 'recommendation' / 'recommended'
+      const eligibleRows = candidateRows.filter(row => {
+        let st = '';
+        for (const k of Object.keys(row)) {
+          if (k.toLowerCase().includes('status')) {
+            st = String(row[k] ?? '').toLowerCase().trim();
+            if (st) break;
+          }
+        }
+        if (!st) st = String(row.col_status || row.status || '').toLowerCase().trim();
+        return st === 'fail' || st === 'failed' || st === 'recommendation' || st === 'recommended';
+      });
+
+      if (eligibleRows.length === 0) {
+        return res.json({
+          message: 'No failed or recommended test cases found in the sheet.',
+          createdCount: 0,
+          skippedCount: 0,
+          tickets: []
+        });
+      }
+
+      // Check which test cases already have active tickets in this project
+      const existingTicketsRes = await pool.query(
+        `SELECT test_case_id FROM tickets 
+         WHERE project_id = $1 AND test_case_id IS NOT NULL AND status IN ('Open', 'In Progress', 'Reopened', 'Resolved')`,
+        [project_id]
+      );
+      const existingTcSet = new Set(existingTicketsRes.rows.map(r => String(r.test_case_id).trim().toLowerCase()));
+
+      const createdTickets = [];
+      let skippedCount = 0;
+
+      for (const tc of eligibleRows) {
+        const tcId = (tc.col_id || tc.id || '').trim();
+        const tcKey = tcId.toLowerCase();
+
+        // Skip duplicate if active ticket already exists for this test case
+        if (tcKey && existingTcSet.has(tcKey)) {
+          skippedCount++;
+          continue;
+        }
+
+        let st = '';
+        for (const k of Object.keys(tc)) {
+          if (k.toLowerCase().includes('status')) {
+            st = String(tc[k] ?? '').toLowerCase().trim();
+            if (st) break;
+          }
+        }
+        if (!st) st = String(tc.col_status || tc.status || '').toLowerCase().trim();
+        const isRecommendation = st === 'recommendation' || st === 'recommended';
+
+        const ticket_code = await generateBugTicketCode(project.project_code);
+        const tcTitle = tc.col_title || tc.title || tc.scenario || 'Test Scenario Execution';
+        const title = `[${tcId || 'TC'}] ${tcTitle} - ${isRecommendation ? 'Recommendation' : 'Test Failure'}`;
+        const steps = tc.col_steps || tc.steps || tc.test_steps || '1. Navigate to target screen\n2. Execute test case steps\n3. Observe outcome';
+        const expected = tc.col_expected || tc.expected || tc.expected_result || 'Expected behavior per specification';
+        const actual = tc.col_actual || tc.actual || tc.actual_result || (isRecommendation ? 'QA recommends workflow or UI enhancement.' : 'Test execution resulted in defect or unexpected failure.');
+        const moduleName = tc.col_module || tc.module || 'General';
+
+        const fullDesc = `Test Case ID: ${tcId || 'N/A'}\nModule: ${moduleName}\nType: ${isRecommendation ? 'Recommendation' : 'Defect / Failure'}\n\nSteps to Reproduce / Details:\n${steps}\n\nExpected Result:\n${expected}\n\nActual Result:\n${actual}`;
+
+        let processedAttachments = [];
+        if (tc.col_screenshot && typeof tc.col_screenshot === 'string' && tc.col_screenshot.trim() !== '') {
+          const savedUrl = saveBase64Image(tc.col_screenshot.trim(), `${tcId || 'proof'}.png`);
+          if (savedUrl) processedAttachments.push(savedUrl);
+        }
+        if (Array.isArray(tc.attachments)) {
+          for (const a of tc.attachments) {
+            const url = typeof a === 'string' ? a : a?.url;
+            if (url) {
+              const savedUrl = saveBase64Image(url);
+              if (savedUrl) processedAttachments.push(savedUrl);
+            }
+          }
+        }
+
+        const insertRes = await pool.query(
+          `INSERT INTO tickets (
+            ticket_code, title, description, project_id, project_code,
+            test_case_id, module, sub_module, test_scenario, test_steps, test_data,
+            expected_result, actual_result, severity, priority, category,
+            type, status, reporter, raised_by, raised_by_id, raised_at, 
+            assigned_to, attachments
+          )
+          VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10, $11,
+            $12, $13, $14, $15, $16,
+            $17, 'Open', $18, $18, $19, CURRENT_TIMESTAMP,
+            $20, $21
+          )
+          RETURNING *`,
+          [
+            ticket_code,
+            title,
+            fullDesc,
+            project.id,
+            project.project_code,
+            tcId || 'TC-GEN',
+            moduleName,
+            tc.col_submodule || '',
+            tcTitle,
+            steps,
+            tc.col_data || '',
+            expected,
+            actual,
+            tc.col_priority === 'Critical' ? 'Critical' : (tc.col_priority || 'High'),
+            tc.col_priority === 'Critical' ? 'Urgent' : (tc.col_priority || 'High'),
+            isRecommendation ? 'Quality Recommendation' : 'Functional Bug',
+            isRecommendation ? 'Recommendation' : 'Bug',
+            user.full_name || user.email,
+            user.id,
+            'Project Team', // Assigned to the Project Team pool!
+            JSON.stringify(processedAttachments)
+          ]
+        );
+
+        const created = insertRes.rows[0];
+        createdTickets.push(created);
+        if (tcKey) existingTcSet.add(tcKey);
+
+        // Audit Log in ticket_history
+        await logTicketHistory(
+          created.id,
+          'Created',
+          null,
+          'Open',
+          user.full_name,
+          user.id,
+          `${isRecommendation ? 'Recommendation' : 'Bug'} ticket created via bulk run from sheet "${sheet_name || 'Test Execution Sheet'}".`
+        );
+      }
+
+      // Update project tickets count
+      if (createdTickets.length > 0) {
+        await pool.query('UPDATE projects SET tickets_count = COALESCE(tickets_count, 0) + $1 WHERE id = $2', [createdTickets.length, project.id]);
+
+        // In-app notification to Project Lead
+        if (project.project_lead_id) {
+          await sendInAppNotification(
+            project.project_lead_id,
+            'Bulk Tickets Generated from Test Sheet',
+            `${createdTickets.length} new defect/recommendation tickets generated by ${user.full_name} for "${project.name}". Assigned to Project Team.`,
+            'ticket_bulk_created',
+            `/admin/tickets`
+          );
+        }
+      }
+
+      res.status(201).json({
+        message: `Successfully created ${createdTickets.length} tickets assigned to the Project Team.${skippedCount > 0 ? ` (${skippedCount} already had active tickets and were skipped).` : ''}`,
+        createdCount: createdTickets.length,
+        skippedCount,
+        tickets: createdTickets
+      });
+    } catch (err) {
+      console.error('Error in bulk tickets from sheet:', err);
+      res.status(500).json({ error: 'Failed to bulk-generate tickets from sheet.' });
     }
   });
 

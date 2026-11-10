@@ -443,6 +443,11 @@ export default function AdminProjectSheet() {
   const [selectedFailTestCase, setSelectedFailTestCase] = useState(null);
   const [pendingUploadCell, setPendingUploadCell] = useState(null);
 
+  // Bulk Raise Tickets Automation
+  const [bulkRaiseModalOpen, setBulkRaiseModalOpen] = useState(false);
+  const [submittingBulkTickets, setSubmittingBulkTickets] = useState(false);
+  const [bulkResultNotice, setBulkResultNotice] = useState(null);
+
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -1866,6 +1871,76 @@ export default function AdminProjectSheet() {
     return { total, pass, fail, blocked, inProgress, untested, passRate, failRate, blockedRate };
   }, [currentRows]);
 
+  // Helper to determine if a row represents Fail or Recommendation
+  const getRowStatusType = useCallback((row) => {
+    let val = '';
+    for (const col of currentColumns) {
+      const isStatus = col.type === 'status' || col.id === 'col_status' || col.id === 'status' || col.label?.toLowerCase().includes('status');
+      if (isStatus) {
+        val = String(row[col.id] ?? '').trim().toLowerCase();
+        if (val) break;
+      }
+    }
+    if (!val) {
+      val = String(row.col_status ?? row.status ?? '').trim().toLowerCase();
+    }
+    if (val === 'fail' || val === 'failed') return 'fail';
+    if (val === 'recommendation' || val === 'recommended') return 'recommendation';
+    return null;
+  }, [currentColumns]);
+
+  // Aggregate pending test cases for 1-click bulk ticket raising
+  const pendingBulkCases = useMemo(() => {
+    const fails = [];
+    const recs = [];
+    currentRows.forEach((r, idx) => {
+      const type = getRowStatusType(r);
+      if (type === 'fail') fails.push({ ...r, _rowIndex: idx });
+      else if (type === 'recommendation') recs.push({ ...r, _rowIndex: idx });
+    });
+    return {
+      fails,
+      recs,
+      total: fails.length + recs.length,
+      all: [...fails, ...recs]
+    };
+  }, [currentRows, getRowStatusType]);
+
+  // Handle 1-click bulk ticket generation
+  const handleBulkRaiseTickets = async () => {
+    if (pendingBulkCases.total === 0) {
+      showToast('No failed or recommendation test cases found to raise.');
+      return;
+    }
+    setSubmittingBulkTickets(true);
+    setBulkResultNotice(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        project_id: project?.id,
+        sheet_id: currentSheet?.id,
+        sheet_name: currentSheet?.sheet_name,
+        test_cases: pendingBulkCases.all
+      };
+
+      const res = await axios.post('http://localhost:5000/api/admin/tickets/bulk-from-sheet', payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      showToast(res.data.message || `Successfully created ${res.data.createdCount} tickets!`);
+      setBulkResultNotice(res.data);
+      setTimeout(() => {
+        setBulkRaiseModalOpen(false);
+      }, 1600);
+    } catch (err) {
+      console.error('Failed to bulk-raise tickets:', err);
+      showToast(err.response?.data?.error || 'Failed to raise tickets in bulk. Please try again.');
+    } finally {
+      setSubmittingBulkTickets(false);
+    }
+  };
+
   const confirmLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
@@ -2167,6 +2242,26 @@ export default function AdminProjectSheet() {
               <span className="dot fail" />
               <span>Issues: {qaMetrics.fail + qaMetrics.blocked}</span>
             </div>
+
+            {/* 1-Click Bulk Raise Tickets for Day / Sheet Run */}
+            <button
+              type="button"
+              className={`pjs-bulk-raise-btn ${pendingBulkCases.total > 0 ? 'has-pending' : ''}`}
+              onClick={() => {
+                if (pendingBulkCases.total === 0) {
+                  showToast('No failed or recommendation test cases found in this sheet.');
+                } else {
+                  setBulkResultNotice(null);
+                  setBulkRaiseModalOpen(true);
+                }
+              }}
+              title="Raise all failed and recommendation test cases as project tickets with a single click"
+            >
+              <Bug size={14} />
+              <span>Raise All Tickets</span>
+              <span className="pjs-bulk-badge">{pendingBulkCases.total}</span>
+            </button>
+
             <button className="pjs-share-btn" onClick={handleExportCSV} title="Export CSV Spreadsheet">
               <Download size={14} />
               <span>Export</span>
@@ -3360,6 +3455,121 @@ export default function AdminProjectSheet() {
             showToast(`Bug ticket ${createdTicket.ticket_code} created successfully!`);
           }}
         />
+
+        {/* Bulk Raise Tickets Modal */}
+        {bulkRaiseModalOpen && (
+          <div
+            className="pjs-bulk-overlay"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget && !submittingBulkTickets) setBulkRaiseModalOpen(false);
+            }}
+          >
+            <div className="pjs-bulk-card" role="dialog" aria-modal="true">
+              <div className="pjs-bulk-header">
+                <div className="pjs-bulk-title-wrap">
+                  <div className="pjs-bulk-icon-box">
+                    <Layers size={22} />
+                  </div>
+                  <div>
+                    <h3>Raise All Failed &amp; Recommended Tickets</h3>
+                    <p>Bulk convert sheet execution findings into official project tickets</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="pjs-bulk-close"
+                  onClick={() => !submittingBulkTickets && setBulkRaiseModalOpen(false)}
+                  aria-label="Close dialog"
+                  disabled={submittingBulkTickets}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="pjs-bulk-body">
+                {/* Metrics Breakdown */}
+                <div className="pjs-bulk-stat-grid">
+                  <div className="pjs-bulk-stat-box fail">
+                    <span className="pjs-bulk-stat-label">Failed Cases</span>
+                    <span className="pjs-bulk-stat-val">{pendingBulkCases.fails.length}</span>
+                  </div>
+                  <div className="pjs-bulk-stat-box rec">
+                    <span className="pjs-bulk-stat-label">Recommendations</span>
+                    <span className="pjs-bulk-stat-val">{pendingBulkCases.recs.length}</span>
+                  </div>
+                  <div className="pjs-bulk-stat-box team">
+                    <span className="pjs-bulk-stat-label">Assigned To</span>
+                    <span className="pjs-bulk-stat-val" style={{ fontSize: '13px', marginTop: '4px', color: '#1E3A8A' }}>Project Team Pool</span>
+                  </div>
+                </div>
+
+                {/* Target Information */}
+                <div className="pjs-bulk-info-banner">
+                  <strong>Project Pool Assignment:</strong> Tickets will be linked to <strong>{project?.name || 'Current Project'}</strong> (<code>{project?.project_code}</code>) and assigned to the <strong>Project Team Pool</strong>. All developers and project leads involved in this project will immediately see them in their ticket list.
+                </div>
+
+                {/* Test Cases Preview List */}
+                <div className="pjs-bulk-cases-preview">
+                  <span className="pjs-bulk-preview-title">
+                    Cases to be raised ({pendingBulkCases.total})
+                  </span>
+                  <div className="pjs-bulk-cases-list">
+                    {pendingBulkCases.all.map((tc, idx) => {
+                      const isRec = getRowStatusType(tc) === 'recommendation';
+                      const tcId = tc.col_id || tc.id || `TC-${idx + 1}`;
+                      const title = tc.col_title || tc.title || 'Test Execution';
+                      return (
+                        <div key={idx} className="pjs-bulk-case-item">
+                          <span className={`pjs-case-pill ${isRec ? 'rec' : 'fail'}`}>
+                            {isRec ? 'Recommendation' : 'Failed'}
+                          </span>
+                          <span className="pjs-case-tc-id">{tcId}</span>
+                          <span className="pjs-case-title" title={title}>{title}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {bulkResultNotice && (
+                  <div className="pjs-bulk-success-alert">
+                    <CheckCircle2 size={16} />
+                    <span>{bulkResultNotice.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pjs-bulk-footer">
+                <button
+                  type="button"
+                  className="pjs-bulk-btn-secondary"
+                  onClick={() => setBulkRaiseModalOpen(false)}
+                  disabled={submittingBulkTickets}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pjs-bulk-btn-primary"
+                  onClick={handleBulkRaiseTickets}
+                  disabled={submittingBulkTickets || pendingBulkCases.total === 0}
+                >
+                  {submittingBulkTickets ? (
+                    <>
+                      <RotateCw size={15} className="pjs-spin-icon" />
+                      <span>Generating Tickets...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bug size={15} />
+                      <span>Generate {pendingBulkCases.total} Tickets Now</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 10. Image / Screenshot Lightbox Modal */}
         {previewImageModal && (

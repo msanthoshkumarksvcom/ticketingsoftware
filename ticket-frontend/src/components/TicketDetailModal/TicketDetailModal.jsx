@@ -380,7 +380,7 @@ export default function TicketDetailModal({
                     <div className="tdm-section-title">
                       <CheckCircle2 size={15} color="#16A34A" />
                       <span>Engineering Resolution Details</span>
-                      <span className="tdm-res-badge">Resolved by {ticket.resolved_by || 'Developer'}</span>
+                      <span className="tdm-res-badge">Resolved by {ticket.resolved_by || 'Developer'}{ticket.resolved_at ? ` on ${new Date(ticket.resolved_at).toLocaleDateString()}` : ''}</span>
                     </div>
                     <div className="tdm-resolution-view">
                       <div className="tdm-res-field">
@@ -417,6 +417,26 @@ export default function TicketDetailModal({
                     </div>
                   </div>
                 ) : null}
+
+                {/* QA Verification Box when Closed */}
+                {ticket.status === 'Closed' && (
+                  <div className="tdm-section-card tdm-closed-audit-card">
+                    <div className="tdm-section-title">
+                      <ShieldCheck size={15} color="#16A34A" />
+                      <span>QA Verification &amp; Sign-Off</span>
+                      <span className="tdm-res-badge tdm-closed-badge">Closed &amp; Verified</span>
+                    </div>
+                    <div className="tdm-closed-audit-body">
+                      <p>This defect was re-tested and marked as resolved by QA.</p>
+                      <div className="tdm-audit-pill-row">
+                        <span><strong>Resolved by:</strong> {ticket.resolved_by || 'Developer'}</span>
+                        {ticket.resolved_at && <span><strong>Resolved Date:</strong> {new Date(ticket.resolved_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                        <span><strong>Closed by:</strong> {ticket.closed_by || 'QA Member'}</span>
+                        {ticket.closed_at && <span><strong>Closed Date:</strong> {new Date(ticket.closed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* DEVELOPER ACTION: Resolution Form */}
                 {isDeveloper && (ticket.status === 'In Progress' || ticket.status === 'Reopened') && showResolutionForm && (
@@ -635,7 +655,7 @@ export default function TicketDetailModal({
                     ) : (
                       <div className="tdm-status-notice closed">
                         <CheckCircle2 size={16} color="#16A34A" />
-                        <span>This defect is verified and closed.</span>
+                        <span>This defect is verified and closed{ticket.closed_by ? ` by ${ticket.closed_by}` : ''}{ticket.closed_at ? ` on ${new Date(ticket.closed_at).toLocaleDateString()}` : ''}.</span>
                       </div>
                     )}
                   </div>
@@ -681,6 +701,7 @@ export default function TicketDetailModal({
                     {ticket.resolved_by && <div><span>Resolved By:</span> <strong>{ticket.resolved_by}</strong></div>}
                     {ticket.resolved_at && <div><span>Resolved Date:</span> <strong>{new Date(ticket.resolved_at).toLocaleDateString()}</strong></div>}
                     {ticket.closed_by && <div><span>Closed By:</span> <strong>{ticket.closed_by}</strong></div>}
+                    {ticket.closed_at && <div><span>Closed Date:</span> <strong>{new Date(ticket.closed_at).toLocaleDateString()}</strong></div>}
                   </div>
                 </div>
 

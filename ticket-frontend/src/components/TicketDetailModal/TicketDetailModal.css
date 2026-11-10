@@ -360,6 +360,46 @@
   font-weight: 700;
 }
 
+.tdm-closed-audit-card {
+  border-color: #86efac !important;
+  background: #f0fdf4 !important;
+}
+
+.tdm-closed-badge {
+  background: #16a34a !important;
+  color: #ffffff !important;
+}
+
+.tdm-closed-audit-body {
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.tdm-closed-audit-body p {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #15803d;
+  font-weight: 500;
+}
+
+.tdm-audit-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tdm-audit-pill-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #ffffff;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #166534;
+}
+
 .tdm-resolution-view {
   display: flex;
   flex-direction: column;
