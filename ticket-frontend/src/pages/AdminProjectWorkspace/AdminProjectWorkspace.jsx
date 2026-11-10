@@ -551,7 +551,7 @@ export default function AdminProjectWorkspace() {
             <div className="project-workspace-title">
               <span className="project-workspace-code">{activeProject.project_code}</span>
               <h1>{activeProject.name}</h1>
-              <p>{activeProject.department || 'Quality Assurance'} &bull; {activeProject.status || 'Active'}</p>
+              <p>{activeProject.department || 'Website'} &bull; {activeProject.status || 'Active'}</p>
             </div>
           </header>
 

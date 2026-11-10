@@ -10,7 +10,6 @@ import {
   Edit2,
   FileSpreadsheet,
   FileText,
-  Filter,
   Folder,
   FolderPlus,
   LayoutGrid,
@@ -37,15 +36,29 @@ const EXACT_DEFAULT_PROJECTS = [];
 
 export const generateProjectCode = (nameVal, existingProjects = []) => {
   if (!nameVal || !nameVal.trim()) return '';
-  const cleanName = nameVal
+
+  // Split into words by spaces, hyphens or underscores
+  const words = nameVal
     .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .split(/[\s\-_]+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, ''))
+    .filter(Boolean);
 
-  if (!cleanName) return '';
+  if (words.length === 0) return '';
 
-  const prefix = `PRJ-${cleanName}`;
+  let codeKey = '';
+  if (words.length > 1) {
+    // Multi-word project: take first letters of the words (acronym, e.g. "Customer Support Portal" -> "CSP")
+    codeKey = words.map((w) => w.charAt(0).toUpperCase()).join('');
+  } else {
+    // Single word project: shorten word to 3-4 uppercase characters (e.g. "Hospital" -> "HOSP", "Dee" -> "DEE")
+    const singleWord = words[0].toUpperCase();
+    codeKey = singleWord.length > 4 ? singleWord.slice(0, 4) : singleWord;
+  }
+
+  if (!codeKey) return '';
+
+  const prefix = `PRJ-${codeKey}`;
   let maxNum = 0;
   const regex = new RegExp(`^${prefix}-([0-9]+)$`);
   if (Array.isArray(existingProjects)) {
@@ -120,7 +133,6 @@ function AdminProjects() {
   const [projects, setProjects] = useState([]);
   const [, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
-  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [statusFilter, setStatusFilter] = useState('All Statuses');
@@ -249,7 +261,7 @@ function AdminProjects() {
 
   // Filter & Sort Projects
   const filteredProjects = useMemo(() => {
-    const activeSearch = (searchQuery || headerSearchQuery).trim().toLowerCase();
+    const activeSearch = searchQuery.trim().toLowerCase();
 
     return projects.filter((p) => {
       const matchesSearch =
@@ -276,7 +288,7 @@ function AdminProjects() {
       // 'Last Updated' default order
       return (b.id || 0) - (a.id || 0);
     });
-  }, [projects, searchQuery, headerSearchQuery, departmentFilter, statusFilter, sortBy]);
+  }, [projects, searchQuery, departmentFilter, statusFilter, sortBy]);
 
   // Compute Stats from real database records (0 when empty)
   const stats = useMemo(() => {
@@ -573,7 +585,7 @@ function AdminProjects() {
       name: 'New QA Project',
       description: 'Project created via spreadsheet sheet view',
       lead_name: 'Lead Tester',
-      department: 'Quality Assurance',
+      department: 'Website',
       status: 'Planning',
       priority: 'Medium',
       start_date: new Date().toISOString().split('T')[0],
@@ -678,18 +690,8 @@ function AdminProjects() {
             <strong>Projects</strong>
           </div>
 
-          {/* Right Header: Search Pill + Notification Bell + Profile */}
+          {/* Right Header: Notification Bell + Profile */}
           <div className="header-right pj-exact-header-right">
-            <div className="header-search pj-header-search-pill">
-              <Search size={15} />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={headerSearchQuery}
-                onChange={(e) => setHeaderSearchQuery(e.target.value)}
-              />
-            </div>
-
             <button className="notification-bell pj-header-bell-btn" title="Notifications" aria-label="Notifications">
               <Bell size={18} />
               <span className="notification-count pj-bell-badge">1</span>
@@ -749,24 +751,6 @@ function AdminProjects() {
                 </button>
               </div>
 
-              {/* Filter Button */}
-              <button
-                className={`pj-btn-filter ${
-                  searchQuery || departmentFilter !== 'All Departments' || statusFilter !== 'All Statuses'
-                    ? 'active-filter'
-                    : ''
-                }`}
-                onClick={() => {
-                  setSearchQuery('');
-                  setHeaderSearchQuery('');
-                  setDepartmentFilter('All Departments');
-                  setStatusFilter('All Statuses');
-                }}
-              >
-                <Filter size={15} />
-                <span>Filter</span>
-              </button>
-
               {/* + Create Project Primary Button */}
               {!isQAMember && (
                 <button className="pj-btn-create-primary" onClick={openCreateModal}>
@@ -824,9 +808,6 @@ function AdminProjects() {
                   <option value="Mobile App">Mobile App</option>
                   <option value="Web and Mobile">Web and Mobile</option>
                   <option value="Desktop App">Desktop App</option>
-                  <option value="Quality Assurance">Quality Assurance</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Operations">Operations</option>
                 </select>
                 <ChevronDown size={14} />
               </div>
@@ -962,7 +943,7 @@ function AdminProjects() {
               onAddRow={handleAddSheetRow}
               onDeleteRow={handleDeleteProject}
               onOpenProjectSheet={(project) => navigate(`/admin/projects/${project.id}/sheet`)}
-              searchQuery={searchQuery || headerSearchQuery}
+              searchQuery={searchQuery}
               departmentFilter={departmentFilter}
               statusFilter={statusFilter}
             />
@@ -1062,7 +1043,7 @@ function AdminProjects() {
                     {/* Row 1, Col 1: Department */}
                     <div className="pj-meta-item" title={project.department}>
                       <Building2 size={15} />
-                      <span>{project.department || 'Operations'}</span>
+                      <span>{project.department || 'Website'}</span>
                     </div>
 
                     {/* Row 1, Col 2: Project Lead */}
@@ -1297,7 +1278,7 @@ function AdminProjects() {
                     <input
                       type="text"
                       name="project_code"
-                      placeholder="e.g. PRJ-CUSTOMER_PORTAL-0001"
+                      placeholder="e.g. PRJ-CSP-0001"
                       value={formData.project_code}
                       readOnly
                       required

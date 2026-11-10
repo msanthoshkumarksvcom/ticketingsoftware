@@ -839,10 +839,8 @@ app.delete('/api/admin/projects/:id', async (req, res) => {
 // PROJECT SHEETS (Spreadsheet Module API)
 // ==========================================
 
-// Helper for default starter sheets
+// Helper for default starter sheets: clean sheet with no predefined dummy rows
 const generateDefaultSheets = (project) => {
-  const projName = project?.name || 'QA Project';
-  const projCode = project?.project_code || 'PRJ';
   return [
     {
       sheet_name: 'Test Execution Sheet',
@@ -858,146 +856,7 @@ const generateDefaultSheets = (project) => {
         { id: 'col_assigned', label: 'Assigned QA', width: 160, type: 'text' },
         { id: 'col_date', label: 'Execution Date', width: 130, type: 'date' }
       ],
-      rows: [
-        {
-          id: 'row-1',
-          col_id: `${projCode}-TC-01`,
-          col_title: 'Verify user authentication with valid credentials',
-          col_module: 'Authentication',
-          col_priority: 'High',
-          col_steps: '1. Enter email, 2. Enter valid password, 3. Click Login',
-          col_expected: 'User redirected to role workspace with active token',
-          col_status: 'Pass',
-          col_assigned: project?.lead_name || 'QA Team',
-          col_date: '2026-10-22'
-        },
-        {
-          id: 'row-2',
-          col_id: `${projCode}-TC-02`,
-          col_title: 'Sheet inline cell editing and live auto-save',
-          col_module: 'Sheet Module',
-          col_priority: 'Critical',
-          col_steps: '1. Double-click cell, 2. Enter value, 3. Press Enter',
-          col_expected: 'Cell updates instantly and syncs with database',
-          col_status: 'Pass',
-          col_assigned: 'Automation QA',
-          col_date: '2026-10-23'
-        },
-        {
-          id: 'row-3',
-          col_id: `${projCode}-TC-03`,
-          col_title: 'Filter test cases by status in spreadsheet table',
-          col_module: 'Spreadsheet Grid',
-          col_priority: 'Medium',
-          col_steps: '1. Click filter, 2. Choose status = Fail, 3. View table',
-          col_expected: 'Table displays only matching test case rows',
-          col_status: 'Pass',
-          col_assigned: 'Tester 1',
-          col_date: '2026-10-23'
-        },
-        {
-          id: 'row-4',
-          col_id: `${projCode}-TC-04`,
-          col_title: 'Export sheet data to CSV formatted spreadsheet',
-          col_module: 'Export / Import',
-          col_priority: 'High',
-          col_steps: '1. Click Export CSV button on sheet toolbar',
-          col_expected: 'CSV file generated with all headers and row entries',
-          col_status: 'In Progress',
-          col_assigned: project?.lead_name || 'QA Lead',
-          col_date: '2026-10-23'
-        },
-        {
-          id: 'row-5',
-          col_id: `${projCode}-TC-05`,
-          col_title: 'Formula calculation for pass percentage and totals',
-          col_module: 'Summary Bar',
-          col_priority: 'Medium',
-          col_steps: '1. Inspect bottom formula status bar',
-          col_expected: 'Displays accurate Pass Rate %, total test count',
-          col_status: 'Untested',
-          col_assigned: 'QA Engineer',
-          col_date: '2026-10-24'
-        }
-      ]
-    },
-    {
-      sheet_name: 'Requirements Matrix',
-      columns: [
-        { id: 'col_req_id', label: 'Req ID', width: 110, type: 'text' },
-        { id: 'col_feature', label: 'Feature Description', width: 280, type: 'text' },
-        { id: 'col_biz_priority', label: 'Business Priority', width: 140, type: 'priority' },
-        { id: 'col_qa_lead', label: 'QA Lead', width: 160, type: 'text' },
-        { id: 'col_dev_lead', label: 'Dev Lead', width: 160, type: 'text' },
-        { id: 'col_coverage', label: 'Coverage Status', width: 150, type: 'status' },
-        { id: 'col_signoff', label: 'Sign-Off Status', width: 140, type: 'status' }
-      ],
-      rows: [
-        {
-          id: 'row-1',
-          col_req_id: 'REQ-01',
-          col_feature: 'Spreadsheet-like Project Sheet View with inline edits',
-          col_biz_priority: 'Critical',
-          col_qa_lead: 'Santhosh',
-          col_dev_lead: 'Karthikeyan',
-          col_coverage: 'Pass',
-          col_signoff: 'Pass'
-        },
-        {
-          id: 'row-2',
-          col_req_id: 'REQ-02',
-          col_feature: 'Dedicated Project Sheets Module with custom columns & tabs',
-          col_biz_priority: 'High',
-          col_qa_lead: project?.lead_name || 'Manikandan',
-          col_dev_lead: 'Pavishek',
-          col_coverage: 'Pass',
-          col_signoff: 'In Progress'
-        },
-        {
-          id: 'row-3',
-          col_req_id: 'REQ-03',
-          col_feature: 'Formula bar and summary status calculations',
-          col_biz_priority: 'Medium',
-          col_qa_lead: 'Deepak Kumar',
-          col_dev_lead: 'Eng Team',
-          col_coverage: 'In Progress',
-          col_signoff: 'Untested'
-        }
-      ]
-    },
-    {
-      sheet_name: 'Defect Log',
-      columns: [
-        { id: 'col_bug_id', label: 'Defect ID', width: 110, type: 'text' },
-        { id: 'col_summary', label: 'Defect Summary', width: 300, type: 'text' },
-        { id: 'col_severity', label: 'Severity', width: 130, type: 'priority' },
-        { id: 'col_repro', label: 'Reproducibility', width: 140, type: 'text' },
-        { id: 'col_status', label: 'Defect Status', width: 140, type: 'status' },
-        { id: 'col_assigned_dev', label: 'Assigned Engineer', width: 170, type: 'text' },
-        { id: 'col_target', label: 'Target Release', width: 130, type: 'text' }
-      ],
-      rows: [
-        {
-          id: 'row-1',
-          col_bug_id: 'DEF-101',
-          col_summary: 'Ensure table cell focus outline doesn\'t overflow table border',
-          col_severity: 'Low',
-          col_repro: 'Consistent',
-          col_status: 'Pass',
-          col_assigned_dev: 'Frontend Team',
-          col_target: 'v1.0.1'
-        },
-        {
-          id: 'row-2',
-          col_bug_id: 'DEF-102',
-          col_summary: 'Sync formula bar text input with active selected cell',
-          col_severity: 'Medium',
-          col_repro: 'Edge case',
-          col_status: 'Pass',
-          col_assigned_dev: 'UI Lead',
-          col_target: 'v1.0.1'
-        }
-      ]
+      rows: []
     }
   ];
 };
@@ -1090,9 +949,7 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
     { id: 'col_c', label: 'Column C', width: 160, type: 'text' },
     { id: 'col_status', label: 'Status', width: 130, type: 'status' }
   ];
-  const defaultRows = rows && Array.isArray(rows) ? rows : [
-    { id: 'row-1', col_a: '', col_b: '', col_c: '', col_status: 'Untested' }
-  ];
+  const defaultRows = rows && Array.isArray(rows) ? rows : [];
 
   try {
     const insertRes = await pool.query(
