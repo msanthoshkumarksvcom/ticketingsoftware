@@ -448,6 +448,36 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   }
 });
 
+// Admin Projects: Get potential project leads (all active users except admin/manager)
+app.get('/api/admin/project-leads', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT id, emp_id, full_name, email, department, role 
+       FROM users 
+       WHERE LOWER(role) NOT IN ('admin', 'manager', 'super admin')
+         AND LOWER(email) NOT LIKE '%admin%'
+         AND LOWER(email) != 'manager@gmail.com'
+         AND status = 'Active'
+       ORDER BY full_name ASC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching project leads:', error);
+    res.status(500).json({ error: 'Failed to fetch project leads' });
+  }
+});
+
 // Admin Projects: Get all projects (Role-filtered)
 app.get('/api/admin/projects', async (req, res) => {
   const user = await getUserFromReq(req);
@@ -502,7 +532,7 @@ app.post('/api/admin/projects', async (req, res) => {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  const { project_code, name, description, lead_name, project_lead_id, client_name, department, status, priority, progress, start_date, end_date } = req.body;
+  const { project_code, name, description, lead_name, project_lead_id, client_name, department, status, priority, progress, start_date, end_date, team_members } = req.body;
 
   if (!project_code || !name) {
     return res.status(400).json({ error: 'Project Code and Project Name are required.' });
@@ -530,6 +560,10 @@ app.post('/api/admin/projects', async (req, res) => {
       ? end_date.toString().trim()
       : null;
 
+    const cleanTeamMembers = team_members !== undefined && team_members !== null && !isNaN(parseInt(team_members, 10))
+      ? Math.min(Math.max(1, parseInt(team_members, 10)), 9)
+      : 4;
+
     let resolvedLeadName = lead_name || 'Admin User';
     let leadAssignedAt = null;
     let leadAssignedBy = null;
@@ -545,8 +579,8 @@ app.post('/api/admin/projects', async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO projects (project_code, name, description, lead_name, project_lead_id, client_name, lead_assigned_at, lead_assigned_by, department, status, priority, progress, start_date, end_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `INSERT INTO projects (project_code, name, description, lead_name, project_lead_id, client_name, lead_assigned_at, lead_assigned_by, department, status, priority, progress, start_date, end_date, team_members)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         project_code.trim(),
@@ -562,7 +596,8 @@ app.post('/api/admin/projects', async (req, res) => {
         priority || 'Medium',
         calcProgress,
         cleanStartDate,
-        cleanEndDate
+        cleanEndDate,
+        cleanTeamMembers
       ]
     );
 

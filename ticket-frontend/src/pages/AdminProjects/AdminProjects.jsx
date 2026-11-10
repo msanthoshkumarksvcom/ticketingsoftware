@@ -35,6 +35,58 @@ import './AdminProjects.css';
 // Default empty projects array
 const EXACT_DEFAULT_PROJECTS = [];
 
+export const generateProjectCode = (nameVal, existingProjects = []) => {
+  if (!nameVal || !nameVal.trim()) return '';
+  const cleanName = nameVal
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!cleanName) return '';
+
+  const prefix = `PRJ-${cleanName}`;
+  let maxNum = 0;
+  const regex = new RegExp(`^${prefix}-([0-9]+)$`);
+  if (Array.isArray(existingProjects)) {
+    existingProjects.forEach((p) => {
+      if (p && p.project_code) {
+        const match = p.project_code.match(regex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    });
+  }
+  const nextNum = String(maxNum + 1).padStart(4, '0');
+  return `${prefix}-${nextNum}`;
+};
+
+export const getTodayDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const getMinTargetDate = (startDateStr) => {
+  const baseStr = startDateStr || getTodayDateString();
+  const parts = baseStr.split('-');
+  if (parts.length === 3) {
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    d.setDate(d.getDate() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return baseStr;
+};
+
 const initialProjectForm = {
   project_code: '',
   name: '',
@@ -43,13 +95,10 @@ const initialProjectForm = {
   project_lead_id: '',
   lead_name: '',
   priority: 'Medium',
-  department: 'Quality Assurance',
+  department: '',
   status: 'In Progress',
-  start_date: new Date().toISOString().split('T')[0],
-  team_members: 4,
-  test_cases: 0,
-  documents: 0,
-  tickets_count: 0,
+  start_date: '',
+  team_members: '',
   end_date: ''
 };
 
@@ -76,12 +125,31 @@ function AdminProjects() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
+
     axios.get('http://localhost:5000/api/admin/project-leads', {
       headers: { Authorization: `Bearer ${token}` }
     }).then((res) => {
-      setProjectLeads(Array.isArray(res.data) ? res.data : []);
-    }).catch((err) => {
-      console.warn('Could not fetch project leads:', err.message);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setProjectLeads(res.data);
+      } else {
+        throw new Error('No leads from dedicated route, fallback to users');
+      }
+    }).catch(async () => {
+      try {
+        const usersRes = await axios.get('http://localhost:5000/api/admin/users', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (Array.isArray(usersRes.data)) {
+          const nonAdminUsers = usersRes.data.filter((u) => {
+            const r = (u.role || '').toLowerCase();
+            const e = (u.email || '').toLowerCase();
+            return !r.includes('admin') && r !== 'manager' && !e.includes('admin') && e !== 'manager@gmail.com';
+          });
+          setProjectLeads(nonAdminUsers);
+        }
+      } catch (err) {
+        console.warn('Could not fetch project leads or users:', err.message);
+      }
     });
   }, []);
 
@@ -211,6 +279,49 @@ function AdminProjects() {
   // Form handlers
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+
+    // Validation: Only allow alphabetic characters and spaces for Project Name & Client Name
+    if (name === 'name' || name === 'client_name') {
+      const cleanAlpha = value.replace(/[^a-zA-Z\s]/g, '');
+      setFormData((prev) => {
+        const updated = { ...prev, [name]: cleanAlpha };
+        if (name === 'name' && !isEditing) {
+          updated.project_code = generateProjectCode(cleanAlpha, projects);
+        }
+        return updated;
+      });
+      if (formError) setFormError('');
+      return;
+    }
+
+    // Validation: Team Members only numbers below 10 (1-9)
+    if (name === 'team_members') {
+      const cleanDigits = value.replace(/[^0-9]/g, '');
+      if (cleanDigits === '') {
+        setFormData((prev) => ({ ...prev, [name]: '' }));
+      } else {
+        const num = parseInt(cleanDigits, 10);
+        if (num < 10) {
+          setFormData((prev) => ({ ...prev, [name]: num }));
+        }
+      }
+      if (formError) setFormError('');
+      return;
+    }
+
+    // Validation: Start Date adjustment updates min target date
+    if (name === 'start_date') {
+      setFormData((prev) => {
+        const updated = { ...prev, start_date: value };
+        if (prev.end_date && prev.end_date <= value) {
+          updated.end_date = '';
+        }
+        return updated;
+      });
+      if (formError) setFormError('');
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formError) setFormError('');
   };
@@ -218,7 +329,11 @@ function AdminProjects() {
   const openCreateModal = () => {
     setIsEditing(false);
     setEditId(null);
-    setFormData(initialProjectForm);
+    setFormData({
+      ...initialProjectForm,
+      start_date: getTodayDateString(),
+      team_members: ''
+    });
     setFormError('');
     setIsModalOpen(true);
   };
@@ -234,13 +349,10 @@ function AdminProjects() {
       project_lead_id: project.project_lead_id || '',
       lead_name: project.lead_name || '',
       priority: project.priority || 'Medium',
-      department: project.department || 'Operations',
-      status: project.status || 'Active',
-      start_date: project.start_date ? project.start_date.split('T')[0] : '2026-10-12',
-      team_members: project.team_members || 4,
-      test_cases: project.test_cases || 0,
-      documents: project.documents || 0,
-      tickets_count: project.tickets_count || 0,
+      department: project.department || 'Website',
+      status: project.status || 'In Progress',
+      start_date: project.start_date ? project.start_date.split('T')[0] : getTodayDateString(),
+      team_members: project.team_members !== undefined && project.team_members !== null ? project.team_members : '',
       end_date: project.end_date ? project.end_date.split('T')[0] : ''
     });
     setFormError('');
@@ -250,12 +362,87 @@ function AdminProjects() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
+    const alphaRegex = /^[a-zA-Z\s]+$/;
+
+    // 1. Project Name validation (alphabets only)
+    if (!formData.name?.trim()) {
       setFormError('Please enter a Project Name.');
       return;
     }
-    if (!formData.project_code.trim()) {
-      setFormError('Please enter a Project Code.');
+    if (!alphaRegex.test(formData.name.trim())) {
+      setFormError('Project Name can only contain alphabetic characters and spaces.');
+      return;
+    }
+
+    // 2. Project Code validation
+    if (!formData.project_code?.trim()) {
+      setFormError('Please enter or generate a Project Code (Format: PRJ-PRJ_NAME-0001).');
+      return;
+    }
+
+    // 3. Project Type (Department) validation
+    if (!formData.department?.trim()) {
+      setFormError('Please select a Project Type.');
+      return;
+    }
+
+    // 4. Client Name validation (alphabets only)
+    if (!formData.client_name?.trim()) {
+      setFormError('Please enter a Client Name.');
+      return;
+    }
+    if (!alphaRegex.test(formData.client_name.trim())) {
+      setFormError('Client Name can only contain alphabetic characters and spaces.');
+      return;
+    }
+
+    // 5. Project Lead validation
+    if (!formData.project_lead_id) {
+      setFormError('Please select a Project Lead.');
+      return;
+    }
+
+    // 6. Priority validation
+    if (!formData.priority) {
+      setFormError('Please select a Priority level.');
+      return;
+    }
+
+    // 7. Status validation
+    if (!formData.status) {
+      setFormError('Please select a Status.');
+      return;
+    }
+
+    // 8. Start Date validation (present or future date)
+    const todayStr = getTodayDateString();
+    if (!formData.start_date) {
+      setFormError('Please select a Start Date.');
+      return;
+    }
+    if (formData.start_date < todayStr) {
+      setFormError('Start Date must be today or a future date.');
+      return;
+    }
+
+    // 9. Target End Date validation (optional, but if provided, must be strictly after start date)
+    if (formData.end_date) {
+      if (formData.end_date <= formData.start_date) {
+        setFormError('Target End Date must be after the Start Date.');
+        return;
+      }
+    }
+
+    // 10. Team Members validation (must be number below 10: 1 to 9)
+    const tm = parseInt(formData.team_members, 10);
+    if (formData.team_members === '' || isNaN(tm) || tm < 1 || tm >= 10) {
+      setFormError('Team Members is required and must be a number below 10 (1 - 9).');
+      return;
+    }
+
+    // 11. Project Description validation
+    if (!formData.description?.trim()) {
+      setFormError('Please enter a Project Description.');
       return;
     }
 
@@ -601,26 +788,28 @@ function AdminProjects() {
               <Search size={16} />
               <input
                 type="text"
-                placeholder="Search by project name, code, department..."
+                placeholder="Search by project name, code, project type..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
             <div className="pj-dropdown-group">
-              {/* All Departments */}
+              {/* All Project Types */}
               <div className="pj-custom-select-wrap">
                 <select
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
-                  aria-label="Filter by department"
+                  aria-label="Filter by project type"
                 >
-                  <option value="All Departments">All Departments</option>
-                  <option value="Operations">Operations</option>
-                  <option value="Engineering">Engineering</option>
+                  <option value="All Departments">All Project Types</option>
+                  <option value="Website">Website</option>
+                  <option value="Mobile App">Mobile App</option>
+                  <option value="Web and Mobile">Web and Mobile</option>
+                  <option value="Desktop App">Desktop App</option>
                   <option value="Quality Assurance">Quality Assurance</option>
-                  <option value="Human Resources">Human Resources</option>
-                  <option value="Finance">Finance</option>
+                  <option value="Engineering">Engineering</option>
+                  <option value="Operations">Operations</option>
                 </select>
                 <ChevronDown size={14} />
               </div>
@@ -953,7 +1142,7 @@ function AdminProjects() {
                     <tr>
                       <th>Project Code</th>
                       <th>Project Name</th>
-                      <th>Department</th>
+                      <th>Project Type</th>
                       <th>Lead</th>
                       <th>Status</th>
                       <th>Start Date</th>
@@ -1069,58 +1258,80 @@ function AdminProjects() {
 
                 <div className="pj-form-grid">
                   <div className="pj-form-group">
-                    <label>Project Code *</label>
-                    <input
-                      type="text"
-                      name="project_code"
-                      placeholder="e.g. PRJ-PORTAL-03"
-                      value={formData.project_code}
-                      onChange={handleInputChange}
-                      required
-                      disabled={isEditing}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Project Name *</label>
+                    <label>
+                      Project Name <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="text"
                       name="name"
                       placeholder="e.g. Customer Support Portal"
                       value={formData.name}
                       onChange={handleInputChange}
+                      pattern="[a-zA-Z\s]+"
+                      title="Only alphabetic characters and spaces are allowed"
                       required
                     />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Department</label>
+                    <label>
+                      Project Code <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="project_code"
+                      placeholder="e.g. PRJ-CUSTOMER_PORTAL-0001"
+                      value={formData.project_code}
+                      readOnly
+                      required
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        cursor: 'not-allowed',
+                        color: '#0F172A',
+                        fontWeight: 600
+                      }}
+                      title="Auto-generated from Project Name"
+                    />
+                  </div>
+
+                  <div className="pj-form-group">
+                    <label>
+                      Project Type <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <select
                       name="department"
                       value={formData.department}
                       onChange={handleInputChange}
+                      required
                     >
-                      <option value="Operations">Operations</option>
-                      <option value="Engineering">Engineering</option>
-                      <option value="Quality Assurance">Quality Assurance</option>
-                      <option value="Human Resources">Human Resources</option>
-                      <option value="Finance">Finance</option>
+                      <option value="">-- Select Project Type --</option>
+                      <option value="Website">Website</option>
+                      <option value="Mobile App">Mobile App</option>
+                      <option value="Web and Mobile">Web and Mobile</option>
+                      <option value="Desktop App">Desktop App</option>
                     </select>
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Client Name</label>
+                    <label>
+                      Client Name <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="text"
                       name="client_name"
                       placeholder="e.g. Acme Health Corp"
                       value={formData.client_name || ''}
                       onChange={handleInputChange}
+                      pattern="[a-zA-Z\s]+"
+                      title="Only alphabetic characters and spaces are allowed"
+                      required
                     />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Project Lead</label>
+                    <label>
+                      Project Lead <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <select
                       name="project_lead_id"
                       value={formData.project_lead_id || ''}
@@ -1133,23 +1344,28 @@ function AdminProjects() {
                           lead_name: leadObj ? leadObj.full_name : ''
                         }));
                       }}
+                      required
                     >
-                      <option value="">-- Select Project Lead (Optional) --</option>
+                      <option value="">-- Select Project Lead --</option>
                       {projectLeads.map((lead) => (
                         <option key={lead.id} value={lead.id}>
-                          {lead.full_name} ({lead.email})
+                          {lead.full_name} ({lead.role || 'Member'}) - {lead.email}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Priority</label>
+                    <label>
+                      Priority <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <select
                       name="priority"
                       value={formData.priority || 'Medium'}
                       onChange={handleInputChange}
+                      required
                     >
+                      <option value="">-- Select Priority --</option>
                       <option value="Critical">Critical</option>
                       <option value="High">High</option>
                       <option value="Medium">Medium</option>
@@ -1158,12 +1374,16 @@ function AdminProjects() {
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Status</label>
+                    <label>
+                      Status <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <select
                       name="status"
                       value={formData.status}
                       onChange={handleInputChange}
+                      required
                     >
+                      <option value="">-- Select Status --</option>
                       <option value="Active">Active</option>
                       <option value="In Progress">In Progress</option>
                       <option value="Planning">Planning</option>
@@ -1173,77 +1393,59 @@ function AdminProjects() {
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Start Date</label>
+                    <label>
+                      Start Date <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="date"
                       name="start_date"
                       value={formData.start_date}
+                      min={getTodayDateString()}
                       onChange={handleInputChange}
+                      required
                     />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Target End Date</label>
+                    <label>
+                      Target End Date <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 'normal' }}>(Optional)</span>
+                    </label>
                     <input
                       type="date"
                       name="end_date"
                       value={formData.end_date || ''}
+                      min={getMinTargetDate(formData.start_date)}
                       onChange={handleInputChange}
                     />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Team Members</label>
+                    <label>
+                      Team Members <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="number"
                       name="team_members"
                       min="1"
+                      max="9"
+                      placeholder="Enter team size (1 - 9)"
                       value={formData.team_members}
                       onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Test Cases Count</label>
-                    <input
-                      type="number"
-                      name="test_cases"
-                      min="0"
-                      value={formData.test_cases}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Documents Count</label>
-                    <input
-                      type="number"
-                      name="documents"
-                      min="0"
-                      value={formData.documents}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Tickets Count</label>
-                    <input
-                      type="number"
-                      name="tickets_count"
-                      min="0"
-                      value={formData.tickets_count}
-                      onChange={handleInputChange}
+                      required
                     />
                   </div>
 
                   <div className="pj-form-group pj-form-full">
-                    <label>Project Description</label>
+                    <label>
+                      Project Description <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <textarea
                       name="description"
-                      rows="2"
+                      rows="3"
                       placeholder="Brief overview of project scope and objectives..."
                       value={formData.description}
                       onChange={handleInputChange}
+                      required
                     />
                   </div>
                 </div>
