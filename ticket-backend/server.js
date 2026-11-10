@@ -9,6 +9,8 @@ import { initDatabase } from './init-db.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerWorkflowRoutes, getUserFromReq } from './services/leadDevWorkflow.js';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +18,13 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
+  }
+});
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey_change_in_production';
 
@@ -1561,7 +1570,105 @@ app.get('/api/admin/reports-summary', async (req, res) => {
 // Register Project Lead Management, Developer Assignment & Bug Ticket Automation Routes
 registerWorkflowRoutes(app);
 
-app.listen(PORT, async () => {
+// ==========================================
+// REAL-TIME COLLABORATIVE WEBSOCKET (SOCKET.IO)
+// ==========================================
+// Tracks active viewers: Map<roomId, Map<socketId, userInfo>>
+const roomViewers = new Map();
+
+io.on('connection', (socket) => {
+  let currentRoom = null;
+  let currentUser = null;
+
+  // 1. Join Sheet Room
+  socket.on('join_sheet_room', ({ projectId, sheetId, user }) => {
+    if (!projectId) return;
+    const roomId = `project_sheet_${projectId}`;
+    currentRoom = roomId;
+    currentUser = user || { id: socket.id, name: 'Team Member', role: 'Viewer' };
+
+    socket.join(roomId);
+
+    if (!roomViewers.has(roomId)) {
+      roomViewers.set(roomId, new Map());
+    }
+    roomViewers.get(roomId).set(socket.id, currentUser);
+
+    const viewersList = Array.from(roomViewers.get(roomId).values());
+    io.to(roomId).emit('sheet_presence_updated', {
+      roomId,
+      viewers: viewersList
+    });
+  });
+
+  // 2. Leave Sheet Room
+  socket.on('leave_sheet_room', ({ projectId }) => {
+    const roomId = `project_sheet_${projectId}`;
+    socket.leave(roomId);
+    if (roomViewers.has(roomId)) {
+      roomViewers.get(roomId).delete(socket.id);
+      const viewersList = Array.from(roomViewers.get(roomId).values());
+      io.to(roomId).emit('sheet_presence_updated', {
+        roomId,
+        viewers: viewersList
+      });
+    }
+  });
+
+  // 3. Live Instant Cell Edit Broadcast
+  socket.on('sheet_cell_edited', (data) => {
+    const { projectId, sheetId, rowIndex, colId, value, user } = data;
+    const roomId = `project_sheet_${projectId}`;
+    socket.to(roomId).emit('sheet_cell_updated', {
+      sheetId,
+      rowIndex,
+      colId,
+      value,
+      user
+    });
+  });
+
+  // 4. Live Full Sheet Data Sync (e.g. after adding rows, columns, or bulk changes)
+  socket.on('sheet_data_synced', (data) => {
+    const { projectId, sheetId, sheets, updatedBy } = data;
+    const roomId = `project_sheet_${projectId}`;
+    socket.to(roomId).emit('sheet_data_synced', {
+      sheetId,
+      sheets,
+      updatedBy
+    });
+  });
+
+  // 5. Live Cell Focus / Selection (Shows colored border indicating someone is on that cell)
+  socket.on('sheet_cell_focused', (data) => {
+    const { projectId, sheetId, rowIndex, colId, user } = data;
+    const roomId = `project_sheet_${projectId}`;
+    socket.to(roomId).emit('sheet_cell_focused', {
+      sheetId,
+      rowIndex,
+      colId,
+      user,
+      socketId: socket.id
+    });
+  });
+
+  // 6. Handle Disconnect
+  socket.on('disconnect', () => {
+    if (currentRoom && roomViewers.has(currentRoom)) {
+      roomViewers.get(currentRoom).delete(socket.id);
+      const viewersList = Array.from(roomViewers.get(currentRoom).values());
+      io.to(currentRoom).emit('sheet_presence_updated', {
+        roomId: currentRoom,
+        viewers: viewersList
+      });
+      if (roomViewers.get(currentRoom).size === 0) {
+        roomViewers.delete(currentRoom);
+      }
+    }
+  });
+});
+
+httpServer.listen(PORT, async () => {
   await initDatabase();
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running with Socket.IO on http://localhost:${PORT}`);
 });

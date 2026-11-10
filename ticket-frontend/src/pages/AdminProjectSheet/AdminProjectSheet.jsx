@@ -45,10 +45,14 @@ import {
   Image,
   Upload,
   Maximize2,
-  Folder
+  Folder,
+  Radio,
+  Users
 } from 'lucide-react';
+import { io } from 'socket.io-client';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import RaiseBugTicketModal from '../../components/RaiseBugTicketModal/RaiseBugTicketModal';
+import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import { Bug } from 'lucide-react';
 import './AdminProjectSheet.css';
 
@@ -441,12 +445,28 @@ export default function AdminProjectSheet() {
   const [previewImageModal, setPreviewImageModal] = useState(null);
   const [raiseBugModalOpen, setRaiseBugModalOpen] = useState(false);
   const [selectedFailTestCase, setSelectedFailTestCase] = useState(null);
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [pendingUploadCell, setPendingUploadCell] = useState(null);
 
   // Bulk Raise Tickets Automation
   const [bulkRaiseModalOpen, setBulkRaiseModalOpen] = useState(false);
   const [submittingBulkTickets, setSubmittingBulkTickets] = useState(false);
   const [bulkResultNotice, setBulkResultNotice] = useState(null);
+
+  // Socket.IO Real-Time Collaboration State
+  const socketRef = useRef(null);
+  const [activeViewers, setActiveViewers] = useState([]);
+  const [remoteFocusCells, setRemoteFocusCells] = useState({});
+  const [liveToast, setLiveToast] = useState('');
+  const liveToastTimeoutRef = useRef(null);
+
+  const showLiveNotification = useCallback((msg) => {
+    setLiveToast(msg);
+    if (liveToastTimeoutRef.current) clearTimeout(liveToastTimeoutRef.current);
+    liveToastTimeoutRef.current = setTimeout(() => {
+      setLiveToast('');
+    }, 3200);
+  }, []);
 
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
@@ -513,21 +533,56 @@ export default function AdminProjectSheet() {
     return `${letter}${rowNum}`;
   }, [selectionMode, selectedRowIndices, selectedColId, activeColIndex, activeCell.rowIndex, currentColumns]);
 
-  // Load sheets from backend API or localStorage
+  // Load sheets from backend API & sync with active project tickets
   const loadProjectSheets = useCallback(async () => {
     const token = localStorage.getItem('token');
     const localKey = `pjs_sheets_${projectId}`;
 
     if (token) {
       try {
-        const res = await axios.get(`http://localhost:5000/api/admin/projects/${projectId}/sheets`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.data) {
-          if (res.data.project) setProject(res.data.project);
-          if (Array.isArray(res.data.sheets) && res.data.sheets.length > 0) {
-            setSheets(res.data.sheets);
-            localStorage.setItem(localKey, JSON.stringify(res.data.sheets));
+        const [sheetsRes, ticketsRes] = await Promise.all([
+          axios.get(`http://localhost:5000/api/admin/projects/${projectId}/sheets`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get(`http://localhost:5000/api/admin/tickets?project_id=${projectId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => ({ data: [] }))
+        ]);
+
+        if (sheetsRes.data) {
+          if (sheetsRes.data.project) setProject(sheetsRes.data.project);
+          if (Array.isArray(sheetsRes.data.sheets) && sheetsRes.data.sheets.length > 0) {
+            // Build a fast lookup map for all existing tickets in this project
+            const ticketMap = new Map();
+            if (Array.isArray(ticketsRes?.data)) {
+              ticketsRes.data.forEach((t) => {
+                if (t.test_case_id) {
+                  ticketMap.set(String(t.test_case_id).trim().toLowerCase(), t);
+                }
+              });
+            }
+
+            // Enrich all sheet rows with their live ticket_code and ticket_status
+            const enrichedSheets = sheetsRes.data.sheets.map((sheet) => {
+              if (!Array.isArray(sheet.rows)) return sheet;
+              const enrichedRows = sheet.rows.map((row) => {
+                const tcKey = String(row.col_id || row.id || '').trim().toLowerCase();
+                if (ticketMap.has(tcKey)) {
+                  const t = ticketMap.get(tcKey);
+                  return {
+                    ...row,
+                    ticket_code: t.ticket_code,
+                    ticket_id: t.id,
+                    ticket_status: t.status
+                  };
+                }
+                return row;
+              });
+              return { ...sheet, rows: enrichedRows };
+            });
+
+            setSheets(enrichedSheets);
+            localStorage.setItem(localKey, JSON.stringify(enrichedSheets));
             return;
           }
         }
@@ -550,6 +605,81 @@ export default function AdminProjectSheet() {
   useEffect(() => {
     loadProjectSheets();
   }, [loadProjectSheets]);
+
+  // Connect to Socket.IO for Live Sheet Collaboration across QA Team, Manager, Project Lead
+  useEffect(() => {
+    if (!projectId) return;
+
+    const socket = io('http://localhost:5000', {
+      transports: ['websocket', 'polling']
+    });
+    socketRef.current = socket;
+
+    const currentUserInfo = {
+      id: localStorage.getItem('userId') || localStorage.getItem('userEmail') || `user_${Date.now()}`,
+      name: localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'Team Member',
+      role: localStorage.getItem('userRole') || 'QA Member',
+      email: localStorage.getItem('userEmail') || ''
+    };
+
+    socket.on('connect', () => {
+      socket.emit('join_sheet_room', {
+        projectId,
+        sheetId: currentSheet?.id,
+        user: currentUserInfo
+      });
+    });
+
+    socket.on('sheet_presence_updated', (data) => {
+      if (Array.isArray(data?.viewers)) {
+        setActiveViewers(data.viewers);
+      }
+    });
+
+    socket.on('sheet_cell_updated', (data) => {
+      const { rowIndex, colId, value, user } = data;
+      setSheets((prevSheets) => {
+        const nextSheets = [...prevSheets];
+        const targetSheet = { ...nextSheets[activeSheetIndex] };
+        const updatedRows = [...(targetSheet.rows || [])];
+        if (updatedRows[rowIndex]) {
+          updatedRows[rowIndex] = { ...updatedRows[rowIndex], [colId]: value };
+          targetSheet.rows = updatedRows;
+          nextSheets[activeSheetIndex] = targetSheet;
+          return nextSheets;
+        }
+        return prevSheets;
+      });
+      if (user?.name) {
+        showLiveNotification(`${user.name} updated cell in row ${rowIndex + 1}`);
+      }
+    });
+
+    socket.on('sheet_data_synced', (data) => {
+      if (Array.isArray(data?.sheets)) {
+        setSheets(data.sheets);
+        if (data.updatedBy) {
+          showLiveNotification(`Sheet synchronized by ${data.updatedBy}`);
+        }
+      }
+    });
+
+    socket.on('sheet_cell_focused', (data) => {
+      setRemoteFocusCells((prev) => ({
+        ...prev,
+        [data.socketId]: {
+          rowIndex: data.rowIndex,
+          colId: data.colId,
+          user: data.user
+        }
+      }));
+    });
+
+    return () => {
+      socket.emit('leave_sheet_room', { projectId });
+      socket.disconnect();
+    };
+  }, [projectId, currentSheet?.id, activeSheetIndex, showLiveNotification]);
 
   // Sync active cell value to formula bar
   useEffect(() => {
@@ -616,6 +746,16 @@ export default function AdminProjectSheet() {
       } catch (err) {
         console.warn('Could not sync to cloud, stored locally:', err.message);
       }
+    }
+
+    // Broadcast full sheet sync via WebSockets
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('sheet_data_synced', {
+        projectId,
+        sheetId: targetSheet?.id,
+        sheets: updatedSheets,
+        updatedBy: localStorage.getItem('userName') || 'Team Member'
+      });
     }
 
     setTimeout(() => {
@@ -913,6 +1053,21 @@ export default function AdminProjectSheet() {
     setSheets(updatedSheets);
     persistSheetChanges(updatedSheets);
     setEditingCell(null);
+
+    // Broadcast instant cell update via WebSockets
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('sheet_cell_edited', {
+        projectId,
+        sheetId: currentSheet?.id,
+        rowIndex,
+        colId,
+        value: newVal,
+        user: {
+          name: localStorage.getItem('userName') || 'Team Member',
+          role: localStorage.getItem('userRole') || 'QA Member'
+        }
+      });
+    }
   };
 
   // Global Clipboard Paste Listener for Images & Screenshots
@@ -1889,14 +2044,18 @@ export default function AdminProjectSheet() {
     return null;
   }, [currentColumns]);
 
-  // Aggregate pending test cases for 1-click bulk ticket raising
+  // Aggregate pending test cases for 1-click bulk ticket raising (ONLY unraised cases!)
   const pendingBulkCases = useMemo(() => {
     const fails = [];
     const recs = [];
     currentRows.forEach((r, idx) => {
       const type = getRowStatusType(r);
-      if (type === 'fail') fails.push({ ...r, _rowIndex: idx });
-      else if (type === 'recommendation') recs.push({ ...r, _rowIndex: idx });
+      // ONLY include rows where ticket has NOT yet been raised
+      const isAlreadyRaised = Boolean(r.ticket_code && r.ticket_code.trim());
+      if (!isAlreadyRaised) {
+        if (type === 'fail') fails.push({ ...r, _rowIndex: idx });
+        else if (type === 'recommendation') recs.push({ ...r, _rowIndex: idx });
+      }
     });
     return {
       fails,
@@ -1909,7 +2068,7 @@ export default function AdminProjectSheet() {
   // Handle 1-click bulk ticket generation
   const handleBulkRaiseTickets = async () => {
     if (pendingBulkCases.total === 0) {
-      showToast('No failed or recommendation test cases found to raise.');
+      showToast('All failed and recommendation test cases already have tickets raised.');
       return;
     }
     setSubmittingBulkTickets(true);
@@ -1930,6 +2089,29 @@ export default function AdminProjectSheet() {
 
       showToast(res.data.message || `Successfully created ${res.data.createdCount} tickets!`);
       setBulkResultNotice(res.data);
+
+      // If backend returned stamped updatedRows, apply them immediately to local state and broadcast via Socket.IO
+      if (Array.isArray(res.data.updatedRows)) {
+        setSheets((prevSheets) => {
+          const nextSheets = [...prevSheets];
+          nextSheets[activeSheetIndex] = {
+            ...nextSheets[activeSheetIndex],
+            rows: res.data.updatedRows
+          };
+          if (socketRef.current && socketRef.current.connected) {
+            socketRef.current.emit('sheet_data_synced', {
+              projectId,
+              sheetId: currentSheet?.id,
+              sheets: nextSheets,
+              updatedBy: localStorage.getItem('userName') || 'Team Member'
+            });
+          }
+          return nextSheets;
+        });
+      } else {
+        loadProjectSheets();
+      }
+
       setTimeout(() => {
         setBulkRaiseModalOpen(false);
       }, 1600);
@@ -2234,6 +2416,42 @@ export default function AdminProjectSheet() {
 
           {/* Header Right: Project QA Summary Chips */}
           <div className="pjs-header-right">
+            {/* Live WebSockets Status Indicator */}
+            <div className="pjs-live-sync-indicator" title="Connected in real-time via WebSockets">
+              <span className="pjs-live-pulse-dot" />
+              <span className="pjs-live-sync-text">Live Sync</span>
+            </div>
+
+            {/* Active Team Viewers Avatars Strip */}
+            {activeViewers.length > 0 && (
+              <div className="pjs-active-viewers-strip" title={`${activeViewers.length} team member(s) collaborating live`}>
+                {activeViewers.slice(0, 4).map((viewer, idx) => {
+                  const initials = (viewer.name || 'User')
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase();
+                  const roleColor = viewer.role === 'Project Lead' ? '#7C3AED' : viewer.role === 'Manager' ? '#0F172A' : '#2563EB';
+                  return (
+                    <div
+                      key={idx}
+                      className="pjs-viewer-avatar"
+                      style={{ background: roleColor }}
+                      title={`${viewer.name} (${viewer.role}) - Active Now`}
+                    >
+                      {initials}
+                    </div>
+                  );
+                })}
+                {activeViewers.length > 4 && (
+                  <div className="pjs-viewer-avatar more" title={`${activeViewers.length - 4} more team members`}>
+                    +{activeViewers.length - 4}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="pjs-header-stat-chip">
               <span className="dot pass" />
               <span>Pass: {qaMetrics.passRate}%</span>
@@ -2706,15 +2924,11 @@ export default function AdminProjectSheet() {
                 const isRowSelected = selectionMode === 'row' && selectedRowIndices.includes(rIdx);
                 const isCopiedRow = copiedIndicator?.type === 'rows' ? copiedIndicator.indices?.includes(rIdx) : (copiedIndicator?.type === 'row' && copiedIndicator.index === rIdx);
 
-                // Check if any status column or status property in this row indicates "Fail"
-                const isFailRow = currentColumns.some((col) => {
-                  const isStatus = col.type === 'status' || col.id === 'col_status' || col.id === 'status' || col.label?.toLowerCase().includes('status');
-                  if (isStatus) {
-                    const val = String(row[col.id] ?? '').trim().toLowerCase();
-                    return val === 'fail' || val === 'failed';
-                  }
-                  return false;
-                }) || ['fail', 'failed'].includes(String(row.col_status ?? row.status ?? '').trim().toLowerCase());
+                // Check if any status column or status property in this row indicates "Fail" or "Recommendation"
+                const rowStatusType = getRowStatusType(row);
+                const isFailRow = rowStatusType === 'fail';
+                const isRecRow = rowStatusType === 'recommendation';
+                const isFailOrRecRow = isFailRow || isRecRow;
 
                 return (
                   <tr
@@ -2846,7 +3060,20 @@ export default function AdminProjectSheet() {
                                     <ChevronDown size={11} />
                                   </span>
                                 </div>
-                                {isFailRow && (
+                                {row.ticket_code ? (
+                                  <button
+                                    type="button"
+                                    className={`pjs-cell-ticket-badge ${String(row.ticket_status || 'Open').toLowerCase().replace(/\s+/g, '-')}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedTicketId(row.ticket_id || row.ticket_code);
+                                    }}
+                                    title={`Linked Ticket: ${row.ticket_code} (${row.ticket_status || 'Open'}) - Click to view ticket`}
+                                  >
+                                    <Bug size={10} />
+                                    <span>{row.ticket_code}</span>
+                                  </button>
+                                ) : isFailOrRecRow ? (
                                   <button
                                     type="button"
                                     className="pjs-cell-raise-bug-btn"
@@ -2855,12 +3082,12 @@ export default function AdminProjectSheet() {
                                       setSelectedFailTestCase(row);
                                       setRaiseBugModalOpen(true);
                                     }}
-                                    title="Click to raise project bug ticket for this failure"
+                                    title={`Click to raise ${isRecRow ? 'recommendation' : 'bug'} ticket for this case`}
                                   >
                                     <Bug size={11} />
-                                    <span>Raise Bug</span>
+                                    <span>Raise {isRecRow ? 'Rec' : 'Bug'}</span>
                                   </button>
-                                )}
+                                ) : null}
                               </div>
                             )
                           ) : col.type === 'priority' ? (
@@ -3453,8 +3680,66 @@ export default function AdminProjectSheet() {
           testCaseData={selectedFailTestCase}
           onTicketCreated={(createdTicket) => {
             showToast(`Bug ticket ${createdTicket.ticket_code} created successfully!`);
+            setSheets((prevSheets) => {
+              const next = [...prevSheets];
+              const tSheet = { ...next[activeSheetIndex] };
+              if (Array.isArray(tSheet.rows)) {
+                tSheet.rows = tSheet.rows.map(r => {
+                  const rKey = String(r.col_id || r.id || '').trim().toLowerCase();
+                  const targetKey = String(selectedFailTestCase?.col_id || selectedFailTestCase?.id || '').trim().toLowerCase();
+                  if (rKey === targetKey) {
+                    return {
+                      ...r,
+                      ticket_code: createdTicket.ticket_code,
+                      ticket_id: createdTicket.id,
+                      ticket_status: 'Open'
+                    };
+                  }
+                  return r;
+                });
+                next[activeSheetIndex] = tSheet;
+              }
+              if (socketRef.current && socketRef.current.connected) {
+                socketRef.current.emit('sheet_data_synced', {
+                  projectId,
+                  sheetId: currentSheet?.id,
+                  sheets: next,
+                  updatedBy: localStorage.getItem('userName') || 'Team Member'
+                });
+              }
+              return next;
+            });
           }}
         />
+
+        {/* Ticket Detail & Audit Modal (Opens when clicking any ticket badge on the sheet) */}
+        {selectedTicketId && (
+          <TicketDetailModal
+            isOpen={Boolean(selectedTicketId)}
+            onClose={() => setSelectedTicketId(null)}
+            ticketId={selectedTicketId}
+            userRole={localStorage.getItem('userRole') || 'QA Member'}
+            onTicketUpdated={(updatedTicket) => {
+              setSheets((prevSheets) => {
+                const next = [...prevSheets];
+                const tSheet = { ...next[activeSheetIndex] };
+                if (Array.isArray(tSheet.rows)) {
+                  tSheet.rows = tSheet.rows.map(r => {
+                    if (r.ticket_code === updatedTicket.ticket_code || r.ticket_id === updatedTicket.id) {
+                      return {
+                        ...r,
+                        ticket_status: updatedTicket.status
+                      };
+                    }
+                    return r;
+                  });
+                  next[activeSheetIndex] = tSheet;
+                }
+                return next;
+              });
+            }}
+          />
+        )}
 
         {/* Bulk Raise Tickets Modal */}
         {bulkRaiseModalOpen && (
@@ -3610,6 +3895,14 @@ export default function AdminProjectSheet() {
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Real-time Collaboration Notification Toast */}
+        {liveToast && (
+          <div className="pjs-live-float-toast">
+            <Radio size={14} className="pjs-live-toast-icon" />
+            <span>{liveToast}</span>
           </div>
         )}
       </main>

@@ -2178,6 +2178,42 @@
   transform: scale(1.02);
 }
 
+.pjs-cell-ticket-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  flex-shrink: 0;
+}
+
+.pjs-cell-ticket-badge:hover {
+  background: #dbeafe;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.2);
+}
+
+.pjs-cell-ticket-badge.resolved {
+  background: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+  color: #15803d !important;
+}
+
+.pjs-cell-ticket-badge.closed {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
 .pjs-dev-blocked-card {
   max-width: 500px;
   margin: 60px auto;
@@ -2534,4 +2570,121 @@
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Real-Time Collaboration: Live Sync Badge, Active Viewers, Floating Toast
+   ────────────────────────────────────────────────────────────────────────── */
+.pjs-live-sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 14px;
+  user-select: none;
+}
+
+.pjs-live-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: livePulse 1.8s infinite;
+}
+
+@keyframes livePulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.pjs-live-sync-text {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #065f46;
+  letter-spacing: 0.2px;
+}
+
+.pjs-active-viewers-strip {
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.pjs-viewer-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: transform 0.15s ease, z-index 0.15s ease;
+  user-select: none;
+}
+
+.pjs-viewer-avatar:first-child {
+  margin-left: 0;
+}
+
+.pjs-viewer-avatar:hover {
+  transform: translateY(-2px) scale(1.1);
+  z-index: 10;
+}
+
+.pjs-viewer-avatar.more {
+  background: #64748b !important;
+  font-size: 9.5px;
+}
+
+.pjs-live-float-toast {
+  position: fixed;
+  bottom: 48px;
+  right: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.3);
+  z-index: 10001;
+  animation: slideToastUp 0.25s ease-out;
+}
+
+.pjs-live-toast-icon {
+  color: #10b981;
+  animation: livePulse 1.5s infinite;
+}
+
+@keyframes slideToastUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

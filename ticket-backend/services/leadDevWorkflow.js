@@ -579,6 +579,37 @@ export function registerWorkflowRoutes(app) {
         );
       }
 
+      // 9. Stamp ticket_code onto the test case in project_sheets
+      if (test_case_id) {
+        try {
+          const targetTcKey = test_case_id.trim().toLowerCase();
+          const sheetsRes = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [project.id]);
+          for (const s of sheetsRes.rows) {
+            if (Array.isArray(s.rows)) {
+              let found = false;
+              const updatedRows = s.rows.map(r => {
+                const rKey = String(r.col_id || r.id || '').trim().toLowerCase();
+                if (rKey === targetTcKey) {
+                  found = true;
+                  return {
+                    ...r,
+                    ticket_code: createdTicket.ticket_code,
+                    ticket_id: createdTicket.id,
+                    ticket_status: 'Open'
+                  };
+                }
+                return r;
+              });
+              if (found) {
+                await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+              }
+            }
+          }
+        } catch (stampErr) {
+          console.warn('Could not stamp ticket_code onto project_sheets:', stampErr.message);
+        }
+      }
+
       res.status(201).json({
         message: 'Bug ticket created successfully under project.',
         ticket: {
@@ -658,6 +689,7 @@ export function registerWorkflowRoutes(app) {
       const existingTcSet = new Set(existingTicketsRes.rows.map(r => String(r.test_case_id).trim().toLowerCase()));
 
       const createdTickets = [];
+      const tcToTicketMap = new Map();
       let skippedCount = 0;
 
       for (const tc of eligibleRows) {
@@ -748,7 +780,14 @@ export function registerWorkflowRoutes(app) {
 
         const created = insertRes.rows[0];
         createdTickets.push(created);
-        if (tcKey) existingTcSet.add(tcKey);
+        if (tcKey) {
+          existingTcSet.add(tcKey);
+          tcToTicketMap.set(tcKey, {
+            ticket_code: created.ticket_code,
+            ticket_id: created.id,
+            ticket_status: 'Open'
+          });
+        }
 
         // Audit Log in ticket_history
         await logTicketHistory(
@@ -778,11 +817,51 @@ export function registerWorkflowRoutes(app) {
         }
       }
 
+      // 6. Stamp generated ticket_code directly onto the sheet rows in project_sheets!
+      let updatedSheetRows = null;
+      if (tcToTicketMap.size > 0) {
+        try {
+          const currentSheetRes = await pool.query(
+            'SELECT id, rows FROM project_sheets WHERE project_id = $1',
+            [project.id]
+          );
+          for (const s of currentSheetRes.rows) {
+            if (Array.isArray(s.rows)) {
+              let sheetModified = false;
+              const stamped = s.rows.map(row => {
+                const rKey = String(row.col_id || row.id || '').trim().toLowerCase();
+                if (tcToTicketMap.has(rKey)) {
+                  sheetModified = true;
+                  const tInfo = tcToTicketMap.get(rKey);
+                  return {
+                    ...row,
+                    ticket_code: tInfo.ticket_code,
+                    ticket_id: tInfo.ticket_id,
+                    ticket_status: tInfo.ticket_status,
+                    ticket_raised_at: new Date().toISOString()
+                  };
+                }
+                return row;
+              });
+              if (sheetModified) {
+                await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(stamped), s.id]);
+                if (String(s.id) === String(sheet_id) || !updatedSheetRows) {
+                  updatedSheetRows = stamped;
+                }
+              }
+            }
+          }
+        } catch (stampErr) {
+          console.warn('Error stamping ticket_code onto project_sheets:', stampErr.message);
+        }
+      }
+
       res.status(201).json({
         message: `Successfully created ${createdTickets.length} tickets assigned to the Project Team.${skippedCount > 0 ? ` (${skippedCount} already had active tickets and were skipped).` : ''}`,
         createdCount: createdTickets.length,
         skippedCount,
-        tickets: createdTickets
+        tickets: createdTickets,
+        updatedRows: updatedSheetRows
       });
     } catch (err) {
       console.error('Error in bulk tickets from sheet:', err);

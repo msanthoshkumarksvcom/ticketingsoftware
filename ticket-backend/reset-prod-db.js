@@ -52,7 +52,8 @@ export async function resetProductionDatabase() {
         ('EMP-001', 'System Administrator', 'manager@gmail.com', $1, 'Administration', 'Manager', 'Active'),
         ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active'),
         ('EMP-003', 'Project Lead', 'projectlead@gmail.com', $1, 'Engineering', 'Project Lead', 'Active'),
-        ('EMP-004', 'Developer', 'developer@gmail.com', $1, 'Development', 'Developer', 'Active')
+        ('EMP-004', 'Developer', 'developer@gmail.com', $1, 'Development', 'Developer', 'Active'),
+        ('EMP-005', 'QA Member', 'qamember@gmail.com', $1, 'Quality Assurance', 'QA Member', 'Active')
       ON CONFLICT (email) DO UPDATE SET
         password = EXCLUDED.password,
         role = EXCLUDED.role,
