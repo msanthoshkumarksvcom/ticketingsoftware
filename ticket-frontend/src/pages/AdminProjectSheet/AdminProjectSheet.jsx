@@ -3076,10 +3076,12 @@ export default function AdminProjectSheet() {
                                       e.stopPropagation();
                                       setSelectedTicketId(row.ticket_id || row.ticket_code);
                                     }}
-                                    title={`Linked Ticket: ${row.ticket_code} (${row.ticket_status || 'Open'}) - Click to view ticket`}
+                                    title={`Defect Ticket Raised: ${row.ticket_code} (${row.ticket_status || 'Open'}) - Click to view ticket & full evidence`}
                                   >
-                                    <Bug size={10} />
-                                    <span>{row.ticket_code}</span>
+                                    <CheckCircle2 size={11} className="pjs-badge-check-icon" />
+                                    <span className="pjs-badge-raised-tag">Raised:</span>
+                                    <span className="pjs-badge-code">{row.ticket_code}</span>
+                                    <span className="pjs-cell-ticket-status-pill">{row.ticket_status || 'Open'}</span>
                                   </button>
                                 ) : isFailOrRecRow ? (
                                   <button
@@ -3087,7 +3089,7 @@ export default function AdminProjectSheet() {
                                     className="pjs-cell-raise-bug-btn"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setSelectedFailTestCase(row);
+                                      setSelectedFailTestCase({ ...row, _rowIndex: rIdx });
                                       setRaiseBugModalOpen(true);
                                     }}
                                     title={`Click to raise ${isRecRow ? 'recommendation' : 'bug'} ticket for this case`}
@@ -3691,14 +3693,17 @@ export default function AdminProjectSheet() {
             const targetColId = selectedFailTestCase?.col_id ? String(selectedFailTestCase.col_id).trim().toLowerCase() : '';
             const targetRowId = selectedFailTestCase?.id ? String(selectedFailTestCase.id).trim().toLowerCase() : '';
 
+            const targetIndex = selectedFailTestCase?._rowIndex;
+
             setSheets((prevSheets) => {
               const next = [...prevSheets];
               const tSheet = { ...next[activeSheetIndex] };
               if (Array.isArray(tSheet.rows)) {
-                tSheet.rows = tSheet.rows.map(r => {
+                tSheet.rows = tSheet.rows.map((r, rIdx) => {
                   const rCol = String(r.col_id || '').trim().toLowerCase();
                   const rId = String(r.id || '').trim().toLowerCase();
-                  const isMatch = (targetColId && (rCol === targetColId || rId === targetColId)) ||
+                  const isMatch = (targetIndex !== undefined && rIdx === targetIndex) ||
+                                  (targetColId && (rCol === targetColId || rId === targetColId)) ||
                                   (targetRowId && (rId === targetRowId || rCol === targetRowId));
                   if (isMatch) {
                     return {

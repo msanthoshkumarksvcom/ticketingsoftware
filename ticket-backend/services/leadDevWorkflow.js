@@ -105,7 +105,7 @@ export const sendInAppNotification = async (userId, title, message, type = 'info
   }
 };
 
-export function registerWorkflowRoutes(app) {
+export function registerWorkflowRoutes(app, io) {
   // ==========================================
   // 1. IMAGE UPLOAD
   // ==========================================
@@ -1088,6 +1088,98 @@ export function registerWorkflowRoutes(app) {
     }
   });
 
+  // Developer claims real-time exclusive lock to resolve ticket (Intimates & locks out other developers)
+  app.post('/api/admin/tickets/:id/lock', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const ticketId = req.params.id;
+    try {
+      const ticketRes = await pool.query('SELECT * FROM tickets WHERE id = $1', [ticketId]);
+      if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found.' });
+      const ticket = ticketRes.rows[0];
+
+      // If already locked by ANOTHER developer within the last 15 minutes, prevent collision
+      const isLockedByOther = ticket.locked_by_id && 
+                              Number(ticket.locked_by_id) !== Number(user.id) && 
+                              ticket.locked_at && 
+                              (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000);
+
+      if (isLockedByOther) {
+        return res.status(423).json({
+          error: `Ticket is currently being resolved by ${ticket.locked_by}. Please wait or coordinate with them.`,
+          locked_by: ticket.locked_by,
+          locked_by_id: ticket.locked_by_id,
+          locked_at: ticket.locked_at
+        });
+      }
+
+      // Lock ticket for this developer and move to In Progress if currently Open
+      const updateRes = await pool.query(
+        `UPDATE tickets 
+         SET locked_by = $1, 
+             locked_by_id = $2, 
+             locked_at = CURRENT_TIMESTAMP,
+             status = CASE WHEN status = 'Open' THEN 'In Progress' ELSE status END
+         WHERE id = $3
+         RETURNING *`,
+        [user.full_name, user.id, ticketId]
+      );
+
+      const lockedTicket = updateRes.rows[0];
+
+      // Broadcast real-time lock across WebSocket
+      if (io) {
+        io.emit('ticket_lock_changed', {
+          ticketId,
+          locked_by: user.full_name,
+          locked_by_id: user.id,
+          locked_at: lockedTicket.locked_at,
+          status: lockedTicket.status
+        });
+      }
+
+      res.json({
+        message: `Ticket locked by ${user.full_name}.`,
+        ticket: lockedTicket
+      });
+    } catch (err) {
+      console.error('Error locking ticket:', err);
+      res.status(500).json({ error: 'Failed to claim ticket lock.' });
+    }
+  });
+
+  // Release lock on ticket (e.g. developer cancelled or closed resolution form)
+  app.post('/api/admin/tickets/:id/unlock', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const ticketId = req.params.id;
+    try {
+      const updateRes = await pool.query(
+        `UPDATE tickets 
+         SET locked_by = NULL, locked_by_id = NULL, locked_at = NULL 
+         WHERE id = $1
+         RETURNING *`,
+        [ticketId]
+      );
+
+      if (io) {
+        io.emit('ticket_lock_changed', {
+          ticketId,
+          locked_by: null,
+          locked_by_id: null,
+          locked_at: null
+        });
+      }
+
+      res.json({ message: 'Ticket lock released.', ticket: updateRes.rows[0] });
+    } catch (err) {
+      console.error('Error unlocking ticket:', err);
+      res.status(500).json({ error: 'Failed to release ticket lock.' });
+    }
+  });
+
   // Developer resolves bug ticket (Mandatory resolution form)
   app.put('/api/admin/tickets/:id/resolve', async (req, res) => {
     const user = await getUserFromReq(req);
@@ -1150,7 +1242,10 @@ export function registerWorkflowRoutes(app) {
              assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $7),
              assigned_developer_id = COALESCE(assigned_developer_id, $8),
              assigned_developer_name = COALESCE(assigned_developer_name, $7),
-             assigned_developer_email = COALESCE(assigned_developer_email, $10)
+             assigned_developer_email = COALESCE(assigned_developer_email, $10),
+             locked_by = NULL,
+             locked_by_id = NULL,
+             locked_at = NULL
          WHERE id = $9
          RETURNING *`,
         [
@@ -1166,6 +1261,16 @@ export function registerWorkflowRoutes(app) {
           user.email
         ]
       );
+
+      if (io) {
+        io.emit('ticket_lock_changed', {
+          ticketId,
+          locked_by: null,
+          locked_by_id: null,
+          locked_at: null,
+          status: 'Resolved'
+        });
+      }
 
       // Log in history
       await logTicketHistory(

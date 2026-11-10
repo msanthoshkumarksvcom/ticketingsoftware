@@ -2203,6 +2203,24 @@
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
 }
 
+.pjs-badge-check-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.pjs-badge-raised-tag {
+  color: #166534;
+  font-weight: 800;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pjs-badge-code {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
 .pjs-cell-ticket-status-pill {
   font-size: 9.5px;
   font-weight: 600;
@@ -2219,7 +2237,25 @@
   color: #15803d !important;
 }
 
-.pjs-cell-ticket-badge.resolved .pjs-cell-ticket-status-pill {
+.pjs-cell-ticket-badge.resolved .pjs-badge-check-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.pjs-badge-raised-tag {
+  color: #166534;
+  font-weight: 800;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pjs-badge-code {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.pjs-cell-ticket-status-pill {
   background: #dcfce7;
   color: #15803d;
 }
@@ -2230,7 +2266,25 @@
   color: #475569 !important;
 }
 
-.pjs-cell-ticket-badge.closed .pjs-cell-ticket-status-pill {
+.pjs-cell-ticket-badge.closed .pjs-badge-check-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.pjs-badge-raised-tag {
+  color: #166534;
+  font-weight: 800;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pjs-badge-code {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.pjs-cell-ticket-status-pill {
   background: #e2e8f0;
   color: #475569;
 }

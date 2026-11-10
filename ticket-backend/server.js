@@ -1032,7 +1032,7 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
 
     // 2. Fetch existing sheets
     const sheetsRes = await pool.query(
-      'SELECT id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at FROM project_sheets WHERE project_id = $1 ORDER BY id ASC',
+      'SELECT id, project_id, sheet_name, tab_color, columns, rows, formatting, created_at, updated_at FROM project_sheets WHERE project_id = $1 ORDER BY id ASC',
       [id]
     );
 
@@ -1049,10 +1049,10 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
 
     for (const sheet of defaultSheets) {
       const insertRes = await pool.query(
-        `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, formatting, updated_at)
-         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-         RETURNING id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at`,
-        [id, sheet.sheet_name, JSON.stringify(sheet.columns), JSON.stringify(sheet.rows), JSON.stringify(sheet.formatting || {})]
+        `INSERT INTO project_sheets (project_id, sheet_name, tab_color, columns, rows, formatting, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+         RETURNING id, project_id, sheet_name, tab_color, columns, rows, formatting, created_at, updated_at`,
+        [id, sheet.sheet_name, sheet.tab_color || '#0F9D58', JSON.stringify(sheet.columns), JSON.stringify(sheet.rows), JSON.stringify(sheet.formatting || {})]
       );
       createdSheets.push(insertRes.rows[0]);
     }
@@ -1081,7 +1081,7 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
   }
 
   const { id } = req.params;
-  const { sheet_name, columns, rows, formatting } = req.body;
+  const { sheet_name, columns, rows, formatting, tab_color } = req.body;
 
   const finalName = sheet_name?.trim() || 'New Sheet';
   const defaultCols = columns && Array.isArray(columns) && columns.length > 0 ? columns : [
@@ -1096,10 +1096,10 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
 
   try {
     const insertRes = await pool.query(
-      `INSERT INTO project_sheets (project_id, sheet_name, columns, rows, formatting, updated_at)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-       RETURNING id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at`,
-      [id, finalName, JSON.stringify(defaultCols), JSON.stringify(defaultRows), JSON.stringify(formatting || {})]
+      `INSERT INTO project_sheets (project_id, sheet_name, tab_color, columns, rows, formatting, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+       RETURNING id, project_id, sheet_name, tab_color, columns, rows, formatting, created_at, updated_at`,
+      [id, finalName, tab_color || '#0F9D58', JSON.stringify(defaultCols), JSON.stringify(defaultRows), JSON.stringify(formatting || {})]
     );
 
     res.status(201).json(insertRes.rows[0]);
@@ -1123,7 +1123,7 @@ app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
   }
 
   const { id, sheetId } = req.params;
-  const { sheet_name, columns, rows, formatting } = req.body;
+  const { sheet_name, columns, rows, formatting, tab_color } = req.body;
 
   try {
     const existing = await pool.query(
@@ -1141,14 +1141,16 @@ app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
         columns = COALESCE($2, columns),
         rows = COALESCE($3, rows),
         formatting = COALESCE($4, formatting),
+        tab_color = COALESCE($5, tab_color),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5 AND project_id = $6
-       RETURNING id, project_id, sheet_name, columns, rows, formatting, created_at, updated_at`,
+       WHERE id = $6 AND project_id = $7
+       RETURNING id, project_id, sheet_name, tab_color, columns, rows, formatting, created_at, updated_at`,
       [
         sheet_name !== undefined ? sheet_name.trim() : null,
         columns !== undefined ? JSON.stringify(columns) : null,
         rows !== undefined ? JSON.stringify(rows) : null,
         formatting !== undefined ? JSON.stringify(formatting) : null,
+        tab_color !== undefined ? tab_color : null,
         sheetId,
         id
       ]
@@ -1805,7 +1807,7 @@ app.get('/api/admin/reports-summary', async (req, res) => {
 });
 
 // Register Project Lead Management, Developer Assignment & Bug Ticket Automation Routes
-registerWorkflowRoutes(app);
+registerWorkflowRoutes(app, io);
 
 // ==========================================
 // REAL-TIME COLLABORATIVE WEBSOCKET (SOCKET.IO)
@@ -1889,7 +1891,47 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 6. Handle Disconnect
+  // 6. Ticket Modal Room & Developer Lock / Intimation
+  socket.on('join_ticket_room', ({ ticketId, user }) => {
+    if (!ticketId) return;
+    const ticketRoom = `ticket_${ticketId}`;
+    socket.join(ticketRoom);
+  });
+
+  socket.on('leave_ticket_room', ({ ticketId }) => {
+    if (!ticketId) return;
+    socket.leave(`ticket_${ticketId}`);
+  });
+
+  socket.on('ticket_resolving_claim', (data) => {
+    const { ticketId, user } = data;
+    io.emit('ticket_lock_changed', {
+      ticketId,
+      locked_by: user?.name,
+      locked_by_id: user?.id,
+      locked_at: new Date().toISOString()
+    });
+  });
+
+  socket.on('ticket_resolving_release', (data) => {
+    const { ticketId } = data;
+    io.emit('ticket_lock_changed', {
+      ticketId,
+      locked_by: null,
+      locked_by_id: null
+    });
+  });
+
+  socket.on('ticket_resolving_typing', (data) => {
+    const { ticketId, user, field } = data;
+    socket.to(`ticket_${ticketId}`).emit('ticket_resolving_typing', {
+      ticketId,
+      user,
+      field
+    });
+  });
+
+  // 7. Handle Disconnect
   socket.on('disconnect', () => {
     if (currentRoom && roomViewers.has(currentRoom)) {
       roomViewers.get(currentRoom).delete(socket.id);
