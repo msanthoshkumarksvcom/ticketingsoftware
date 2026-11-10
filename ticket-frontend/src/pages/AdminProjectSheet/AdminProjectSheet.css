@@ -2181,10 +2181,10 @@
 .pjs-cell-ticket-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 10.5px;
+  gap: 5px;
+  padding: 2.5px 8px;
+  border-radius: 5px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -2193,13 +2193,24 @@
   background: #eff6ff;
   color: #1d4ed8;
   flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
 }
 
 .pjs-cell-ticket-badge:hover {
   background: #dbeafe;
   border-color: #2563eb;
   transform: translateY(-1px);
-  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+}
+
+.pjs-cell-ticket-status-pill {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1e40af;
+  text-transform: capitalize;
 }
 
 .pjs-cell-ticket-badge.resolved {
@@ -2208,10 +2219,20 @@
   color: #15803d !important;
 }
 
+.pjs-cell-ticket-badge.resolved .pjs-cell-ticket-status-pill {
+  background: #dcfce7;
+  color: #15803d;
+}
+
 .pjs-cell-ticket-badge.closed {
   background: #f1f5f9 !important;
   border-color: #cbd5e1 !important;
   color: #475569 !important;
+}
+
+.pjs-cell-ticket-badge.closed .pjs-cell-ticket-status-pill {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .pjs-dev-blocked-card {
@@ -2253,6 +2274,21 @@
   background: #dbeafe;
   border-color: #3b82f6;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+}
+
+.pjs-bulk-raise-btn.all-raised {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.pjs-bulk-raise-btn.all-raised:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.pjs-bulk-check-icon {
+  color: #16a34a;
 }
 
 .pjs-bulk-badge {

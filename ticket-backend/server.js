@@ -1486,12 +1486,12 @@ app.get('/api/admin/tickets', async (req, res) => {
 
     if (project_id) {
       params.push(project_id);
-      query += ` AND t.project_id = ${params.length}`;
+      query += ` AND t.project_id = $${params.length}`;
     }
 
     if (status) {
       params.push(status);
-      query += ` AND t.status = ${params.length}`;
+      query += ` AND t.status = $${params.length}`;
     }
 
     query += ` ORDER BY t.id DESC`;

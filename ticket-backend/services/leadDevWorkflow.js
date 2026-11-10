@@ -567,28 +567,33 @@ export function registerWorkflowRoutes(app) {
       }
 
       // 9. Stamp ticket_code onto the test case in project_sheets
+      let updatedSheetRows = null;
       if (test_case_id) {
         try {
           const targetTcKey = test_case_id.trim().toLowerCase();
+          const targetRowId = req.body.row_id ? String(req.body.row_id).trim().toLowerCase() : '';
           const sheetsRes = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [project.id]);
           for (const s of sheetsRes.rows) {
             if (Array.isArray(s.rows)) {
               let found = false;
               const updatedRows = s.rows.map(r => {
-                const rKey = String(r.col_id || r.id || '').trim().toLowerCase();
-                if (rKey === targetTcKey) {
+                const kCol = String(r.col_id || '').trim().toLowerCase();
+                const kId = String(r.id || '').trim().toLowerCase();
+                if ((targetTcKey && (kCol === targetTcKey || kId === targetTcKey)) || (targetRowId && (kId === targetRowId || kCol === targetRowId))) {
                   found = true;
                   return {
                     ...r,
                     ticket_code: createdTicket.ticket_code,
                     ticket_id: createdTicket.id,
-                    ticket_status: 'Open'
+                    ticket_status: 'Open',
+                    ticket_raised_at: new Date().toISOString()
                   };
                 }
                 return r;
               });
               if (found) {
                 await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                if (!updatedSheetRows) updatedSheetRows = updatedRows;
               }
             }
           }
@@ -602,7 +607,8 @@ export function registerWorkflowRoutes(app) {
         ticket: {
           ...createdTicket,
           attachments: processedAttachments
-        }
+        },
+        updatedRows: updatedSheetRows
       });
     } catch (err) {
       console.error('Error creating ticket from test case:', err);
@@ -646,7 +652,11 @@ export function registerWorkflowRoutes(app) {
       }
 
       // Filter candidate rows where status is 'fail', 'failed', or 'recommendation' / 'recommended'
+      // If a row ALREADY has ticket_code set, it is ALREADY RAISED and must be excluded!
       const eligibleRows = candidateRows.filter(row => {
+        if (row.ticket_code && String(row.ticket_code).trim()) {
+          return false;
+        }
         let st = '';
         for (const k of Object.keys(row)) {
           if (k.toLowerCase().includes('status')) {
@@ -660,7 +670,7 @@ export function registerWorkflowRoutes(app) {
 
       if (eligibleRows.length === 0) {
         return res.json({
-          message: 'No failed or recommended test cases found in the sheet.',
+          message: 'No new unraised failed or recommendation test cases found.',
           createdCount: 0,
           skippedCount: 0,
           tickets: []
@@ -669,11 +679,16 @@ export function registerWorkflowRoutes(app) {
 
       // Check which test cases already have active tickets in this project
       const existingTicketsRes = await pool.query(
-        `SELECT test_case_id FROM tickets 
+        `SELECT id, ticket_code, test_case_id, status FROM tickets 
          WHERE project_id = $1 AND test_case_id IS NOT NULL AND status IN ('Open', 'In Progress', 'Reopened', 'Resolved')`,
         [project_id]
       );
-      const existingTcSet = new Set(existingTicketsRes.rows.map(r => String(r.test_case_id).trim().toLowerCase()));
+      const existingTcMap = new Map();
+      existingTicketsRes.rows.forEach(r => {
+        if (r.test_case_id) {
+          existingTcMap.set(String(r.test_case_id).trim().toLowerCase(), r);
+        }
+      });
 
       const createdTickets = [];
       const tcToTicketMap = new Map();
@@ -682,10 +697,23 @@ export function registerWorkflowRoutes(app) {
       for (const tc of eligibleRows) {
         const tcId = (tc.col_id || tc.id || '').trim();
         const tcKey = tcId.toLowerCase();
+        const altIdKey = tc.id ? String(tc.id).trim().toLowerCase() : '';
+        const altColKey = tc.col_id ? String(tc.col_id).trim().toLowerCase() : '';
 
-        // Skip duplicate if active ticket already exists for this test case
-        if (tcKey && existingTcSet.has(tcKey)) {
+        // If an active ticket already exists for this test case, stamp it and skip creating duplicate
+        const existingTicket = (tcKey && existingTcMap.get(tcKey)) || (altColKey && existingTcMap.get(altColKey)) || (altIdKey && existingTcMap.get(altIdKey));
+        if (existingTicket) {
           skippedCount++;
+          const tInfo = {
+            ticket_code: existingTicket.ticket_code,
+            ticket_id: existingTicket.id,
+            ticket_status: existingTicket.status || 'Open',
+            ticket_raised_at: new Date().toISOString()
+          };
+          if (tcKey) tcToTicketMap.set(tcKey, tInfo);
+          if (altColKey) tcToTicketMap.set(altColKey, tInfo);
+          if (altIdKey) tcToTicketMap.set(altIdKey, tInfo);
+          if (tc._rowIndex !== undefined) tcToTicketMap.set(`row_idx_${tc._rowIndex}`, tInfo);
           continue;
         }
 
@@ -767,14 +795,16 @@ export function registerWorkflowRoutes(app) {
 
         const created = insertRes.rows[0];
         createdTickets.push(created);
-        if (tcKey) {
-          existingTcSet.add(tcKey);
-          tcToTicketMap.set(tcKey, {
-            ticket_code: created.ticket_code,
-            ticket_id: created.id,
-            ticket_status: 'Open'
-          });
-        }
+        const tInfo = {
+          ticket_code: created.ticket_code,
+          ticket_id: created.id,
+          ticket_status: 'Open',
+          ticket_raised_at: new Date().toISOString()
+        };
+        if (tcKey) tcToTicketMap.set(tcKey, tInfo);
+        if (altColKey) tcToTicketMap.set(altColKey, tInfo);
+        if (altIdKey) tcToTicketMap.set(altIdKey, tInfo);
+        if (tc._rowIndex !== undefined) tcToTicketMap.set(`row_idx_${tc._rowIndex}`, tInfo);
 
         // Audit Log in ticket_history
         await logTicketHistory(
@@ -815,17 +845,20 @@ export function registerWorkflowRoutes(app) {
           for (const s of currentSheetRes.rows) {
             if (Array.isArray(s.rows)) {
               let sheetModified = false;
-              const stamped = s.rows.map(row => {
-                const rKey = String(row.col_id || row.id || '').trim().toLowerCase();
-                if (tcToTicketMap.has(rKey)) {
+              const stamped = s.rows.map((row, rIdx) => {
+                const kCol = String(row.col_id || '').trim().toLowerCase();
+                const kId = String(row.id || '').trim().toLowerCase();
+                const tInfo = (kCol && tcToTicketMap.get(kCol)) || 
+                              (kId && tcToTicketMap.get(kId)) || 
+                              tcToTicketMap.get(`row_idx_${rIdx}`);
+                if (tInfo) {
                   sheetModified = true;
-                  const tInfo = tcToTicketMap.get(rKey);
                   return {
                     ...row,
                     ticket_code: tInfo.ticket_code,
                     ticket_id: tInfo.ticket_id,
                     ticket_status: tInfo.ticket_status,
-                    ticket_raised_at: new Date().toISOString()
+                    ticket_raised_at: tInfo.ticket_raised_at || new Date().toISOString()
                   };
                 }
                 return row;

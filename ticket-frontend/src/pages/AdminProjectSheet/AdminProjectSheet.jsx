@@ -559,6 +559,9 @@ export default function AdminProjectSheet() {
                 if (t.test_case_id) {
                   ticketMap.set(String(t.test_case_id).trim().toLowerCase(), t);
                 }
+                if (t.ticket_code) {
+                  ticketMap.set(String(t.ticket_code).trim().toLowerCase(), t);
+                }
               });
             }
 
@@ -566,9 +569,13 @@ export default function AdminProjectSheet() {
             const enrichedSheets = sheetsRes.data.sheets.map((sheet) => {
               if (!Array.isArray(sheet.rows)) return sheet;
               const enrichedRows = sheet.rows.map((row) => {
-                const tcKey = String(row.col_id || row.id || '').trim().toLowerCase();
-                if (ticketMap.has(tcKey)) {
-                  const t = ticketMap.get(tcKey);
+                const kCol = String(row.col_id || '').trim().toLowerCase();
+                const kId = String(row.id || '').trim().toLowerCase();
+                const kTicket = String(row.ticket_code || '').trim().toLowerCase();
+                const t = (kCol && ticketMap.get(kCol)) || 
+                          (kId && ticketMap.get(kId)) || 
+                          (kTicket && ticketMap.get(kTicket));
+                if (t) {
                   return {
                     ...row,
                     ticket_code: t.ticket_code,
@@ -2092,24 +2099,19 @@ export default function AdminProjectSheet() {
 
       // If backend returned stamped updatedRows, apply them immediately to local state and broadcast via Socket.IO
       if (Array.isArray(res.data.updatedRows)) {
+        const localKey = `pjs_sheets_${projectId}`;
         setSheets((prevSheets) => {
           const nextSheets = [...prevSheets];
           nextSheets[activeSheetIndex] = {
             ...nextSheets[activeSheetIndex],
             rows: res.data.updatedRows
           };
-          if (socketRef.current && socketRef.current.connected) {
-            socketRef.current.emit('sheet_data_synced', {
-              projectId,
-              sheetId: currentSheet?.id,
-              sheets: nextSheets,
-              updatedBy: localStorage.getItem('userName') || 'Team Member'
-            });
-          }
+          localStorage.setItem(localKey, JSON.stringify(nextSheets));
+          persistSheetChanges(nextSheets);
           return nextSheets;
         });
       } else {
-        loadProjectSheets();
+        await loadProjectSheets();
       }
 
       setTimeout(() => {
@@ -2464,20 +2466,26 @@ export default function AdminProjectSheet() {
             {/* 1-Click Bulk Raise Tickets for Day / Sheet Run */}
             <button
               type="button"
-              className={`pjs-bulk-raise-btn ${pendingBulkCases.total > 0 ? 'has-pending' : ''}`}
+              className={`pjs-bulk-raise-btn ${pendingBulkCases.total > 0 ? 'has-pending' : 'all-raised'}`}
               onClick={() => {
                 if (pendingBulkCases.total === 0) {
-                  showToast('No failed or recommendation test cases found in this sheet.');
+                  showToast('All failed and recommendation test cases in this sheet already have tickets raised.');
                 } else {
                   setBulkResultNotice(null);
                   setBulkRaiseModalOpen(true);
                 }
               }}
-              title="Raise all failed and recommendation test cases as project tickets with a single click"
+              title={pendingBulkCases.total > 0 
+                ? `Raise ${pendingBulkCases.total} new unraised ticket(s) for this project` 
+                : 'All failed/recommendation test cases already have tickets raised'}
             >
               <Bug size={14} />
-              <span>Raise All Tickets</span>
-              <span className="pjs-bulk-badge">{pendingBulkCases.total}</span>
+              <span>{pendingBulkCases.total > 0 ? `Raise New Tickets (${pendingBulkCases.total})` : 'All Tickets Raised'}</span>
+              {pendingBulkCases.total > 0 ? (
+                <span className="pjs-bulk-badge">{pendingBulkCases.total}</span>
+              ) : (
+                <Check size={13} className="pjs-bulk-check-icon" />
+              )}
             </button>
 
             <button className="pjs-share-btn" onClick={handleExportCSV} title="Export CSV Spreadsheet">
@@ -3680,33 +3688,34 @@ export default function AdminProjectSheet() {
           testCaseData={selectedFailTestCase}
           onTicketCreated={(createdTicket) => {
             showToast(`Bug ticket ${createdTicket.ticket_code} created successfully!`);
+            const targetColId = selectedFailTestCase?.col_id ? String(selectedFailTestCase.col_id).trim().toLowerCase() : '';
+            const targetRowId = selectedFailTestCase?.id ? String(selectedFailTestCase.id).trim().toLowerCase() : '';
+
             setSheets((prevSheets) => {
               const next = [...prevSheets];
               const tSheet = { ...next[activeSheetIndex] };
               if (Array.isArray(tSheet.rows)) {
                 tSheet.rows = tSheet.rows.map(r => {
-                  const rKey = String(r.col_id || r.id || '').trim().toLowerCase();
-                  const targetKey = String(selectedFailTestCase?.col_id || selectedFailTestCase?.id || '').trim().toLowerCase();
-                  if (rKey === targetKey) {
+                  const rCol = String(r.col_id || '').trim().toLowerCase();
+                  const rId = String(r.id || '').trim().toLowerCase();
+                  const isMatch = (targetColId && (rCol === targetColId || rId === targetColId)) ||
+                                  (targetRowId && (rId === targetRowId || rCol === targetRowId));
+                  if (isMatch) {
                     return {
                       ...r,
                       ticket_code: createdTicket.ticket_code,
                       ticket_id: createdTicket.id,
-                      ticket_status: 'Open'
+                      ticket_status: createdTicket.status || 'Open',
+                      ticket_raised_at: new Date().toISOString()
                     };
                   }
                   return r;
                 });
                 next[activeSheetIndex] = tSheet;
               }
-              if (socketRef.current && socketRef.current.connected) {
-                socketRef.current.emit('sheet_data_synced', {
-                  projectId,
-                  sheetId: currentSheet?.id,
-                  sheets: next,
-                  updatedBy: localStorage.getItem('userName') || 'Team Member'
-                });
-              }
+              const localKey = `pjs_sheets_${projectId}`;
+              localStorage.setItem(localKey, JSON.stringify(next));
+              persistSheetChanges(next);
               return next;
             });
           }}
@@ -3725,7 +3734,7 @@ export default function AdminProjectSheet() {
                 const tSheet = { ...next[activeSheetIndex] };
                 if (Array.isArray(tSheet.rows)) {
                   tSheet.rows = tSheet.rows.map(r => {
-                    if (r.ticket_code === updatedTicket.ticket_code || r.ticket_id === updatedTicket.id) {
+                    if (r.ticket_code === updatedTicket.ticket_code || String(r.ticket_id) === String(updatedTicket.id)) {
                       return {
                         ...r,
                         ticket_status: updatedTicket.status
@@ -3735,6 +3744,9 @@ export default function AdminProjectSheet() {
                   });
                   next[activeSheetIndex] = tSheet;
                 }
+                const localKey = `pjs_sheets_${projectId}`;
+                localStorage.setItem(localKey, JSON.stringify(next));
+                persistSheetChanges(next);
                 return next;
               });
             }}
