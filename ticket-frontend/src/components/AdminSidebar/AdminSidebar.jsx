@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import './AdminSidebar.css';
 
-const mainMenuNav = [
+export const MAIN_ADMIN_NAV = [
   { label: 'Dashboard', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Projects', to: '/admin/projects', icon: FolderKanban },
   { label: 'Users', to: '/admin/users', icon: Users, end: true },
@@ -28,6 +28,8 @@ const mainMenuNav = [
   { label: 'Deployment Approval', to: '/admin/deployment-approval', icon: Rocket },
   { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
+
+const mainMenuNav = MAIN_ADMIN_NAV;
 
 export const QA_MEMBER_NAV = [
   { label: 'Dashboard', to: '/qa-member', icon: LayoutDashboard, end: true },
@@ -50,6 +52,7 @@ export const DEVELOPER_NAV = [
   { label: 'Dashboard', to: '/developer', icon: LayoutDashboard, end: true },
   { label: 'Assigned Tickets', to: '/admin/tickets', icon: Ticket },
   { label: 'My Projects', to: '/admin/projects', icon: FolderKanban },
+  { label: 'Project Reports', to: '/admin/reports', icon: BarChart3 },
   { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
 
