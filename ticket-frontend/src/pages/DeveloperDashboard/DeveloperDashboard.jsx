@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { io } from 'socket.io-client';
+import { SOCKET_URL } from '../../utils/apiConfig';
 import {
   Code2,
+  Folder,
+  FolderOpen,
   FolderKanban,
   Ticket,
   CheckCircle2,
@@ -18,12 +22,31 @@ import {
   ChevronDown,
   Layers,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  Lock
 } from 'lucide-react';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import '../../styles/admin.css';
 import './DeveloperDashboard.css';
+
+const DEV_STATUS_OPTIONS = [
+  { value: 'All', label: 'All Statuses' },
+  { value: 'Open', label: 'Open' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Resolved', label: 'Resolved (Pending QA)' },
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Reopened', label: 'Reopened' }
+];
+
+const DEV_SEVERITY_OPTIONS = [
+  { value: 'All', label: 'All Severities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
 
 export default function DeveloperDashboard() {
   const navigate = useNavigate();
@@ -100,6 +123,45 @@ export default function DeveloperDashboard() {
     fetchMe();
     fetchStats();
     fetchTickets();
+
+    // Real-time synchronization for ticket locks and resolutions
+    const socket = io(SOCKET_URL, {
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      timeout: 5000
+    });
+
+    socket.on('ticket_lock_changed', (data) => {
+      if (data?.ticketId) {
+        setTickets((prev) =>
+          prev.map((t) => {
+            if (String(t.id) === String(data.ticketId)) {
+              return {
+                ...t,
+                locked_by: data.locked_by,
+                locked_by_id: data.locked_by_id,
+                locked_at: data.locked_at,
+                status: data.status || t.status
+              };
+            }
+            return t;
+          })
+        );
+      }
+    });
+
+    socket.on('ticket_updated', (updatedTicket) => {
+      if (updatedTicket?.id) {
+        setTickets((prev) =>
+          prev.map((t) => (String(t.id) === String(updatedTicket.id) ? { ...t, ...updatedTicket } : t))
+        );
+        fetchStats();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [navigate]);
 
   const confirmLogout = () => {
@@ -110,6 +172,56 @@ export default function DeveloperDashboard() {
   const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'Developer');
   const avatarLabel = displayName.charAt(0).toUpperCase();
 
+  const assignedProjects = stats?.projects || [];
+
+  const getTicketProjectKey = (ticket) => {
+    if (ticket.project_id) return `id-${ticket.project_id}`;
+    if (ticket.project_code && ticket.project_code.toLowerCase() !== 'general') {
+      return `code-${ticket.project_code.trim().toLowerCase()}`;
+    }
+    return 'general';
+  };
+
+  const projectFolderTabs = useMemo(() => {
+    const map = new Map();
+    assignedProjects.forEach((p) => {
+      const key = `id-${p.id}`;
+      map.set(key, {
+        key,
+        projectId: p.id,
+        name: p.name || p.project_code || 'Project',
+        code: p.project_code || 'N/A',
+        count: 0
+      });
+    });
+
+    tickets.forEach((t) => {
+      const key = getTicketProjectKey(t);
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          projectId: t.project_id || null,
+          name: t.project_name || (key === 'general' ? 'General Tickets' : t.project_code || 'Project'),
+          code: t.project_code || 'General',
+          count: 0
+        });
+      }
+      map.get(key).count += 1;
+    });
+
+    return Array.from(map.values());
+  }, [assignedProjects, tickets]);
+
+  const devProjectOptions = useMemo(() => {
+    return [
+      { value: 'All', label: 'All Projects' },
+      ...projectFolderTabs.map((pf) => ({
+        value: pf.key,
+        label: `${pf.name} (${pf.code})`
+      }))
+    ];
+  }, [projectFolderTabs]);
+
   // Filtered Tickets
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
@@ -119,11 +231,13 @@ export default function DeveloperDashboard() {
         t.ticket_code?.toLowerCase().includes(q) ||
         t.title?.toLowerCase().includes(q) ||
         t.test_case_id?.toLowerCase().includes(q) ||
-        t.module?.toLowerCase().includes(q);
+        t.module?.toLowerCase().includes(q) ||
+        t.project_name?.toLowerCase().includes(q) ||
+        t.project_code?.toLowerCase().includes(q);
 
       const matchesStatus = statusFilter === 'All' || t.status === statusFilter;
       const matchesSeverity = severityFilter === 'All' || t.severity === severityFilter;
-      const matchesProj = projectFilter === 'All' || String(t.project_id) === projectFilter;
+      const matchesProj = projectFilter === 'All' || getTicketProjectKey(t) === projectFilter;
 
       return matchesSearch && matchesStatus && matchesSeverity && matchesProj;
     });
@@ -138,8 +252,6 @@ export default function DeveloperDashboard() {
     closedTickets: tickets.filter((t) => t.status === 'Closed').length,
     reopenedTickets: tickets.filter((t) => t.status === 'Reopened').length
   };
-
-  const assignedProjects = stats?.projects || [];
 
   return (
     <div className="admin-layout">
@@ -265,28 +377,62 @@ export default function DeveloperDashboard() {
               <div className="dev-section-header">
                 <div>
                   <h2>My Assigned Projects</h2>
-                  <p>Projects you are allocated to by Project Leads. You have access to defect tickets for these projects.</p>
+                  <p>Select a project folder to filter your bug tickets below, or open its dedicated Ticket Folder workspace.</p>
                 </div>
               </div>
               <div className="dev-projects-grid">
-                {assignedProjects.map((proj) => (
-                  <div key={proj.id} className="dev-proj-card">
-                    <div className="dev-proj-top">
-                      <span className="dev-proj-code">{proj.project_code}</span>
-                      <span className={`dev-badge ${(proj.status || 'active').toLowerCase().replace(/\s+/g, '-')}`}>
-                        {proj.status || 'Active'}
-                      </span>
+                {assignedProjects.map((proj) => {
+                  const projKey = `id-${proj.id}`;
+                  const isSelected = projectFilter === projKey;
+                  const projTickets = tickets.filter((t) => getTicketProjectKey(t) === projKey);
+
+                  return (
+                    <div
+                      key={proj.id}
+                      className={`dev-proj-card ${isSelected ? 'is-selected' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setProjectFilter((prev) => (prev === projKey ? 'All' : projKey))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setProjectFilter((prev) => (prev === projKey ? 'All' : projKey));
+                        }
+                      }}
+                    >
+                      <div className="dev-proj-top">
+                        <span className="dev-proj-code" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          {isSelected ? <FolderOpen size={12} /> : <Folder size={12} />}
+                          {proj.project_code}
+                        </span>
+                        <span className={`dev-badge ${(proj.status || 'active').toLowerCase().replace(/\s+/g, '-')}`}>
+                          {proj.status || 'Active'}
+                        </span>
+                      </div>
+                      <h4>{proj.name}</h4>
+                      <div className="dev-proj-lead-info">
+                        <span>Project Lead:</span>
+                        <strong>{proj.project_lead_name || proj.lead_name || 'Unassigned'}</strong>
+                      </div>
+                      <div className="dev-proj-card-footer">
+                        <span className="dev-proj-ticket-count">
+                          <Ticket size={12} /> {projTickets.length} Ticket{projTickets.length === 1 ? '' : 's'}
+                        </span>
+                        <button
+                          type="button"
+                          className="dev-proj-open-folder-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/tickets?projectId=${proj.id}`);
+                          }}
+                        >
+                          <FolderOpen size={12} />
+                          <span>Open Folder</span>
+                        </button>
+                      </div>
                     </div>
-                    <h4>{proj.name}</h4>
-                    <div className="dev-proj-lead-info">
-                      <span>Project Lead:</span>
-                      <strong>{proj.project_lead_name || 'Unassigned'}</strong>
-                    </div>
-                    <div className="dev-proj-assigned-date">
-                      Assigned on {new Date(proj.assigned_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -297,11 +443,46 @@ export default function DeveloperDashboard() {
               <div>
                 <h2>My Assigned Bug Tickets</h2>
                 <p>
-                  Defects raised from failed test executions requiring your engineering fix. Open any ticket to review the test case steps, error screenshots, and submit your resolution.
+                  Defects organized by project folder. Select a project folder tab or open any ticket to review steps and submit your resolution.
                 </p>
               </div>
               <div className="dev-ticket-count-pill">{filteredTickets.length} Tickets</div>
             </div>
+
+            {/* Project Folder Tabs */}
+            {projectFolderTabs.length > 0 && (
+              <div className="dev-folder-tabs" role="tablist" aria-label="Filter tickets by project folder">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={projectFilter === 'All'}
+                  className={`dev-folder-tab ${projectFilter === 'All' ? 'active' : ''}`}
+                  onClick={() => setProjectFilter('All')}
+                >
+                  <Folder size={14} />
+                  <span>All Project Folders</span>
+                  <span className="dev-folder-tab-count">{tickets.length}</span>
+                </button>
+                {projectFolderTabs.map((pf) => {
+                  const isActive = projectFilter === pf.key;
+                  return (
+                    <button
+                      key={pf.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className={`dev-folder-tab ${isActive ? 'active' : ''}`}
+                      onClick={() => setProjectFilter(isActive ? 'All' : pf.key)}
+                    >
+                      {isActive ? <FolderOpen size={14} /> : <Folder size={14} />}
+                      <span>{pf.name}</span>
+                      <span className="dev-folder-tab-code">{pf.code}</span>
+                      <span className="dev-folder-tab-count">{pf.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Filter Bar */}
             <div className="dev-filters-bar">
@@ -309,49 +490,37 @@ export default function DeveloperDashboard() {
                 <Search size={15} />
                 <input
                   type="text"
-                  placeholder="Search by ticket ID, defect title, module, test case..."
+                  placeholder="Search by ticket ID, defect title, module, test case, project..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              <div className="dev-filter-selects">
-                <select
+              <div className="dev-filter-selects" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <CustomSelect
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="dev-select"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Open">Open</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Resolved">Resolved (Pending QA)</option>
-                  <option value="Closed">Closed</option>
-                  <option value="Reopened">Reopened</option>
-                </select>
+                  onChange={setStatusFilter}
+                  options={DEV_STATUS_OPTIONS}
+                  variant="filter"
+                  placeholder="All Statuses"
+                />
 
-                <select
+                <CustomSelect
                   value={severityFilter}
-                  onChange={(e) => setSeverityFilter(e.target.value)}
-                  className="dev-select"
-                >
-                  <option value="All">All Severities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                  onChange={setSeverityFilter}
+                  options={DEV_SEVERITY_OPTIONS}
+                  variant="filter"
+                  placeholder="All Severities"
+                />
 
-                {assignedProjects.length > 1 && (
-                  <select
+                {projectFolderTabs.length > 1 && (
+                  <CustomSelect
                     value={projectFilter}
-                    onChange={(e) => setProjectFilter(e.target.value)}
-                    className="dev-select"
-                  >
-                    <option value="All">All Projects</option>
-                    {assignedProjects.map((p) => (
-                      <option key={p.id} value={String(p.id)}>{p.name}</option>
-                    ))}
-                  </select>
+                    onChange={setProjectFilter}
+                    options={devProjectOptions}
+                    variant="filter"
+                    placeholder="All Projects"
+                  />
                 )}
               </div>
             </div>
@@ -391,7 +560,12 @@ export default function DeveloperDashboard() {
                             <span className="dev-ticket-code-tag">{ticket.ticket_code}</span>
                           </td>
                           <td>
-                            <span className="dev-ticket-proj">{ticket.project_name || ticket.project_code}</span>
+                            <div className="dev-ticket-proj-stack">
+                              <span className="dev-ticket-proj-name">{ticket.project_name || 'General'}</span>
+                              {ticket.project_code && (
+                                <span className="dev-ticket-proj-code">{ticket.project_code}</span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <div className="dev-ticket-title-col">
@@ -408,9 +582,31 @@ export default function DeveloperDashboard() {
                             </span>
                           </td>
                           <td>
-                            <span className={`dev-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                              {ticket.status}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span className={`dev-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
+                                {ticket.status}
+                              </span>
+                              {ticket.locked_by && ticket.status !== 'Resolved' && ticket.status !== 'Closed' && (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    fontSize: '10.5px',
+                                    fontWeight: '600',
+                                    color: '#b45309',
+                                    background: '#fef3c7',
+                                    border: '1px solid #fde68a',
+                                    borderRadius: '4px',
+                                    padding: '1px 6px',
+                                    width: 'fit-content'
+                                  }}
+                                  title={`Locked by ${ticket.locked_by}`}
+                                >
+                                  <Lock size={10} /> {ticket.locked_by}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <span className="dev-raised-by">{ticket.raised_by || 'QA Member'}</span>
@@ -422,7 +618,13 @@ export default function DeveloperDashboard() {
                               onClick={() => setSelectedTicketId(ticket.id)}
                             >
                               <Eye size={13} />
-                              <span>{isPendingFix ? 'Work on Defect' : 'View Report'}</span>
+                              <span>
+                                {isPendingFix
+                                  ? ticket.locked_by && ticket.locked_by.toLowerCase() !== displayName.toLowerCase()
+                                    ? `Locked (${ticket.locked_by.split(' ')[0]})`
+                                    : 'Work on Defect'
+                                  : 'View Report'}
+                              </span>
                             </button>
                           </td>
                         </tr>

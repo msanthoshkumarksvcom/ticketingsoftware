@@ -41,41 +41,42 @@
 }
 
 .um-header-titles h1 {
-  font-size: 1.5rem;
+  font-size: var(--fs-h1, 1.375rem);
   font-weight: 800;
   color: #0f172a;
   margin: 0 0 3px 0;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.025em;
 }
 
 .um-header-titles p {
-  font-size: 0.88rem;
+  font-size: var(--fs-body, 0.84375rem);
   color: #64748b;
   margin: 0;
   max-width: 720px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .um-btn-create {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #2563eb;
+  background: var(--color-primary, #2563eb);
   color: #ffffff;
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 0.92rem;
-  font-weight: 600;
+  height: var(--btn-height-md, 38px);
+  padding: 0 16px;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--fs-label, 0.78125rem);
+  font-weight: 700;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .um-btn-create:hover {
-  background: #1d4ed8;
+  background: var(--color-primary-hover, #1d4ed8);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
 }
 
 /* 4 Summary Stat Cards */
@@ -726,79 +727,12 @@
   width: 100%;
   max-width: 580px;
   box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(226, 232, 240, 0.7);
-  overflow: visible;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - 40px);
   animation: modalScaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   margin: auto;
-}
-
-.um-modal-card.um-modal-streamlined {
-  max-width: 480px;
-  border-radius: 18px;
-}
-
-/* Streamlined Avatar Upload */
-.um-avatar-upload-streamlined {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-}
-
-.um-avatar-preview-sm {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.um-avatar-img-sm {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.um-upload-link {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #2563eb;
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.um-upload-link:hover {
-  color: #1d4ed8;
-  text-decoration: underline;
-}
-
-.um-remove-link {
-  background: transparent;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: #ef4444;
-  cursor: pointer;
-  padding: 0;
-}
-
-.um-remove-link:hover {
-  text-decoration: underline;
-}
-
-.um-upload-muted {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-left: auto;
 }
 
 @keyframes modalScaleUp {
@@ -865,12 +799,13 @@
 }
 
 .um-modal-body {
-  padding: 0 28px 24px 28px;
-  overflow: visible;
+  padding: 0 28px 18px 28px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
   flex: 1 1 auto;
+  min-height: 0;
 }
 
 .um-modal-body::-webkit-scrollbar {
@@ -894,19 +829,19 @@
 .um-avatar-upload-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  gap: 16px;
+  padding: 14px 18px;
+  background: #fbfcfe;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 14px;
 }
 
 .um-avatar-preview-box {
-  width: 46px;
-  height: 46px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: #ffffff;
-  border: 1.5px solid #cbd5e1;
+  border: 1.5px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1049,7 +984,7 @@
   align-items: center;
   height: 40px;
   border: 1.5px solid #cbd5e1;
-  border-radius: 12px;
+  border-radius: 9px;
   background: #ffffff;
   padding: 0 11px;
   gap: 8px;

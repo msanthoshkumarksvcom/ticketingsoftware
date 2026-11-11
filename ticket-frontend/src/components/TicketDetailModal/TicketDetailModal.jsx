@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import {
   X,
@@ -18,9 +18,29 @@ import {
   Code2,
   History,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  ExternalLink,
+  Download,
+  Eye,
+  RefreshCw
 } from 'lucide-react';
+import { io } from 'socket.io-client';
+import CustomSelect from '../CustomSelect/CustomSelect';
 import './TicketDetailModal.css';
+import { API_BASE, SOCKET_URL } from '../../utils/apiConfig';
+
+// Prepend backend host for relative image uploads so they never break
+export const getFullImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+    return url;
+  }
+  if (url.startsWith('/')) {
+    return `${API_BASE}${url}`;
+  }
+  return `${API_BASE}/uploads/tickets/${url}`;
+};
 
 export default function TicketDetailModal({
   isOpen,
@@ -59,12 +79,30 @@ export default function TicketDetailModal({
   const [zoomImage, setZoomImage] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
+  const [otherDeveloperTyping, setOtherDeveloperTyping] = useState(null);
   const resFileInputRef = useRef(null);
+  const socketRef = useRef(null);
+  const typingTimerRef = useRef(null);
 
-  const currentUserRole = userRole || (typeof window !== 'undefined' ? localStorage.getItem('userRole') : '');
-  const isDeveloper = currentUserRole === 'Developer';
-  const isProjectLead = currentUserRole === 'Project Lead';
-  const isQA = ['QA Member', 'QA Lead', 'Manager', 'Super Admin'].includes(currentUserRole);
+  const currentUserRole = String(userRole || (typeof window !== 'undefined' ? localStorage.getItem('userRole') : '') || '').trim();
+  const currentUserId = Number(localStorage.getItem('userId')) || null;
+  const currentUserName = localStorage.getItem('userName') || 'Developer';
+  const isDeveloper = currentUserRole.toLowerCase() === 'developer';
+  const isProjectLead = currentUserRole.toLowerCase() === 'project lead';
+  const isQA = ['qa member', 'qa lead', 'manager', 'super admin', 'admin', 'administrator'].includes(currentUserRole.toLowerCase());
+
+  const isLockedByMe = Boolean(
+    ticket?.locked_by &&
+    ((ticket.locked_by_id && currentUserId && Number(ticket.locked_by_id) === Number(currentUserId)) ||
+     (currentUserName && ticket.locked_by?.trim().toLowerCase() === currentUserName?.trim().toLowerCase()))
+  );
+
+  const isLockedByOther = Boolean(
+    ticket?.locked_by &&
+    !isLockedByMe &&
+    ticket?.locked_at &&
+    (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000)
+  );
 
   useEffect(() => {
     if (isOpen && ticketId) {
@@ -72,14 +110,66 @@ export default function TicketDetailModal({
       if (!isDeveloper) {
         fetchDevelopers();
       }
+
+      // Connect to Socket.IO for real-time developer lock & intimation
+      const socket = io(SOCKET_URL, {
+        transports: ['polling', 'websocket'],
+        reconnection: true,
+        timeout: 5000
+      });
+      socketRef.current = socket;
+
+      socket.emit('join_ticket_room', {
+        ticketId,
+        user: { id: currentUserId, name: currentUserName }
+      });
+
+      socket.on('ticket_lock_changed', (data) => {
+        if (String(data.ticketId) === String(ticketId)) {
+          setTicket((prev) => prev ? {
+            ...prev,
+            locked_by: data.locked_by,
+            locked_by_id: data.locked_by_id,
+            locked_at: data.locked_at,
+            status: data.status || prev.status
+          } : prev);
+        }
+      });
+
+      socket.on('ticket_resolving_typing', (data) => {
+        if (String(data.ticketId) === String(ticketId) && Number(data.user?.id) !== currentUserId) {
+          setOtherDeveloperTyping(data.user?.name || 'Another developer');
+          if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+          typingTimerRef.current = setTimeout(() => {
+            setOtherDeveloperTyping(null);
+          }, 3500);
+        }
+      });
+
+      return () => {
+        socket.emit('leave_ticket_room', { ticketId });
+        socket.disconnect();
+      };
     } else {
       setTicket(null);
       setShowResolutionForm(false);
       setShowReopenBox(false);
       setActionError('');
       setActionSuccess('');
+      setOtherDeveloperTyping(null);
     }
-  }, [isOpen, ticketId]);
+  }, [isOpen, ticketId, currentUserId, currentUserName]);
+
+  // Emit typing event to intimate other developers in real time
+  const notifyTyping = (field) => {
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('ticket_resolving_typing', {
+        ticketId,
+        user: { id: currentUserId, name: currentUserName },
+        field
+      });
+    }
+  };
 
   const fetchTicketDetails = async () => {
     setLoading(true);
@@ -136,22 +226,59 @@ export default function TicketDetailModal({
     }
   };
 
-  // 2. Developer starts working
-  const handleStartProgress = async () => {
+  // 2. Developer starts resolving & claims exclusive lock
+  const handleStartResolving = async () => {
     setActionError('');
     setActionSuccess('');
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.put(
-        `http://localhost:5000/api/admin/tickets/${ticketId}/start-progress`,
+      const res = await axios.post(
+        `http://localhost:5000/api/admin/tickets/${ticketId}/lock`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setActionSuccess('Ticket moved to In Progress. Happy fixing!');
-      fetchTicketDetails();
+      setTicket(res.data.ticket);
+      setShowResolutionForm(true);
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('ticket_resolving_claim', {
+          ticketId,
+          user: { id: currentUserId, name: currentUserName }
+        });
+      }
       if (onTicketUpdated) onTicketUpdated(res.data.ticket);
     } catch (err) {
-      setActionError(err.response?.data?.error || 'Failed to update progress.');
+      if (err.response?.status === 423) {
+        setActionError(err.response.data.error || 'This ticket is currently locked by another developer.');
+        setTicket((prev) => ({
+          ...prev,
+          locked_by: err.response.data.locked_by,
+          locked_by_id: err.response.data.locked_by_id,
+          locked_at: err.response.data.locked_at
+        }));
+      } else {
+        setActionError(err.response?.data?.error || 'Failed to claim ticket lock.');
+      }
+    }
+  };
+
+  // Developer cancels resolution and releases exclusive lock
+  const handleCancelResolution = async () => {
+    setShowResolutionForm(false);
+    setActionError('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(
+        `http://localhost:5000/api/admin/tickets/${ticketId}/unlock`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTicket(res.data.ticket);
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('ticket_resolving_release', { ticketId });
+      }
+      if (onTicketUpdated) onTicketUpdated(res.data.ticket);
+    } catch (e) {
+      // quiet fallback
     }
   };
 
@@ -209,6 +336,9 @@ export default function TicketDetailModal({
       setActionSuccess('Resolution submitted! Ticket is now pending QA verification.');
       setShowResolutionForm(false);
       fetchTicketDetails();
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('ticket_resolving_release', { ticketId });
+      }
       if (onTicketUpdated) onTicketUpdated(res.data.ticket);
     } catch (err) {
       setActionError(err.response?.data?.error || 'Failed to submit resolution.');
@@ -248,13 +378,32 @@ export default function TicketDetailModal({
     }
   };
 
+  const handleSafeClose = async () => {
+    if (showResolutionForm && isLockedByMe) {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post(
+          `http://localhost:5000/api/admin/tickets/${ticketId}/unlock`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('ticket_resolving_release', { ticketId });
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const attachmentsList = Array.isArray(ticket?.attachments) ? ticket.attachments : [];
   const resolutionAttachmentsList = Array.isArray(ticket?.resolution_attachments) ? ticket.resolution_attachments : [];
 
   return (
-    <div className="tdm-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="tdm-overlay" onMouseDown={(e) => e.target === e.currentTarget && handleSafeClose()}>
       <div className="tdm-card">
         {/* Modal Top Header */}
         <div className="tdm-header">
@@ -267,7 +416,7 @@ export default function TicketDetailModal({
               {ticket?.severity || 'Medium'} Severity
             </span>
           </div>
-          <button type="button" className="tdm-close-btn" onClick={onClose} aria-label="Close dialog">
+          <button type="button" className="tdm-close-btn" onClick={handleSafeClose} aria-label="Close dialog">
             <X size={18} />
           </button>
         </div>
@@ -288,6 +437,34 @@ export default function TicketDetailModal({
             <div className="tdm-content-grid">
               {/* Left Column: Defect Information */}
               <div className="tdm-main-col">
+                {/* Developer Real-Time Lock Alert Banner */}
+                {isLockedByOther && (
+                  <div className="tdm-lock-alert-banner">
+                    <div className="tdm-lock-alert-left">
+                      <Lock size={18} className="tdm-lock-icon-pulse" />
+                      <div>
+                        <span className="tdm-lock-alert-title">Locked by {ticket.locked_by}</span>
+                        <p className="tdm-lock-alert-desc">
+                          {ticket.locked_by} is currently resolving this defect. Another developer cannot resolve while work is in progress.
+                        </p>
+                      </div>
+                    </div>
+                    {ticket.locked_at && (
+                      <span className="tdm-lock-time-tag">
+                        Active since {new Date(ticket.locked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Live Typing Intimation from Other Developer */}
+                {otherDeveloperTyping && (
+                  <div className="tdm-typing-indicator-banner">
+                    <span className="tdm-typing-pulse-dot" />
+                    <span>{otherDeveloperTyping} is actively typing resolution details right now...</span>
+                  </div>
+                )}
+
                 {actionError && (
                   <div className="tdm-alert-box error">
                     <AlertCircle size={16} />
@@ -361,15 +538,44 @@ export default function TicketDetailModal({
                   {attachmentsList.length === 0 ? (
                     <div className="tdm-empty-attachments">No screenshots attached to this ticket.</div>
                   ) : (
-                    <div className="tdm-evidence-strip">
-                      {attachmentsList.map((url, idx) => (
-                        <div key={idx} className="tdm-evidence-thumb-box" onClick={() => setZoomImage(url)}>
-                          <img src={url} alt={`Evidence ${idx + 1}`} className="tdm-evidence-thumb" />
-                          <div className="tdm-evidence-zoom-hover">
-                            <Maximize2 size={13} />
+                    <div className="tdm-evidence-grid">
+                      {attachmentsList.map((url, idx) => {
+                        const fullUrl = getFullImageUrl(url);
+                        return (
+                          <div key={idx} className="tdm-evidence-card">
+                            <div className="tdm-evidence-preview-wrap" onClick={() => setZoomImage(fullUrl)}>
+                              <img src={fullUrl} alt={`Evidence ${idx + 1}`} className="tdm-evidence-img" />
+                              <div className="tdm-evidence-overlay">
+                                <Maximize2 size={16} />
+                                <span>Click to Enlarge</span>
+                              </div>
+                            </div>
+                            <div className="tdm-evidence-card-footer">
+                              <span className="tdm-evidence-label">Proof Screenshot #{idx + 1}</span>
+                              <div className="tdm-evidence-actions">
+                                <button
+                                  type="button"
+                                  className="tdm-evidence-view-btn"
+                                  onClick={() => setZoomImage(fullUrl)}
+                                  title="View full resolution image"
+                                >
+                                  <Eye size={12} />
+                                  <span>View</span>
+                                </button>
+                                <a
+                                  href={fullUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="tdm-evidence-download-btn"
+                                  title="Open original image in new tab"
+                                >
+                                  <ExternalLink size={12} />
+                                </a>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -380,7 +586,7 @@ export default function TicketDetailModal({
                     <div className="tdm-section-title">
                       <CheckCircle2 size={15} color="#16A34A" />
                       <span>Engineering Resolution Details</span>
-                      <span className="tdm-res-badge">Resolved by {ticket.resolved_by || 'Developer'}</span>
+                      <span className="tdm-res-badge">Resolved by {ticket.resolved_by || 'Developer'}{ticket.resolved_at ? ` on ${new Date(ticket.resolved_at).toLocaleDateString()}` : ''}</span>
                     </div>
                     <div className="tdm-resolution-view">
                       <div className="tdm-res-field">
@@ -403,20 +609,71 @@ export default function TicketDetailModal({
                       )}
                       {resolutionAttachmentsList.length > 0 && (
                         <div className="tdm-res-field">
-                          <label>Resolution Evidence / Proof Screenshots</label>
-                          <div className="tdm-evidence-strip">
-                            {resolutionAttachmentsList.map((url, idx) => (
-                              <div key={idx} className="tdm-evidence-thumb-box" onClick={() => setZoomImage(url)}>
-                                <img src={url} alt="Fix Evidence" className="tdm-evidence-thumb" />
-                                <div className="tdm-evidence-zoom-hover"><Maximize2 size={13} /></div>
-                              </div>
-                            ))}
+                          <label>Resolution Evidence / Proof Screenshots ({resolutionAttachmentsList.length})</label>
+                          <div className="tdm-evidence-grid">
+                            {resolutionAttachmentsList.map((url, idx) => {
+                              const fullUrl = getFullImageUrl(url);
+                              return (
+                                <div key={idx} className="tdm-evidence-card">
+                                  <div className="tdm-evidence-preview-wrap" onClick={() => setZoomImage(fullUrl)}>
+                                    <img src={fullUrl} alt="Fix Evidence" className="tdm-evidence-img" />
+                                    <div className="tdm-evidence-overlay">
+                                      <Maximize2 size={16} />
+                                      <span>Click to Enlarge</span>
+                                    </div>
+                                  </div>
+                                  <div className="tdm-evidence-card-footer">
+                                    <span className="tdm-evidence-label">Fix Evidence #{idx + 1}</span>
+                                    <div className="tdm-evidence-actions">
+                                      <button
+                                        type="button"
+                                        className="tdm-evidence-view-btn"
+                                        onClick={() => setZoomImage(fullUrl)}
+                                        title="View full resolution image"
+                                      >
+                                        <Eye size={12} />
+                                        <span>View</span>
+                                      </button>
+                                      <a
+                                        href={fullUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="tdm-evidence-download-btn"
+                                        title="Open image in new tab"
+                                      >
+                                        <ExternalLink size={12} />
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
                 ) : null}
+
+                {/* QA Verification Box when Closed */}
+                {ticket.status === 'Closed' && (
+                  <div className="tdm-section-card tdm-closed-audit-card">
+                    <div className="tdm-section-title">
+                      <ShieldCheck size={15} color="#16A34A" />
+                      <span>QA Verification &amp; Sign-Off</span>
+                      <span className="tdm-res-badge tdm-closed-badge">Closed &amp; Verified</span>
+                    </div>
+                    <div className="tdm-closed-audit-body">
+                      <p>This defect was re-tested and marked as resolved by QA.</p>
+                      <div className="tdm-audit-pill-row">
+                        <span><strong>Resolved by:</strong> {ticket.resolved_by || 'Developer'}</span>
+                        {ticket.resolved_at && <span><strong>Resolved Date:</strong> {new Date(ticket.resolved_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                        <span><strong>Closed by:</strong> {ticket.closed_by || 'QA Member'}</span>
+                        {ticket.closed_at && <span><strong>Closed Date:</strong> {new Date(ticket.closed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* DEVELOPER ACTION: Resolution Form */}
                 {isDeveloper && (ticket.status === 'In Progress' || ticket.status === 'Reopened') && showResolutionForm && (
@@ -433,6 +690,7 @@ export default function TicketDetailModal({
                           className="tdm-input"
                           value={rootCause}
                           onChange={(e) => setRootCause(e.target.value)}
+                          onKeyDown={() => notifyTyping('root_cause')}
                           placeholder="e.g. Unhandled null response from auth token service"
                           required
                         />
@@ -444,6 +702,7 @@ export default function TicketDetailModal({
                           className="tdm-textarea"
                           value={fixImplemented}
                           onChange={(e) => setFixImplemented(e.target.value)}
+                          onKeyDown={() => notifyTyping('fix_implemented')}
                           placeholder="Describe the code solution implemented..."
                           required
                         />
@@ -455,6 +714,7 @@ export default function TicketDetailModal({
                           className="tdm-input"
                           value={filesChanged}
                           onChange={(e) => setFilesChanged(e.target.value)}
+                          onKeyDown={() => notifyTyping('files_changed')}
                           placeholder="e.g. src/auth/loginService.js, src/components/LoginForm.jsx"
                         />
                       </div>
@@ -465,6 +725,7 @@ export default function TicketDetailModal({
                           className="tdm-textarea"
                           value={resDescription}
                           onChange={(e) => setResDescription(e.target.value)}
+                          onKeyDown={() => notifyTyping('description')}
                           placeholder="Detailed instructions for QA verification..."
                           required
                         />
@@ -476,6 +737,7 @@ export default function TicketDetailModal({
                           className="tdm-input"
                           value={resRemarks}
                           onChange={(e) => setResRemarks(e.target.value)}
+                          onKeyDown={() => notifyTyping('remarks')}
                           placeholder="e.g. Verified locally on build v1.4.0 with regression tests passing"
                           required
                         />
@@ -501,7 +763,7 @@ export default function TicketDetailModal({
                         {resAttachments.length > 0 && (
                           <div className="tdm-evidence-strip" style={{ marginTop: 8 }}>
                             {resAttachments.map((url, i) => (
-                              <img key={i} src={url} alt="proof" className="tdm-evidence-thumb" />
+                              <img key={i} src={getFullImageUrl(url)} alt="proof" className="tdm-evidence-thumb" />
                             ))}
                           </div>
                         )}
@@ -510,10 +772,10 @@ export default function TicketDetailModal({
                         <button
                           type="button"
                           className="tdm-btn-secondary"
-                          onClick={() => setShowResolutionForm(false)}
+                          onClick={handleCancelResolution}
                           disabled={submittingResolution}
                         >
-                          Cancel
+                          Cancel &amp; Release Lock
                         </button>
                         <button
                           type="submit"
@@ -573,18 +835,21 @@ export default function TicketDetailModal({
                   <div className="tdm-side-card">
                     <h3>Assigned Developer</h3>
                     <div className="tdm-assign-box">
-                      <select
-                        className="tdm-select"
-                        value={selectedDevId}
-                        onChange={(e) => setSelectedDevId(e.target.value)}
-                      >
-                        <option value="">Unassigned</option>
-                        {availableDevelopers.map((dev) => (
-                          <option key={dev.id} value={dev.id}>
-                            {dev.full_name} ({dev.email})
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <CustomSelect
+                          value={selectedDevId}
+                          onChange={setSelectedDevId}
+                          options={[
+                            { value: '', label: 'Unassigned' },
+                            ...availableDevelopers.map((dev) => ({
+                              value: String(dev.id),
+                              label: `${dev.full_name} (${dev.email})`
+                            }))
+                          ]}
+                          variant="filter"
+                          placeholder="Unassigned"
+                        />
+                      </div>
                       <button
                         type="button"
                         className="tdm-btn-assign"
@@ -607,24 +872,39 @@ export default function TicketDetailModal({
                 {isDeveloper && (
                   <div className="tdm-side-card">
                     <h3>Developer Actions</h3>
-                    {ticket.status === 'Open' || ticket.status === 'Reopened' ? (
+                    {isLockedByOther ? (
+                      <div>
+                        <button
+                          type="button"
+                          className="tdm-btn-locked"
+                          disabled
+                          title={`Locked by ${ticket.locked_by} who is currently resolving this defect`}
+                        >
+                          <Lock size={15} />
+                          <span>Locked by {ticket.locked_by}</span>
+                        </button>
+                        <p className="tdm-lock-note">
+                          {ticket.locked_by} is currently actively resolving this ticket. Work is locked to prevent conflicts.
+                        </p>
+                      </div>
+                    ) : ticket.status === 'Open' || ticket.status === 'Reopened' ? (
                       <button
                         type="button"
                         className="tdm-btn-action-primary"
-                        onClick={handleStartProgress}
+                        onClick={handleStartResolving}
                       >
                         <Clock size={16} />
-                        <span>Start Working (In Progress)</span>
+                        <span>Start Working &amp; Claim Ticket</span>
                       </button>
                     ) : ticket.status === 'In Progress' ? (
                       !showResolutionForm && (
                         <button
                           type="button"
                           className="tdm-btn-action-resolve"
-                          onClick={() => setShowResolutionForm(true)}
+                          onClick={handleStartResolving}
                         >
                           <CheckCircle2 size={16} />
-                          <span>Mark as Resolved</span>
+                          <span>{isLockedByMe ? 'Continue Resolution' : 'Mark as Resolved'}</span>
                         </button>
                       )
                     ) : ticket.status === 'Resolved' ? (
@@ -635,7 +915,37 @@ export default function TicketDetailModal({
                     ) : (
                       <div className="tdm-status-notice closed">
                         <CheckCircle2 size={16} color="#16A34A" />
-                        <span>This defect is verified and closed.</span>
+                        <span>This defect is verified and closed{ticket.closed_by ? ` by ${ticket.closed_by}` : ''}{ticket.closed_at ? ` on ${new Date(ticket.closed_at).toLocaleDateString()}` : ''}.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2b. Non-Developer View: Read-only Defect Status Notice */}
+                {!isDeveloper && (
+                  <div className="tdm-side-card">
+                    <h3>Defect Status</h3>
+                    {ticket.status === 'Open' ? (
+                      <div className="tdm-status-notice">
+                        <Clock size={16} color="#2563EB" />
+                        <span>Pending Developer Pickup. Only assigned developers can resolve this defect.</span>
+                      </div>
+                    ) : ticket.status === 'In Progress' ? (
+                      <div className="tdm-status-notice">
+                        <Clock size={16} color="#D97706" />
+                        <span>
+                          {ticket.locked_by ? `Developer ${ticket.locked_by} is actively resolving this defect.` : 'Developer is actively working on resolution.'}
+                        </span>
+                      </div>
+                    ) : ticket.status === 'Resolved' ? (
+                      <div className="tdm-status-notice">
+                        <CheckCircle2 size={16} color="#16A34A" />
+                        <span>Resolved by {ticket.resolved_by || 'Developer'}. Ready for QA re-testing &amp; verification.</span>
+                      </div>
+                    ) : (
+                      <div className="tdm-status-notice closed">
+                        <CheckCircle2 size={16} color="#16A34A" />
+                        <span>This defect is verified and closed{ticket.closed_by ? ` by ${ticket.closed_by}` : ''}.</span>
                       </div>
                     )}
                   </div>
@@ -681,6 +991,7 @@ export default function TicketDetailModal({
                     {ticket.resolved_by && <div><span>Resolved By:</span> <strong>{ticket.resolved_by}</strong></div>}
                     {ticket.resolved_at && <div><span>Resolved Date:</span> <strong>{new Date(ticket.resolved_at).toLocaleDateString()}</strong></div>}
                     {ticket.closed_by && <div><span>Closed By:</span> <strong>{ticket.closed_by}</strong></div>}
+                    {ticket.closed_at && <div><span>Closed Date:</span> <strong>{new Date(ticket.closed_at).toLocaleDateString()}</strong></div>}
                   </div>
                 </div>
 
@@ -713,14 +1024,38 @@ export default function TicketDetailModal({
         </div>
       </div>
 
-      {/* Lightbox Zoom */}
+      {/* High-Resolution Evidence Lightbox */}
       {zoomImage && (
         <div className="tdm-zoom-lightbox" onClick={() => setZoomImage(null)}>
           <div className="tdm-zoom-content" onClick={(e) => e.stopPropagation()}>
-            <img src={zoomImage} alt="Enlarged screenshot" className="tdm-zoom-img" />
-            <button type="button" className="tdm-zoom-close" onClick={() => setZoomImage(null)}>
-              <X size={20} />
-            </button>
+            <div className="tdm-zoom-toolbar">
+              <a
+                href={zoomImage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tdm-zoom-tool-btn"
+                title="Open high-resolution image in new tab"
+              >
+                <ExternalLink size={16} />
+              </a>
+              <a
+                href={zoomImage}
+                download="defect-screenshot.png"
+                className="tdm-zoom-tool-btn"
+                title="Download original screenshot"
+              >
+                <Download size={16} />
+              </a>
+              <button
+                type="button"
+                className="tdm-zoom-tool-btn tdm-zoom-close"
+                onClick={() => setZoomImage(null)}
+                title="Close Lightbox (Esc)"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <img src={zoomImage} alt="Enlarged defect screenshot" className="tdm-zoom-img" />
           </div>
         </div>
       )}

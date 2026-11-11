@@ -24,6 +24,7 @@ export default function FolderEmblem({ label = '', code = '' }) {
 
   return (
     <div
+      className="pj-folder-emblem"
       style={{
         width: '42px',
         height: '42px',

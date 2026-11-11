@@ -45,10 +45,15 @@ import {
   Image,
   Upload,
   Maximize2,
-  Folder
+  Folder,
+  Radio,
+  Users
 } from 'lucide-react';
+import { io } from 'socket.io-client';
+import { SOCKET_URL } from '../../utils/apiConfig';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import RaiseBugTicketModal from '../../components/RaiseBugTicketModal/RaiseBugTicketModal';
+import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import { Bug } from 'lucide-react';
 import './AdminProjectSheet.css';
 
@@ -63,7 +68,7 @@ const getColLetter = (index) => {
   return letter;
 };
 
-// Fallback starter sheets if backend is empty or offline
+// Fallback starter sheets if backend is empty or offline (clean starter with no predefined dummy rows)
 const FALLBACK_STARTER_SHEETS = [
   {
     id: 1,
@@ -81,197 +86,7 @@ const FALLBACK_STARTER_SHEETS = [
       { id: 'col_assigned', label: 'Assigned QA', width: 160, type: 'text' },
       { id: 'col_date', label: 'Execution Date', width: 130, type: 'date' }
     ],
-    rows: [
-      {
-        id: 'row-1',
-        col_id: 'TC-001',
-        col_title: 'Verify user authentication with valid credentials',
-        col_module: 'Authentication',
-        col_priority: 'High',
-        col_steps: '1. Enter email, 2. Enter valid password, 3. Click Login',
-        col_expected: 'User redirected to role workspace with active session token',
-        col_status: 'Pass',
-        col_assigned: 'QA Lead',
-        col_date: '2026-10-22'
-      },
-      {
-        id: 'row-2',
-        col_id: 'TC-002',
-        col_title: 'Spreadsheet cell inline editing and keyboard navigation',
-        col_module: 'Sheet Module',
-        col_priority: 'Critical',
-        col_steps: '1. Double-click or Enter, 2. Edit value, 3. Press Enter / Tab',
-        col_expected: 'Cell updates instantly and synchronizes with storage',
-        col_status: 'Pass',
-        col_assigned: 'Automation QA',
-        col_date: '2026-10-23'
-      },
-      {
-        id: 'row-3',
-        col_id: 'TC-003',
-        col_title: 'Copy & Paste entire row and column contents across sheet',
-        col_module: 'Spreadsheet Grid',
-        col_priority: 'High',
-        col_steps: '1. Click row # or col letter, 2. Ctrl+C, 3. Select target, 4. Ctrl+V',
-        col_expected: 'All row/column values pasted accurately with formatting',
-        col_status: 'Pass',
-        col_assigned: 'Lead QA',
-        col_date: '2026-10-23'
-      },
-      {
-        id: 'row-4',
-        col_id: 'TC-004',
-        col_title: 'Support N number of multiple sheet tabs with rename & colors',
-        col_module: 'Tabs Engine',
-        col_priority: 'Critical',
-        col_steps: '1. Click + button, 2. Double-click to rename, 3. Pick tab color',
-        col_expected: 'Multiple sheet tabs created, duplicated, and saved smoothly',
-        col_status: 'Pass',
-        col_assigned: 'Tester 1',
-        col_date: '2026-10-24'
-      },
-      {
-        id: 'row-5',
-        col_id: 'TC-005',
-        col_title: 'Real-time QA calculation metrics and CSV export',
-        col_module: 'Reporting',
-        col_priority: 'Medium',
-        col_steps: '1. Update row status, 2. Inspect bottom formula calculations bar',
-        col_expected: 'Pass rate % and issue counts recalculate in real-time',
-        col_status: 'In Progress',
-        col_screenshot: '',
-        col_assigned: 'QA Engineer',
-        col_date: '2026-10-25'
-      },
-      {
-        id: 'row-6',
-        col_id: 'TC-006',
-        col_title: 'Paste image or screenshot directly from clipboard into cell',
-        col_module: 'Screenshots / Media',
-        col_priority: 'High',
-        col_steps: '1. Take screenshot with Win+Shift+S, 2. Select image cell, 3. Press Ctrl+V',
-        col_expected: 'Image preview thumbnail displays in cell, click to open lightbox',
-        col_status: 'Pass',
-        col_screenshot: '',
-        col_assigned: 'QA Lead',
-        col_date: '2026-10-25'
-      },
-      {
-        id: 'row-7',
-        col_id: 'TC-007',
-        col_title: 'Conditional red row highlighting when status is Fail or Failed',
-        col_module: 'Formatting Engine',
-        col_priority: 'Critical',
-        col_steps: '1. Click status dropdown in row, 2. Select Fail',
-        col_expected: 'Entire row background turns soft red with red row number border',
-        col_status: 'Pass',
-        col_screenshot: '',
-        col_assigned: 'Automation QA',
-        col_date: '2026-10-26'
-      },
-      {
-        id: 'row-8',
-        col_id: 'TC-008',
-        col_title: 'Add arbitrary N rows via bottom Google Sheets input',
-        col_module: 'Row Generator',
-        col_priority: 'Medium',
-        col_steps: '1. Enter row count (e.g. 20), 2. Click Add rows at bottom button',
-        col_expected: 'N rows instantly appended to bottom of current sheet tab',
-        col_status: 'Pass',
-        col_screenshot: '',
-        col_assigned: 'Tester 2',
-        col_date: '2026-10-26'
-      },
-      {
-        id: 'row-9',
-        col_id: 'TC-009',
-        col_title: 'Verify regression tests run on latest staging deployment build',
-        col_module: 'Deployments',
-        col_priority: 'High',
-        col_steps: '1. Check CI build hash, 2. Run Cypress end-to-end suite',
-        col_expected: 'All test assertions pass with zero critical defects',
-        col_status: 'Untested',
-        col_screenshot: '',
-        col_assigned: 'Automation QA',
-        col_date: '2026-10-27'
-      },
-      {
-        id: 'row-10',
-        col_id: 'TC-010',
-        col_title: 'Validate responsiveness across desktop, tablet, and mobile',
-        col_module: 'UI / Layout',
-        col_priority: 'Medium',
-        col_steps: '1. Open devtools, 2. Test 1080p, 768p and mobile viewports',
-        col_expected: 'Layout adapts smoothly with fluid toolbar and scrollable grid',
-        col_status: 'Untested',
-        col_screenshot: '',
-        col_assigned: 'QA Member',
-        col_date: '2026-10-27'
-      }
-    ]
-  },
-  {
-    id: 2,
-    sheet_name: 'Requirements Matrix',
-    tab_color: '#1a73e8',
-    columns: [
-      { id: 'col_req_id', label: 'Req ID', width: 110, type: 'text' },
-      { id: 'col_feature', label: 'Feature Description', width: 280, type: 'text' },
-      { id: 'col_biz_priority', label: 'Business Priority', width: 140, type: 'priority' },
-      { id: 'col_qa_lead', label: 'QA Lead', width: 160, type: 'text' },
-      { id: 'col_dev_lead', label: 'Dev Lead', width: 160, type: 'text' },
-      { id: 'col_coverage', label: 'Coverage Status', width: 150, type: 'status' },
-      { id: 'col_signoff', label: 'Sign-Off Status', width: 140, type: 'status' }
-    ],
-    rows: [
-      {
-        id: 'row-1',
-        col_req_id: 'REQ-01',
-        col_feature: 'Google Sheets-level spreadsheet workspace with multi-tabs',
-        col_biz_priority: 'Critical',
-        col_qa_lead: 'Santhosh',
-        col_dev_lead: 'Karthikeyan',
-        col_coverage: 'Pass',
-        col_signoff: 'Pass'
-      },
-      {
-        id: 'row-2',
-        col_req_id: 'REQ-02',
-        col_feature: 'Full row and column copy-paste with keyboard shortcuts',
-        col_biz_priority: 'High',
-        col_qa_lead: 'Manikandan',
-        col_dev_lead: 'Pavishek',
-        col_coverage: 'Pass',
-        col_signoff: 'Pass'
-      }
-    ]
-  },
-  {
-    id: 3,
-    sheet_name: 'Defect Log',
-    tab_color: '#d93025',
-    columns: [
-      { id: 'col_bug_id', label: 'Defect ID', width: 110, type: 'text' },
-      { id: 'col_summary', label: 'Defect Summary', width: 300, type: 'text' },
-      { id: 'col_severity', label: 'Severity', width: 130, type: 'priority' },
-      { id: 'col_repro', label: 'Reproducibility', width: 140, type: 'text' },
-      { id: 'col_status', label: 'Defect Status', width: 140, type: 'status' },
-      { id: 'col_screenshot', label: 'Bug Screenshot', width: 170, type: 'image' },
-      { id: 'col_assigned_dev', label: 'Assigned Engineer', width: 170, type: 'text' },
-      { id: 'col_target', label: 'Target Release', width: 130, type: 'text' }
-    ],
-    rows: [
-      {
-        id: 'row-1',
-        col_bug_id: 'DEF-101',
-        col_summary: 'Ensure table cell focus outline doesn\'t overflow table borders',
-        col_severity: 'Low',
-        col_repro: 'Consistent',
-        col_status: 'Pass',
-        col_assigned_dev: 'Frontend Team',
-        col_target: 'v1.0.1'
-      }
-    ]
+    rows: []
   }
 ];
 
@@ -441,7 +256,28 @@ export default function AdminProjectSheet() {
   const [previewImageModal, setPreviewImageModal] = useState(null);
   const [raiseBugModalOpen, setRaiseBugModalOpen] = useState(false);
   const [selectedFailTestCase, setSelectedFailTestCase] = useState(null);
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [pendingUploadCell, setPendingUploadCell] = useState(null);
+
+  // Bulk Raise Tickets Automation
+  const [bulkRaiseModalOpen, setBulkRaiseModalOpen] = useState(false);
+  const [submittingBulkTickets, setSubmittingBulkTickets] = useState(false);
+  const [bulkResultNotice, setBulkResultNotice] = useState(null);
+
+  // Socket.IO Real-Time Collaboration State
+  const socketRef = useRef(null);
+  const [activeViewers, setActiveViewers] = useState([]);
+  const [remoteFocusCells, setRemoteFocusCells] = useState({});
+  const [liveToast, setLiveToast] = useState('');
+  const liveToastTimeoutRef = useRef(null);
+
+  const showLiveNotification = useCallback((msg) => {
+    setLiveToast(msg);
+    if (liveToastTimeoutRef.current) clearTimeout(liveToastTimeoutRef.current);
+    liveToastTimeoutRef.current = setTimeout(() => {
+      setLiveToast('');
+    }, 3200);
+  }, []);
 
   const showToast = useCallback((msg) => {
     setToastMessage(msg);
@@ -508,21 +344,65 @@ export default function AdminProjectSheet() {
     return `${letter}${rowNum}`;
   }, [selectionMode, selectedRowIndices, selectedColId, activeColIndex, activeCell.rowIndex, currentColumns]);
 
-  // Load sheets from backend API or localStorage
+  // Load sheets from backend API & sync with active project tickets
   const loadProjectSheets = useCallback(async () => {
     const token = localStorage.getItem('token');
     const localKey = `pjs_sheets_${projectId}`;
 
     if (token) {
       try {
-        const res = await axios.get(`http://localhost:5000/api/admin/projects/${projectId}/sheets`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.data) {
-          if (res.data.project) setProject(res.data.project);
-          if (Array.isArray(res.data.sheets) && res.data.sheets.length > 0) {
-            setSheets(res.data.sheets);
-            localStorage.setItem(localKey, JSON.stringify(res.data.sheets));
+        const [sheetsRes, ticketsRes] = await Promise.all([
+          axios.get(`http://localhost:5000/api/admin/projects/${projectId}/sheets`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get(`http://localhost:5000/api/admin/tickets?project_id=${projectId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => ({ data: [] }))
+        ]);
+
+        if (sheetsRes.data) {
+          if (sheetsRes.data.project) setProject(sheetsRes.data.project);
+          if (Array.isArray(sheetsRes.data.sheets) && sheetsRes.data.sheets.length > 0) {
+            // Build a fast lookup map for all existing tickets in this project
+            const ticketMap = new Map();
+            if (Array.isArray(ticketsRes?.data)) {
+              ticketsRes.data.forEach((t) => {
+                if (t.test_case_id) {
+                  ticketMap.set(String(t.test_case_id).trim().toLowerCase(), t);
+                }
+                if (t.ticket_code) {
+                  ticketMap.set(String(t.ticket_code).trim().toLowerCase(), t);
+                }
+              });
+            }
+
+            // Enrich all sheet rows with their live ticket_code and ticket_status
+            const enrichedSheets = sheetsRes.data.sheets.map((sheet) => {
+              if (!Array.isArray(sheet.rows)) return sheet;
+              const enrichedRows = sheet.rows.map((row) => {
+                const kCol = String(row.col_id || '').trim().toLowerCase();
+                const kId = String(row.id || '').trim().toLowerCase();
+                const kTicket = String(row.ticket_code || '').trim().toLowerCase();
+                const t = (kCol && ticketMap.get(kCol)) || 
+                          (kId && ticketMap.get(kId)) || 
+                          (kTicket && ticketMap.get(kTicket));
+                if (t) {
+                  return {
+                    ...row,
+                    ticket_code: t.ticket_code,
+                    ticket_id: t.id,
+                    ticket_status: t.status,
+                    resolved_by: t.resolved_by || row.resolved_by,
+                    resolved_at: t.resolved_at || row.resolved_at
+                  };
+                }
+                return row;
+              });
+              return { ...sheet, rows: enrichedRows };
+            });
+
+            setSheets(enrichedSheets);
+            localStorage.setItem(localKey, JSON.stringify(enrichedSheets));
             return;
           }
         }
@@ -545,6 +425,128 @@ export default function AdminProjectSheet() {
   useEffect(() => {
     loadProjectSheets();
   }, [loadProjectSheets]);
+
+  // Connect to Socket.IO for Live Sheet Collaboration across QA Team, Manager, Project Lead
+  useEffect(() => {
+    if (!projectId) return;
+
+    const socket = io(SOCKET_URL, {
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      timeout: 5000
+    });
+    socketRef.current = socket;
+
+    const currentUserInfo = {
+      id: localStorage.getItem('userId') || localStorage.getItem('userEmail') || `user_${Date.now()}`,
+      name: localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'Team Member',
+      role: localStorage.getItem('userRole') || 'QA Member',
+      email: localStorage.getItem('userEmail') || ''
+    };
+
+    socket.on('connect', () => {
+      socket.emit('join_sheet_room', {
+        projectId,
+        sheetId: currentSheet?.id,
+        user: currentUserInfo
+      });
+    });
+
+    socket.on('sheet_presence_updated', (data) => {
+      if (Array.isArray(data?.viewers)) {
+        setActiveViewers(data.viewers);
+      }
+    });
+
+    socket.on('sheet_cell_updated', (data) => {
+      const { rowIndex, colId, value, user } = data;
+      setSheets((prevSheets) => {
+        const nextSheets = [...prevSheets];
+        const targetSheet = { ...nextSheets[activeSheetIndex] };
+        const updatedRows = [...(targetSheet.rows || [])];
+        if (updatedRows[rowIndex]) {
+          updatedRows[rowIndex] = { ...updatedRows[rowIndex], [colId]: value };
+          targetSheet.rows = updatedRows;
+          nextSheets[activeSheetIndex] = targetSheet;
+          return nextSheets;
+        }
+        return prevSheets;
+      });
+      if (user?.name) {
+        showLiveNotification(`${user.name} updated cell in row ${rowIndex + 1}`);
+      }
+    });
+
+    socket.on('sheet_data_synced', (data) => {
+      if (data?.projectId && String(data.projectId) === String(projectId)) {
+        if (Array.isArray(data?.updatedSheets) && data.updatedSheets.length > 0) {
+          setSheets((prev) => {
+            const next = prev.map((s) => {
+              const matched = data.updatedSheets.find((us) => String(us.id) === String(s.id));
+              return matched ? { ...s, rows: matched.rows } : s;
+            });
+            const localKey = `pjs_sheets_${projectId}`;
+            localStorage.setItem(localKey, JSON.stringify(next));
+            return next;
+          });
+        } else if (Array.isArray(data?.sheets)) {
+          setSheets(data.sheets);
+        } else {
+          loadProjectSheets();
+        }
+        if (data.updatedBy) {
+          showLiveNotification(data.message || `Sheet synchronized by ${data.updatedBy}`);
+        }
+      } else if (Array.isArray(data?.sheets)) {
+        setSheets(data.sheets);
+      }
+    });
+
+    socket.on('ticket_updated', (updatedTicket) => {
+      if (updatedTicket && (String(updatedTicket.project_id) === String(projectId) || updatedTicket.project_code === project?.project_code)) {
+        setSheets((prev) => {
+          const next = prev.map((s) => {
+            if (!Array.isArray(s.rows)) return s;
+            const updatedRows = s.rows.map((r) => {
+              const matchesTicket =
+                (r.ticket_code && r.ticket_code === updatedTicket.ticket_code) ||
+                (r.ticket_id && String(r.ticket_id) === String(updatedTicket.id)) ||
+                (updatedTicket.test_case_id && (r.col_id === updatedTicket.test_case_id || r.id === updatedTicket.test_case_id));
+              if (matchesTicket) {
+                return {
+                  ...r,
+                  ticket_status: updatedTicket.status,
+                  resolved_by: updatedTicket.resolved_by || r.resolved_by,
+                  resolved_at: updatedTicket.resolved_at || r.resolved_at
+                };
+              }
+              return r;
+            });
+            return { ...s, rows: updatedRows };
+          });
+          const localKey = `pjs_sheets_${projectId}`;
+          localStorage.setItem(localKey, JSON.stringify(next));
+          return next;
+        });
+      }
+    });
+
+    socket.on('sheet_cell_focused', (data) => {
+      setRemoteFocusCells((prev) => ({
+        ...prev,
+        [data.socketId]: {
+          rowIndex: data.rowIndex,
+          colId: data.colId,
+          user: data.user
+        }
+      }));
+    });
+
+    return () => {
+      socket.emit('leave_sheet_room', { projectId });
+      socket.disconnect();
+    };
+  }, [projectId, currentSheet?.id, activeSheetIndex, showLiveNotification]);
 
   // Sync active cell value to formula bar
   useEffect(() => {
@@ -613,6 +615,16 @@ export default function AdminProjectSheet() {
       }
     }
 
+    // Broadcast full sheet sync via WebSockets
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('sheet_data_synced', {
+        projectId,
+        sheetId: targetSheet?.id,
+        sheets: updatedSheets,
+        updatedBy: localStorage.getItem('userName') || 'Team Member'
+      });
+    }
+
     setTimeout(() => {
       setCloudStatus('saved');
     }, 400);
@@ -666,7 +678,7 @@ export default function AdminProjectSheet() {
       }
     }
 
-    const color = cellStyle.color || rowStyle.color || colStyle.color || allStyle.color || conditionalColor || '#202124';
+    const color = cellStyle.color || rowStyle.color || colStyle.color || allStyle.color || conditionalColor || '';
     const bgColor = cellStyle.bgColor || rowStyle.bgColor || colStyle.bgColor || allStyle.bgColor || conditionalBg || '';
 
     return {
@@ -747,7 +759,7 @@ export default function AdminProjectSheet() {
       italic: resolved.isItalic,
       underline: resolved.isUnderline,
       strikethrough: resolved.isStrikethrough,
-      color: resolved.color,
+      color: resolved.color || '#202124',
       bgColor: resolved.backgroundColor,
       align: resolved.textAlign,
       valign: resolved.verticalAlign,
@@ -908,6 +920,21 @@ export default function AdminProjectSheet() {
     setSheets(updatedSheets);
     persistSheetChanges(updatedSheets);
     setEditingCell(null);
+
+    // Broadcast instant cell update via WebSockets
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('sheet_cell_edited', {
+        projectId,
+        sheetId: currentSheet?.id,
+        rowIndex,
+        colId,
+        value: newVal,
+        user: {
+          name: localStorage.getItem('userName') || 'Team Member',
+          role: localStorage.getItem('userRole') || 'QA Member'
+        }
+      });
+    }
   };
 
   // Global Clipboard Paste Listener for Images & Screenshots
@@ -1676,11 +1703,7 @@ export default function AdminProjectSheet() {
         { id: 'col_c', label: 'Category', width: 150, type: 'text' },
         { id: 'col_status', label: 'Status', width: 130, type: 'status' }
       ],
-      rows: [
-        { id: 'row-1', col_a: '01', col_b: 'Sample row entry', col_c: 'General', col_status: 'Untested' },
-        { id: 'row-2', col_a: '02', col_b: '', col_c: '', col_status: 'Untested' },
-        { id: 'row-3', col_a: '03', col_b: '', col_c: '', col_status: 'Untested' }
-      ]
+      rows: []
     };
 
     // Try creating via API if available
@@ -1865,6 +1888,98 @@ export default function AdminProjectSheet() {
 
     return { total, pass, fail, blocked, inProgress, untested, passRate, failRate, blockedRate };
   }, [currentRows]);
+
+  // Helper to determine if a row represents Fail or Recommendation
+  const getRowStatusType = useCallback((row) => {
+    let val = '';
+    for (const col of currentColumns) {
+      const isStatus = col.type === 'status' || col.id === 'col_status' || col.id === 'status' || col.label?.toLowerCase().includes('status');
+      if (isStatus) {
+        val = String(row[col.id] ?? '').trim().toLowerCase();
+        if (val) break;
+      }
+    }
+    if (!val) {
+      val = String(row.col_status ?? row.status ?? '').trim().toLowerCase();
+    }
+    if (val === 'fail' || val === 'failed') return 'fail';
+    if (val === 'recommendation' || val === 'recommended') return 'recommendation';
+    return null;
+  }, [currentColumns]);
+
+  // Aggregate pending test cases for 1-click bulk ticket raising (ONLY unraised cases!)
+  const pendingBulkCases = useMemo(() => {
+    const fails = [];
+    const recs = [];
+    currentRows.forEach((r, idx) => {
+      const type = getRowStatusType(r);
+      // ONLY include rows where ticket has NOT yet been raised
+      const isAlreadyRaised = Boolean(r.ticket_code && r.ticket_code.trim());
+      if (!isAlreadyRaised) {
+        if (type === 'fail') fails.push({ ...r, _rowIndex: idx });
+        else if (type === 'recommendation') recs.push({ ...r, _rowIndex: idx });
+      }
+    });
+    return {
+      fails,
+      recs,
+      total: fails.length + recs.length,
+      all: [...fails, ...recs]
+    };
+  }, [currentRows, getRowStatusType]);
+
+  // Handle 1-click bulk ticket generation
+  const handleBulkRaiseTickets = async () => {
+    if (pendingBulkCases.total === 0) {
+      showToast('All failed and recommendation test cases already have tickets raised.');
+      return;
+    }
+    setSubmittingBulkTickets(true);
+    setBulkResultNotice(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        project_id: project?.id,
+        sheet_id: currentSheet?.id,
+        sheet_name: currentSheet?.sheet_name,
+        test_cases: pendingBulkCases.all
+      };
+
+      const res = await axios.post('http://localhost:5000/api/admin/tickets/bulk-from-sheet', payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      showToast(res.data.message || `Successfully created ${res.data.createdCount} tickets!`);
+      setBulkResultNotice(res.data);
+
+      // If backend returned stamped updatedRows, apply them immediately to local state and broadcast via Socket.IO
+      if (Array.isArray(res.data.updatedRows)) {
+        const localKey = `pjs_sheets_${projectId}`;
+        setSheets((prevSheets) => {
+          const nextSheets = [...prevSheets];
+          nextSheets[activeSheetIndex] = {
+            ...nextSheets[activeSheetIndex],
+            rows: res.data.updatedRows
+          };
+          localStorage.setItem(localKey, JSON.stringify(nextSheets));
+          persistSheetChanges(nextSheets);
+          return nextSheets;
+        });
+      } else {
+        await loadProjectSheets();
+      }
+
+      setTimeout(() => {
+        setBulkRaiseModalOpen(false);
+      }, 1600);
+    } catch (err) {
+      console.error('Failed to bulk-raise tickets:', err);
+      showToast(err.response?.data?.error || 'Failed to raise tickets in bulk. Please try again.');
+    } finally {
+      setSubmittingBulkTickets(false);
+    }
+  };
 
   const confirmLogout = () => {
     localStorage.removeItem('token');
@@ -2159,6 +2274,42 @@ export default function AdminProjectSheet() {
 
           {/* Header Right: Project QA Summary Chips */}
           <div className="pjs-header-right">
+            {/* Live WebSockets Status Indicator */}
+            <div className="pjs-live-sync-indicator" title="Connected in real-time via WebSockets">
+              <span className="pjs-live-pulse-dot" />
+              <span className="pjs-live-sync-text">Live Sync</span>
+            </div>
+
+            {/* Active Team Viewers Avatars Strip */}
+            {activeViewers.length > 0 && (
+              <div className="pjs-active-viewers-strip" title={`${activeViewers.length} team member(s) collaborating live`}>
+                {activeViewers.slice(0, 4).map((viewer, idx) => {
+                  const initials = (viewer.name || 'User')
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase();
+                  const roleColor = viewer.role === 'Project Lead' ? '#7C3AED' : viewer.role === 'Manager' ? '#0F172A' : '#2563EB';
+                  return (
+                    <div
+                      key={idx}
+                      className="pjs-viewer-avatar"
+                      style={{ background: roleColor }}
+                      title={`${viewer.name} (${viewer.role}) - Active Now`}
+                    >
+                      {initials}
+                    </div>
+                  );
+                })}
+                {activeViewers.length > 4 && (
+                  <div className="pjs-viewer-avatar more" title={`${activeViewers.length - 4} more team members`}>
+                    +{activeViewers.length - 4}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="pjs-header-stat-chip">
               <span className="dot pass" />
               <span>Pass: {qaMetrics.passRate}%</span>
@@ -2167,6 +2318,32 @@ export default function AdminProjectSheet() {
               <span className="dot fail" />
               <span>Issues: {qaMetrics.fail + qaMetrics.blocked}</span>
             </div>
+
+            {/* 1-Click Bulk Raise Tickets for Day / Sheet Run */}
+            <button
+              type="button"
+              className={`pjs-bulk-raise-btn ${pendingBulkCases.total > 0 ? 'has-pending' : 'all-raised'}`}
+              onClick={() => {
+                if (pendingBulkCases.total === 0) {
+                  showToast('All failed and recommendation test cases in this sheet already have tickets raised.');
+                } else {
+                  setBulkResultNotice(null);
+                  setBulkRaiseModalOpen(true);
+                }
+              }}
+              title={pendingBulkCases.total > 0 
+                ? `Raise ${pendingBulkCases.total} new unraised ticket(s) for this project` 
+                : 'All failed/recommendation test cases already have tickets raised'}
+            >
+              <Bug size={14} />
+              <span>{pendingBulkCases.total > 0 ? `Raise New Tickets (${pendingBulkCases.total})` : 'All Tickets Raised'}</span>
+              {pendingBulkCases.total > 0 ? (
+                <span className="pjs-bulk-badge">{pendingBulkCases.total}</span>
+              ) : (
+                <Check size={13} className="pjs-bulk-check-icon" />
+              )}
+            </button>
+
             <button className="pjs-share-btn" onClick={handleExportCSV} title="Export CSV Spreadsheet">
               <Download size={14} />
               <span>Export</span>
@@ -2611,15 +2788,11 @@ export default function AdminProjectSheet() {
                 const isRowSelected = selectionMode === 'row' && selectedRowIndices.includes(rIdx);
                 const isCopiedRow = copiedIndicator?.type === 'rows' ? copiedIndicator.indices?.includes(rIdx) : (copiedIndicator?.type === 'row' && copiedIndicator.index === rIdx);
 
-                // Check if any status column or status property in this row indicates "Fail"
-                const isFailRow = currentColumns.some((col) => {
-                  const isStatus = col.type === 'status' || col.id === 'col_status' || col.id === 'status' || col.label?.toLowerCase().includes('status');
-                  if (isStatus) {
-                    const val = String(row[col.id] ?? '').trim().toLowerCase();
-                    return val === 'fail' || val === 'failed';
-                  }
-                  return false;
-                }) || ['fail', 'failed'].includes(String(row.col_status ?? row.status ?? '').trim().toLowerCase());
+                // Check if any status column or status property in this row indicates "Fail" or "Recommendation"
+                const rowStatusType = getRowStatusType(row);
+                const isFailRow = rowStatusType === 'fail';
+                const isRecRow = rowStatusType === 'recommendation';
+                const isFailOrRecRow = isFailRow || isRecRow;
 
                 return (
                   <tr
@@ -2654,7 +2827,7 @@ export default function AdminProjectSheet() {
                             backgroundColor: isAllSelected ? undefined : (cellStyle.backgroundColor || undefined),
                             fontFamily: cellStyle.fontFamily,
                             fontSize: cellStyle.fontSize,
-                            color: cellStyle.color,
+                            color: cellStyle.color || undefined,
                             textAlign: cellStyle.textAlign,
                             verticalAlign: cellStyle.verticalAlign
                           }}
@@ -2751,21 +2924,69 @@ export default function AdminProjectSheet() {
                                     <ChevronDown size={11} />
                                   </span>
                                 </div>
-                                {isFailRow && (
+                                {row.ticket_code ? (
+                                  <button
+                                    type="button"
+                                    className={`pjs-cell-ticket-badge ${String(row.ticket_status || 'Open').toLowerCase().replace(/\s+/g, '-')}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedTicketId(row.ticket_id || row.ticket_code);
+                                    }}
+                                    title={`Defect Ticket: ${row.ticket_code} [Status: ${row.ticket_status || 'Open'}${row.resolved_by ? `, Resolved by: ${row.resolved_by}` : ''}] - Click to view ticket & full evidence`}
+                                  >
+                                    {row.ticket_status === 'Resolved' ? (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon resolved" />
+                                        <span className="pjs-badge-raised-tag resolved">Resolved:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        {row.resolved_by && <span className="pjs-badge-resolver">by {row.resolved_by.split(' ')[0]}</span>}
+                                        <span className="pjs-cell-ticket-status-pill resolved">Ready QA</span>
+                                      </>
+                                    ) : row.ticket_status === 'Closed' ? (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon closed" />
+                                        <span className="pjs-badge-raised-tag closed">Closed:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill closed">Verified ✓</span>
+                                      </>
+                                    ) : row.ticket_status === 'In Progress' ? (
+                                      <>
+                                        <Clock size={11} className="pjs-badge-check-icon in-progress" />
+                                        <span className="pjs-badge-raised-tag in-progress">Dev Fixing:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill in-progress">In Progress</span>
+                                      </>
+                                    ) : row.ticket_status === 'Reopened' ? (
+                                      <>
+                                        <RotateCcw size={11} className="pjs-badge-check-icon reopened" />
+                                        <span className="pjs-badge-raised-tag reopened">Reopened:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill reopened">Fix Rejected</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon" />
+                                        <span className="pjs-badge-raised-tag">Raised:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill">{row.ticket_status || 'Open'}</span>
+                                      </>
+                                    )}
+                                  </button>
+                                ) : isFailOrRecRow ? (
                                   <button
                                     type="button"
                                     className="pjs-cell-raise-bug-btn"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setSelectedFailTestCase(row);
+                                      setSelectedFailTestCase({ ...row, _rowIndex: rIdx });
                                       setRaiseBugModalOpen(true);
                                     }}
-                                    title="Click to raise project bug ticket for this failure"
+                                    title={`Click to raise ${isRecRow ? 'recommendation' : 'bug'} ticket for this case`}
                                   >
                                     <Bug size={11} />
-                                    <span>Raise Bug</span>
+                                    <span>Raise {isRecRow ? 'Rec' : 'Bug'}</span>
                                   </button>
-                                )}
+                                ) : null}
                               </div>
                             )
                           ) : col.type === 'priority' ? (
@@ -3358,8 +3579,193 @@ export default function AdminProjectSheet() {
           testCaseData={selectedFailTestCase}
           onTicketCreated={(createdTicket) => {
             showToast(`Bug ticket ${createdTicket.ticket_code} created successfully!`);
+            const targetColId = selectedFailTestCase?.col_id ? String(selectedFailTestCase.col_id).trim().toLowerCase() : '';
+            const targetRowId = selectedFailTestCase?.id ? String(selectedFailTestCase.id).trim().toLowerCase() : '';
+
+            const targetIndex = selectedFailTestCase?._rowIndex;
+
+            setSheets((prevSheets) => {
+              const next = [...prevSheets];
+              const tSheet = { ...next[activeSheetIndex] };
+              if (Array.isArray(tSheet.rows)) {
+                tSheet.rows = tSheet.rows.map((r, rIdx) => {
+                  const rCol = String(r.col_id || '').trim().toLowerCase();
+                  const rId = String(r.id || '').trim().toLowerCase();
+                  const isMatch = (targetIndex !== undefined && rIdx === targetIndex) ||
+                                  (targetColId && (rCol === targetColId || rId === targetColId)) ||
+                                  (targetRowId && (rId === targetRowId || rCol === targetRowId));
+                  if (isMatch) {
+                    return {
+                      ...r,
+                      ticket_code: createdTicket.ticket_code,
+                      ticket_id: createdTicket.id,
+                      ticket_status: createdTicket.status || 'Open',
+                      ticket_raised_at: new Date().toISOString()
+                    };
+                  }
+                  return r;
+                });
+                next[activeSheetIndex] = tSheet;
+              }
+              const localKey = `pjs_sheets_${projectId}`;
+              localStorage.setItem(localKey, JSON.stringify(next));
+              persistSheetChanges(next);
+              return next;
+            });
           }}
         />
+
+        {/* Ticket Detail & Audit Modal (Opens when clicking any ticket badge on the sheet) */}
+        {selectedTicketId && (
+          <TicketDetailModal
+            isOpen={Boolean(selectedTicketId)}
+            onClose={() => setSelectedTicketId(null)}
+            ticketId={selectedTicketId}
+            userRole={localStorage.getItem('userRole') || 'QA Member'}
+            onTicketUpdated={(updatedTicket) => {
+              setSheets((prevSheets) => {
+                const next = [...prevSheets];
+                const tSheet = { ...next[activeSheetIndex] };
+                if (Array.isArray(tSheet.rows)) {
+                  tSheet.rows = tSheet.rows.map(r => {
+                    const matches = (r.ticket_code && r.ticket_code === updatedTicket.ticket_code) ||
+                                    (r.ticket_id && String(r.ticket_id) === String(updatedTicket.id)) ||
+                                    (updatedTicket.test_case_id && (r.col_id === updatedTicket.test_case_id || r.id === updatedTicket.test_case_id));
+                    if (matches) {
+                      return {
+                        ...r,
+                        ticket_status: updatedTicket.status,
+                        resolved_by: updatedTicket.resolved_by || r.resolved_by,
+                        resolved_at: updatedTicket.resolved_at || r.resolved_at
+                      };
+                    }
+                    return r;
+                  });
+                  next[activeSheetIndex] = tSheet;
+                }
+                const localKey = `pjs_sheets_${projectId}`;
+                localStorage.setItem(localKey, JSON.stringify(next));
+                persistSheetChanges(next);
+                return next;
+              });
+            }}
+          />
+        )}
+
+        {/* Bulk Raise Tickets Modal */}
+        {bulkRaiseModalOpen && (
+          <div
+            className="pjs-bulk-overlay"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget && !submittingBulkTickets) setBulkRaiseModalOpen(false);
+            }}
+          >
+            <div className="pjs-bulk-card" role="dialog" aria-modal="true">
+              <div className="pjs-bulk-header">
+                <div className="pjs-bulk-title-wrap">
+                  <div className="pjs-bulk-icon-box">
+                    <Layers size={22} />
+                  </div>
+                  <div>
+                    <h3>Raise All Failed &amp; Recommended Tickets</h3>
+                    <p>Bulk convert sheet execution findings into official project tickets</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="pjs-bulk-close"
+                  onClick={() => !submittingBulkTickets && setBulkRaiseModalOpen(false)}
+                  aria-label="Close dialog"
+                  disabled={submittingBulkTickets}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="pjs-bulk-body">
+                {/* Metrics Breakdown */}
+                <div className="pjs-bulk-stat-grid">
+                  <div className="pjs-bulk-stat-box fail">
+                    <span className="pjs-bulk-stat-label">Failed Cases</span>
+                    <span className="pjs-bulk-stat-val">{pendingBulkCases.fails.length}</span>
+                  </div>
+                  <div className="pjs-bulk-stat-box rec">
+                    <span className="pjs-bulk-stat-label">Recommendations</span>
+                    <span className="pjs-bulk-stat-val">{pendingBulkCases.recs.length}</span>
+                  </div>
+                  <div className="pjs-bulk-stat-box team">
+                    <span className="pjs-bulk-stat-label">Assigned To</span>
+                    <span className="pjs-bulk-stat-val" style={{ fontSize: '13px', marginTop: '4px', color: '#1E3A8A' }}>Project Team Pool</span>
+                  </div>
+                </div>
+
+                {/* Target Information */}
+                <div className="pjs-bulk-info-banner">
+                  <strong>Project Pool Assignment:</strong> Tickets will be linked to <strong>{project?.name || 'Current Project'}</strong> (<code>{project?.project_code}</code>) and assigned to the <strong>Project Team Pool</strong>. All developers and project leads involved in this project will immediately see them in their ticket list.
+                </div>
+
+                {/* Test Cases Preview List */}
+                <div className="pjs-bulk-cases-preview">
+                  <span className="pjs-bulk-preview-title">
+                    Cases to be raised ({pendingBulkCases.total})
+                  </span>
+                  <div className="pjs-bulk-cases-list">
+                    {pendingBulkCases.all.map((tc, idx) => {
+                      const isRec = getRowStatusType(tc) === 'recommendation';
+                      const tcId = tc.col_id || tc.id || `TC-${idx + 1}`;
+                      const title = tc.col_title || tc.title || 'Test Execution';
+                      return (
+                        <div key={idx} className="pjs-bulk-case-item">
+                          <span className={`pjs-case-pill ${isRec ? 'rec' : 'fail'}`}>
+                            {isRec ? 'Recommendation' : 'Failed'}
+                          </span>
+                          <span className="pjs-case-tc-id">{tcId}</span>
+                          <span className="pjs-case-title" title={title}>{title}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {bulkResultNotice && (
+                  <div className="pjs-bulk-success-alert">
+                    <CheckCircle2 size={16} />
+                    <span>{bulkResultNotice.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pjs-bulk-footer">
+                <button
+                  type="button"
+                  className="pjs-bulk-btn-secondary"
+                  onClick={() => setBulkRaiseModalOpen(false)}
+                  disabled={submittingBulkTickets}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pjs-bulk-btn-primary"
+                  onClick={handleBulkRaiseTickets}
+                  disabled={submittingBulkTickets || pendingBulkCases.total === 0}
+                >
+                  {submittingBulkTickets ? (
+                    <>
+                      <RotateCw size={15} className="pjs-spin-icon" />
+                      <span>Generating Tickets...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bug size={15} />
+                      <span>Generate {pendingBulkCases.total} Tickets Now</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 10. Image / Screenshot Lightbox Modal */}
         {previewImageModal && (
@@ -3400,6 +3806,14 @@ export default function AdminProjectSheet() {
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Real-time Collaboration Notification Toast */}
+        {liveToast && (
+          <div className="pjs-live-float-toast">
+            <Radio size={14} className="pjs-live-toast-icon" />
+            <span>{liveToast}</span>
           </div>
         )}
       </main>

@@ -49,16 +49,14 @@ export async function resetProductionDatabase() {
     await pool.query(`
       INSERT INTO users (emp_id, full_name, email, password, department, role, status)
       VALUES 
-        ('EMP-001', 'System Administrator', 'manager@gmail.com', $1, 'Administration', 'Manager', 'Active'),
-        ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active'),
-        ('EMP-003', 'Project Lead', 'projectlead@gmail.com', $1, 'Engineering', 'Project Lead', 'Active'),
-        ('EMP-004', 'Developer', 'developer@gmail.com', $1, 'Development', 'Developer', 'Active')
+        ('EMP-001', 'Manager', 'manager@gmail.com', $1, 'Administration', 'Manager', 'Active'),
+        ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active')
       ON CONFLICT (email) DO UPDATE SET
         password = EXCLUDED.password,
         role = EXCLUDED.role,
         status = 'Active';
     `, [defaultPasswordHash]);
-    console.log('   ✓ Clean system accounts seeded (Password: Kanavu@123).');
+    console.log('   ✓ Clean system accounts seeded (Manager & QA Lead, Password: Kanavu@123).');
 
     // 3. Ensure official roles are seeded
     console.log('3. Seeding standard production roles...');
@@ -100,7 +98,7 @@ export async function resetProductionDatabase() {
     console.log('   - 0 Tickets');
     console.log('   - 0 Test Case Sheets');
     console.log('   - 0 Dummy Assignments');
-    console.log('   - Default Super Admin: manager@gmail.com (Password: Kanavu@123)');
+    console.log('   - Default System Users: manager@gmail.com, qalead@gmail.com (Password: Kanavu@123)');
     console.log('======================================================\n');
     
     process.exit(0);

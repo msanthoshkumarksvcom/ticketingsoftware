@@ -1,34 +1,73 @@
-import { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
-  CalendarDays,
+  ArrowLeft,
   ChevronDown,
-  Check,
-  CircleCheck,
-  Clock3,
+  ChevronRight,
   Eye,
-  ExternalLink,
   FileText,
+  Folder,
+  FolderOpen,
   ImageIcon,
+  LayoutGrid,
+  List,
   LogOut,
   Plus,
-  RotateCcw,
   RefreshCw,
   Search,
   Ticket,
   Upload,
-  UserRound,
   Video,
   X
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
+import FolderEmblem from '../AdminProjects/FolderEmblem';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import '../AdminProjects/AdminProjects.css';
 import './AdminTickets.css';
+
+const TICKET_STATUS_OPTIONS = [
+  { value: 'All', label: 'All Statuses' },
+  { value: 'Open', label: 'Open' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Resolved', label: 'Resolved' },
+  { value: 'Reopened', label: 'Reopened' },
+  { value: 'Closed', label: 'Closed' }
+];
+
+const TICKET_PRIORITY_OPTIONS = [
+  { value: 'All', label: 'All Priorities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
+
+const TICKET_TYPE_OPTIONS = [
+  { value: 'All', label: 'All Types' },
+  { value: 'Bug', label: 'Bug' },
+  { value: 'Incident', label: 'Incident' },
+  { value: 'Feature', label: 'Feature' },
+  { value: 'Task', label: 'Task' }
+];
+
+const MODAL_TYPE_OPTIONS = [
+  { value: 'Bug', label: 'Bug' },
+  { value: 'Incident', label: 'Incident' },
+  { value: 'Feature', label: 'Feature' },
+  { value: 'Task', label: 'Task' }
+];
+
+const MODAL_PRIORITY_OPTIONS = [
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
 
 const initialTicketForm = {
   title: '',
@@ -41,8 +80,53 @@ const initialTicketForm = {
   attachments: []
 };
 
+const TICKET_STATUS_CLASS_MAP = {
+  Open: 'ticket-status-open',
+  'In Progress': 'ticket-status-in-progress',
+  Resolved: 'ticket-status-resolved',
+  Reopened: 'ticket-status-reopened',
+  Closed: 'ticket-status-closed'
+};
+
+const TICKET_TYPE_CLASS_MAP = {
+  Bug: 'type-bug',
+  Incident: 'type-incident',
+  Feature: 'type-feature',
+  Recommendation: 'type-feature',
+  Task: 'type-task'
+};
+
+const TICKET_PRIORITY_CLASS_MAP = {
+  Critical: 'priority-critical',
+  High: 'priority-high',
+  Medium: 'priority-medium',
+  Low: 'priority-low'
+};
+
+function matchesTicketAttributes(ticket, { statusFilter, priorityFilter, typeFilter }) {
+  const matchesStatus = statusFilter === 'All' || ticket.status === statusFilter;
+  const matchesPriority = priorityFilter === 'All' || ticket.priority === priorityFilter;
+  const matchesType = typeFilter === 'All' || ticket.type === typeFilter;
+  return matchesStatus && matchesPriority && matchesType;
+}
+
+function matchesTicketQuery(ticket, query) {
+  if (!query) return true;
+  return (
+    ticket.ticket_code?.toLowerCase().includes(query) ||
+    ticket.title?.toLowerCase().includes(query) ||
+    ticket.description?.toLowerCase().includes(query) ||
+    ticket.assigned_to?.toLowerCase().includes(query) ||
+    ticket.project_code?.toLowerCase().includes(query) ||
+    ticket.project_name?.toLowerCase().includes(query) ||
+    ticket.test_case_id?.toLowerCase().includes(query) ||
+    ticket.module?.toLowerCase().includes(query)
+  );
+}
+
 function AdminTickets() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tickets, setTickets] = useState([]);
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
@@ -51,13 +135,12 @@ function AdminTickets() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [selectedFolderKey, setSelectedFolderKey] = useState(null);
+  const [viewMode, setViewMode] = useState('folders');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(initialTicketForm);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [statusUpdating, setStatusUpdating] = useState(false);
-  const [detailError, setDetailError] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
@@ -103,6 +186,44 @@ function AdminTickets() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const projectOptions = useMemo(() => {
+    if (!projects || projects.length === 0) {
+      return [{ value: 'PRJ-QA-01', label: 'PRJ-QA-01 - Automation Suite' }];
+    }
+    return projects.map((p) => ({
+      value: p.project_code,
+      label: `${p.project_code} - ${p.name}`
+    }));
+  }, [projects]);
+
+  const userOptions = useMemo(() => {
+    if (!users || users.length === 0) {
+      return [{ value: 'Admin User', label: 'Admin User' }];
+    }
+    return users.map((u) => ({
+      value: u.full_name || u.email,
+      label: `${u.full_name || u.email} (${u.role || 'Member'})`
+    }));
+  }, [users]);
+
+  const handleOpenRaiseModal = () => {
+    setFormError('');
+    const defaultProjectCode =
+      (activeFolder && activeFolder.projectCode && activeFolder.projectCode !== 'General'
+        ? activeFolder.projectCode
+        : projects[0]?.project_code) || initialTicketForm.project_code;
+
+    const defaultAssignee =
+      users[0]?.full_name || users[0]?.email || initialTicketForm.assigned_to;
+
+    setFormData({
+      ...initialTicketForm,
+      project_code: defaultProjectCode,
+      assigned_to: defaultAssignee
+    });
+    setIsModalOpen(true);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -165,10 +286,14 @@ function AdminTickets() {
     setSubmitting(true);
 
     try {
+      const matchedProject = projects.find(
+        (p) => p.project_code?.toLowerCase() === formData.project_code?.toLowerCase()
+      );
       const response = await axios.post(
         'http://localhost:5000/api/admin/tickets',
         {
           ...formData,
+          project_id: matchedProject?.id || activeFolder?.projectId || undefined,
           title: formData.title.trim(),
           description: formData.description.trim(),
           attachments: formData.attachments || []
@@ -189,60 +314,222 @@ function AdminTickets() {
     }
   };
 
-  const handleStatusChange = async (status) => {
-    if (!selectedTicket || statusUpdating || selectedTicket.status === status) return;
-    const token = localStorage.getItem('token');
-    setStatusUpdating(true);
-    setDetailError('');
-
-    try {
-      const response = await axios.put(
-        `http://localhost:5000/api/admin/tickets/${selectedTicket.id}/status`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const updatedTicket = response.data.ticket;
-      setTickets((current) =>
-        current.map((ticket) => ticket.id === updatedTicket.id ? updatedTicket : ticket)
-      );
-      setSelectedTicket(updatedTicket);
-    } catch (error) {
-      console.error('Error updating ticket status:', error);
-      setDetailError(error.response?.data?.error || 'Unable to update ticket status. Please try again.');
-    } finally {
-      setStatusUpdating(false);
-    }
-  };
-
   const confirmLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
     navigate('/', { replace: true });
   };
 
-  const filteredTickets = tickets.filter((t) => {
-    const query = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      !query ||
-      t.ticket_code?.toLowerCase().includes(query) ||
-      t.title?.toLowerCase().includes(query) ||
-      t.description?.toLowerCase().includes(query) ||
-      t.assigned_to?.toLowerCase().includes(query) ||
-      t.project_code?.toLowerCase().includes(query);
+  // Group all tickets into their respective project folders, enriched with project metadata
+  const projectFolders = useMemo(() => {
+    const folderMap = new Map();
+    const projectById = new Map();
+    const projectByCode = new Map();
 
-    const matchesStatus = statusFilter === 'All' || t.status === statusFilter;
-    const matchesPriority = priorityFilter === 'All' || t.priority === priorityFilter;
-    const matchesType = typeFilter === 'All' || t.type === typeFilter;
+    projects.forEach((p) => {
+      const key = `id-${p.id}`;
+      projectById.set(String(p.id), p);
+      if (p.project_code) {
+        projectByCode.set(p.project_code.trim().toLowerCase(), p);
+      }
+      folderMap.set(key, {
+        key,
+        projectId: p.id,
+        projectCode: p.project_code || 'N/A',
+        projectName: p.name || p.project_code || 'Untitled Project',
+        leadName: p.lead_name || '',
+        department: p.department || '',
+        status: p.status || 'Active',
+        folderColor: p.folder_color || 'blue',
+        tickets: []
+      });
+    });
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesType;
-  });
+    tickets.forEach((t) => {
+      const codeNorm = t.project_code ? String(t.project_code).trim().toLowerCase() : '';
+      const matchedProject =
+        (t.project_id ? projectById.get(String(t.project_id)) : null) ||
+        (codeNorm ? projectByCode.get(codeNorm) : null);
 
-  const overviewStats = [
-    { label: 'Total Tickets', value: tickets.length, tone: 'total' },
-    { label: 'Open', value: tickets.filter((ticket) => ticket.status === 'Open').length, tone: 'open' },
-    { label: 'In Progress', value: tickets.filter((ticket) => ticket.status === 'In Progress').length, tone: 'progress' },
-    { label: 'Resolved', value: tickets.filter((ticket) => ticket.status === 'Resolved').length, tone: 'resolved' }
-  ];
+      let key;
+      if (matchedProject) {
+        key = `id-${matchedProject.id}`;
+      } else if (t.project_id) {
+        key = `id-${t.project_id}`;
+      } else if (codeNorm && codeNorm !== 'general') {
+        key = `code-${codeNorm}`;
+      } else {
+        key = 'general';
+      }
+
+      if (!folderMap.has(key)) {
+        folderMap.set(key, {
+          key,
+          projectId: matchedProject?.id || t.project_id || null,
+          projectCode: matchedProject?.project_code || t.project_code || 'General',
+          projectName:
+            matchedProject?.name ||
+            t.project_name ||
+            (key === 'general' ? 'General / Unassigned Project' : t.project_code || 'Project Tickets'),
+          leadName: matchedProject?.lead_name || t.project_lead_name || '',
+          department: matchedProject?.department || t.project_department || '',
+          status: matchedProject?.status || t.project_status || 'Active',
+          folderColor: matchedProject?.folder_color || t.project_folder_color || 'blue',
+          tickets: []
+        });
+      }
+
+      folderMap.get(key).tickets.push(t);
+    });
+
+    return Array.from(folderMap.values()).sort((a, b) => {
+      const aHasTickets = a.tickets.length > 0 ? 1 : 0;
+      const bHasTickets = b.tickets.length > 0 ? 1 : 0;
+      if (aHasTickets !== bHasTickets) return bHasTickets - aHasTickets;
+
+      const aActive = a.tickets.filter((t) =>
+        ['Open', 'In Progress', 'Reopened'].includes(t.status)
+      ).length;
+      const bActive = b.tickets.filter((t) =>
+        ['Open', 'In Progress', 'Reopened'].includes(t.status)
+      ).length;
+      if (aActive !== bActive) return bActive - aActive;
+
+      if (b.tickets.length !== a.tickets.length) return b.tickets.length - a.tickets.length;
+      return a.projectName.localeCompare(b.projectName);
+    });
+  }, [projects, tickets]);
+
+  // Open a specific project folder if ?projectId=... or ?projectCode=... is present in the URL
+  useEffect(() => {
+    if (loading || projectFolders.length === 0) return;
+    const urlProjectId = searchParams.get('projectId');
+    const urlProjectCode = searchParams.get('projectCode');
+    if (!urlProjectId && !urlProjectCode) return;
+
+    const target = projectFolders.find((folder) => {
+      if (urlProjectId && String(folder.projectId) === String(urlProjectId)) return true;
+      if (
+        urlProjectCode &&
+        folder.projectCode?.toLowerCase() === String(urlProjectCode).trim().toLowerCase()
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (target) {
+      setSelectedFolderKey(target.key);
+      setViewMode('folders');
+    }
+  }, [loading, projectFolders, searchParams]);
+
+  const activeFolder = useMemo(
+    () => projectFolders.find((f) => f.key === selectedFolderKey) || null,
+    [projectFolders, selectedFolderKey]
+  );
+
+  const handleOpenFolder = (folder) => {
+    setSelectedFolderKey(folder.key);
+    setViewMode('folders');
+    setSearchQuery('');
+    setStatusFilter('All');
+    setPriorityFilter('All');
+    setTypeFilter('All');
+    if (folder.projectId) {
+      setSearchParams({ projectId: String(folder.projectId) }, { replace: true });
+    } else if (folder.projectCode && folder.projectCode !== 'General') {
+      setSearchParams({ projectCode: folder.projectCode }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  const handleCloseFolder = () => {
+    setSelectedFolderKey(null);
+    setSearchQuery('');
+    setStatusFilter('All');
+    setPriorityFilter('All');
+    setTypeFilter('All');
+    if (searchParams.has('projectId') || searchParams.has('projectCode')) {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  const query = searchQuery.trim().toLowerCase();
+  const isShowingFoldersGrid = viewMode === 'folders' && !activeFolder;
+
+  const visibleFolders = useMemo(() => {
+    if (!query) return projectFolders;
+    return projectFolders.filter((folder) => {
+      const folderMatches =
+        folder.projectName?.toLowerCase().includes(query) ||
+        folder.projectCode?.toLowerCase().includes(query) ||
+        folder.leadName?.toLowerCase().includes(query) ||
+        folder.department?.toLowerCase().includes(query);
+      if (folderMatches) return true;
+      return folder.tickets.some((ticket) => matchesTicketQuery(ticket, query));
+    });
+  }, [projectFolders, query]);
+
+  const folderSummaryStats = useMemo(() => {
+    let resolvedFolders = 0;
+    let inProgressFolders = 0;
+
+    projectFolders.forEach((folder) => {
+      if (folder.tickets.length === 0) return;
+      const allResolved = folder.tickets.every((ticket) =>
+        ['Resolved', 'Closed'].includes(ticket.status)
+      );
+      if (allResolved) {
+        resolvedFolders += 1;
+      } else {
+        inProgressFolders += 1;
+      }
+    });
+
+    return [
+      { label: 'Total Folders', value: projectFolders.length, tone: 'total' },
+      { label: 'In Progress Folders', value: inProgressFolders, tone: 'progress' },
+      { label: 'Resolved Folders', value: resolvedFolders, tone: 'resolved' }
+    ];
+  }, [projectFolders]);
+
+  const filteredTickets = useMemo(() => {
+    const sourceTickets = activeFolder ? activeFolder.tickets : tickets;
+    const filterOpts = { statusFilter, priorityFilter, typeFilter };
+    return sourceTickets.filter(
+      (t) => matchesTicketAttributes(t, filterOpts) && matchesTicketQuery(t, query)
+    );
+  }, [activeFolder, tickets, query, statusFilter, priorityFilter, typeFilter]);
+
+  const statsSource = activeFolder ? activeFolder.tickets : tickets;
+  const overviewStats = isShowingFoldersGrid
+    ? folderSummaryStats
+    : [
+        { label: activeFolder ? 'Folder Tickets' : 'Total Tickets', value: statsSource.length, tone: 'total' },
+        { label: 'Open', value: statsSource.filter((ticket) => ticket.status === 'Open').length, tone: 'open' },
+        { label: 'In Progress', value: statsSource.filter((ticket) => ticket.status === 'In Progress').length, tone: 'progress' },
+        { label: 'Resolved', value: statsSource.filter((ticket) => ticket.status === 'Resolved').length, tone: 'resolved' }
+      ];
+
+  const folderNameByKey = useMemo(() => {
+    const map = new Map();
+    projectFolders.forEach((f) => map.set(f.key, f));
+    return map;
+  }, [projectFolders]);
+
+  const resolveTicketProjectName = (ticket) => {
+    if (ticket.project_name) return ticket.project_name;
+    if (ticket.project_id && folderNameByKey.has(`id-${ticket.project_id}`)) {
+      return folderNameByKey.get(`id-${ticket.project_id}`).projectName;
+    }
+    if (ticket.project_code) {
+      const byCode = folderNameByKey.get(`code-${String(ticket.project_code).trim().toLowerCase()}`);
+      if (byCode) return byCode.projectName;
+    }
+    return activeFolder?.projectName || 'General';
+  };
 
   const displayName = userEmail ? userEmail.split('@')[0] : 'Administrator';
   const avatarLabel = displayName.charAt(0).toUpperCase();
@@ -292,12 +579,7 @@ function AdminTickets() {
       <AdminSidebar onLogout={() => setShowLogoutModal(true)} />
 
       <main className="main-content">
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">/</span>
-            <strong>Tickets Queue</strong>
-          </div>
+        <div className="tickets-top-utility-bar">
           <div className="header-right">
             <button
               className="notification-bell"
@@ -317,32 +599,107 @@ function AdminTickets() {
               <ChevronDown size={15} className="profile-chevron" />
             </div>
           </div>
-        </header>
+        </div>
 
         <div className="dashboard-container">
           <div className="projects-layout">
-            <div className="projects-header-row">
-              <div className="projects-header-info">
-                <h2>{isDeveloper ? 'Assigned Defects & Project Tickets' : isProjectLead ? 'Project Defect Tickets' : 'Tickets Workspace'}</h2>
-                <p>{isDeveloper ? 'Investigate defects, apply code fixes, and submit resolution reports for QA signoff.' : 'Track, assign, prioritize, and resolve QA issues and bug reports.'}</p>
+            {!activeFolder && (
+              <div className="projects-header-row">
+                <div className="projects-header-info">
+                  <h2>{isDeveloper ? 'Assigned Defects & Project Tickets' : isProjectLead ? 'Project Defect Tickets' : 'Tickets Workspace'}</h2>
+                  {!isShowingFoldersGrid && (
+                    <p>
+                      {isDeveloper
+                        ? 'Investigate defects, apply code fixes, and submit resolution reports for QA signoff.'
+                        : 'Track, assign, prioritize, and resolve QA issues and bug reports.'}
+                    </p>
+                  )}
+                </div>
+                <div className="users-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="ticket-view-toggle" role="group" aria-label="Ticket workspace view">
+                    <button
+                      type="button"
+                      className={`ticket-view-toggle-btn ${viewMode === 'folders' ? 'active' : ''}`}
+                      onClick={() => {
+                        setViewMode('folders');
+                      }}
+                    >
+                      <LayoutGrid size={15} />
+                      <span>Project Folders</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`ticket-view-toggle-btn ${viewMode === 'all' ? 'active' : ''}`}
+                      onClick={() => {
+                        handleCloseFolder();
+                        setViewMode('all');
+                      }}
+                    >
+                      <List size={15} />
+                      <span>All Tickets</span>
+                    </button>
+                  </div>
+
+                  {!isDeveloper && (
+                    <button
+                      className="btn-primary-action"
+                      onClick={handleOpenRaiseModal}
+                    >
+                      <Plus size={18} />
+                      <span>Raise Ticket</span>
+                    </button>
+                  )}
+                </div>
               </div>
-              {!isDeveloper && (
-                <div className="users-header-actions">
+            )}
+
+            {activeFolder && viewMode === 'folders' && (
+              <div className="ticket-active-folder-banner">
+                <div className="ticket-active-folder-left">
                   <button
+                    type="button"
+                    className="ticket-back-folders-btn"
+                    onClick={handleCloseFolder}
+                    title="Back to Project Folders"
+                    aria-label="Back to Project Folders"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+
+                  <div className="ticket-active-folder-identity">
+                    <div>
+                      <div className="ticket-active-folder-title-row">
+                        <h3>{activeFolder.projectName}</h3>
+                        {activeFolder.status && (
+                          <span className={`pj-status-badge ${(activeFolder.status || 'active').toLowerCase().replace(/\s+/g, '-')}`}>
+                            {activeFolder.status}
+                          </span>
+                        )}
+                      </div>
+                      <p className="ticket-active-folder-meta">
+                        {activeFolder.department ? `${activeFolder.department} • ` : ''}
+                        {activeFolder.leadName ? `Lead: ${activeFolder.leadName} • ` : ''}
+                        Showing {filteredTickets.length} of {activeFolder.tickets.length} ticket
+                        {activeFolder.tickets.length === 1 ? '' : 's'} in this project folder
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {!isDeveloper && (
+                  <button
+                    type="button"
                     className="btn-primary-action"
-                    onClick={() => {
-                      setSelectedTicket(null);
-                      setIsModalOpen(true);
-                    }}
+                    onClick={handleOpenRaiseModal}
                   >
                     <Plus size={18} />
                     <span>Raise Ticket</span>
                   </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
-            <div className="tickets-overview">
+            <div className={`tickets-overview ${isShowingFoldersGrid ? 'folders-overview' : ''}`}>
               {overviewStats.map((card) => (
                 <div key={card.label} className={`overview-card ${card.tone}`}>
                   <span>{card.label}</span>
@@ -356,187 +713,251 @@ function AdminTickets() {
                 <Search size={16} color="#64748b" />
                 <input
                   type="text"
-                  placeholder="Search ticket code, title, assignee, project..."
+                  placeholder={
+                    isShowingFoldersGrid
+                      ? 'Search project folder, lead, department, or ticket...'
+                      : 'Search ticket code, title, assignee, module...'
+                  }
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <select
-                  className="users-filter-select"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Open">Open</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Resolved">Resolved</option>
-                  <option value="Closed">Closed</option>
-                </select>
+              {!isShowingFoldersGrid && (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <CustomSelect
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={TICKET_STATUS_OPTIONS}
+                    variant="filter"
+                    placeholder="All Statuses"
+                  />
 
-                <select
-                  className="users-filter-select"
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                >
-                  <option value="All">All Priorities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                  <CustomSelect
+                    value={priorityFilter}
+                    onChange={setPriorityFilter}
+                    options={TICKET_PRIORITY_OPTIONS}
+                    variant="filter"
+                    placeholder="All Priorities"
+                  />
 
-                <select
-                  className="users-filter-select"
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                >
-                  <option value="All">All Types</option>
-                  <option value="Bug">Bug</option>
-                  <option value="Incident">Incident</option>
-                  <option value="Feature">Feature</option>
-                  <option value="Task">Task</option>
-                </select>
-              </div>
+                  <CustomSelect
+                    value={typeFilter}
+                    onChange={setTypeFilter}
+                    options={TICKET_TYPE_OPTIONS}
+                    variant="filter"
+                    placeholder="All Types"
+                  />
+                </div>
+              )}
             </div>
 
-            <div className="users-table-card">
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>Ticket Code</th>
-                    <th>Title & Description</th>
-                    <th>Project</th>
-                    <th>Type</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Assigned To</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>
-                        Loading tickets...
-                      </td>
-                    </tr>
-                  ) : filteredTickets.length === 0 ? (
-                    <tr>
-                      <td colSpan="8">
-                        <div className="user-empty-state">
-                          <Ticket size={40} style={{ opacity: 0.35, marginBottom: '10px' }} />
-                          <p>No tickets found matching your search or filters.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredTickets.map((t) => (
-                      <tr
-                        key={t.id}
-                        className="ticket-table-row"
-                        onClick={() => {
-                          setSelectedTicketId(t.id);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            setSelectedTicketId(t.id);
-                          }
-                        }}
-                        tabIndex={0}
-                        aria-label={`View ticket ${t.ticket_code}: ${t.title}`}
-                      >
-                        <td>
-                          <span className="project-code-badge">{t.ticket_code}</span>
-                        </td>
-                        <td>
-                          <div className="ticket-title-cell">
-                            <span className="ticket-title-text">{t.title}</span>
-                            {t.description && (
-                              <span className="ticket-desc-sub" title={t.description}>
-                                {t.description}
+            {isShowingFoldersGrid ? (
+              <div className="ticket-folders-section">
+                <div className="ticket-folders-section-header">
+                  <div className="ticket-folders-section-title">
+                    <Folder size={17} color="#2563eb" />
+                    <span>Project Folders</span>
+                    <span className="ticket-folders-total-pill">
+                      {visibleFolders.length} Folder{visibleFolders.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="users-table-card" style={{ textAlign: 'center', padding: '44px' }}>
+                    Loading project ticket folders...
+                  </div>
+                ) : visibleFolders.length === 0 ? (
+                  <div className="users-table-card">
+                    <div className="user-empty-state">
+                      <FolderOpen size={42} style={{ opacity: 0.35, marginBottom: '10px' }} />
+                      <p>
+                        {query
+                          ? 'No project folders match your search.'
+                          : 'No project ticket folders found yet.'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="ticket-folders-grid">
+                    {visibleFolders.map((folder) => {
+                      const folderTickets = folder.tickets;
+
+                      return (
+                        <div
+                          key={folder.key}
+                          className={`ticket-folder-card folder-accent-${folder.folderColor || 'blue'}`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleOpenFolder(folder)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleOpenFolder(folder);
+                            }
+                          }}
+                          aria-label={`Open project folder ${folder.projectName} (${folderTickets.length} tickets)`}
+                        >
+                          <div className="ticket-folder-tab" aria-hidden="true" />
+
+                          <div className="ticket-folder-body">
+                            <div className="ticket-folder-top">
+                              <FolderEmblem label={folder.projectName} />
+                              <span
+                                className={`ticket-folder-count-pill ${
+                                  folderTickets.length === 0 ? 'empty' : ''
+                                }`}
+                              >
+                                <Ticket size={13} />
+                                <span>
+                                  {folderTickets.length} Ticket{folderTickets.length === 1 ? '' : 's'}
+                                </span>
                               </span>
-                            )}
-                            {(t.attachments || []).length > 0 && (
-                              <span className="ticket-attachment-summary">
-                                <Upload size={12} /> {t.attachments.length} attachment{t.attachments.length > 1 ? 's' : ''}
+                            </div>
+
+                            <h3 className="ticket-folder-name" title={folder.projectName}>
+                              {folder.projectName}
+                            </h3>
+                            <p className="ticket-folder-sub">
+                              {folder.department || 'Project Workspace'}
+                              {folder.leadName ? ` • Lead: ${folder.leadName}` : ''}
+                            </p>
+
+                            <div className="ticket-folder-footer">
+                              <span className="ticket-folder-open-cta">
+                                <span>Open Folder</span>
+                                <ChevronRight size={15} />
                               </span>
-                            )}
+                            </div>
                           </div>
-                        </td>
-                        <td>
-                          <span className="user-dept-badge">{t.project_code}</span>
-                        </td>
-                        <td>
-                          <span
-                            className={`ticket-type-badge ${
-                              t.type === 'Bug'
-                                ? 'type-bug'
-                                : t.type === 'Incident'
-                                ? 'type-incident'
-                                : t.type === 'Feature'
-                                ? 'type-feature'
-                                : 'type-task'
-                            }`}
-                          >
-                            {t.type}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            className={`priority-badge ${
-                              t.priority === 'Critical'
-                                ? 'priority-critical'
-                                : t.priority === 'High'
-                                ? 'priority-high'
-                                : t.priority === 'Low'
-                                ? 'priority-low'
-                                : 'priority-medium'
-                            }`}
-                          >
-                            {t.priority}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            className={`status-tag ${
-                              t.status === 'Open'
-                                ? 'ticket-status-open'
-                                : t.status === 'In Progress'
-                                ? 'ticket-status-in-progress'
-                                : t.status === 'Resolved'
-                                ? 'ticket-status-resolved'
-                                : 'ticket-status-closed'
-                            }`}
-                          >
-                            {t.status}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 500, color: '#334155' }}>
-                          {t.assigned_to || 'Unassigned'}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="ticket-view-button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedTicketId(t.id);
-                            }}
-                            aria-label={`View details for ${t.ticket_code}`}
-                          >
-                            <Eye size={15} />
-                            <span>Details</span>
-                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="users-table-card">
+                <table className="users-table">
+                  <thead>
+                    <tr>
+                      <th>Ticket Code</th>
+                      <th>Title & Description</th>
+                      <th>Project</th>
+                      <th>Type</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Assigned To</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>
+                          Loading tickets...
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : filteredTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan="8">
+                          <div className="user-empty-state">
+                            <Ticket size={40} style={{ opacity: 0.35, marginBottom: '10px' }} />
+                            <p>
+                              {activeFolder
+                                ? `No tickets found inside ${activeFolder.projectName} matching your filters.`
+                                : 'No tickets found matching your search or filters.'}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTickets.map((t) => (
+                        <tr
+                          key={t.id}
+                          className="ticket-table-row"
+                          onClick={() => {
+                            setSelectedTicketId(t.id);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setSelectedTicketId(t.id);
+                            }
+                          }}
+                          tabIndex={0}
+                          aria-label={`View ticket ${t.ticket_code}: ${t.title}`}
+                        >
+                          <td>
+                            <span className="project-code-badge">{t.ticket_code}</span>
+                          </td>
+                          <td>
+                            <div className="ticket-title-cell">
+                              <span className="ticket-title-text">{t.title}</span>
+                              {t.description && (
+                                <span className="ticket-desc-sub" title={t.description}>
+                                  {t.description}
+                                </span>
+                              )}
+                              {(t.attachments || []).length > 0 && (
+                                <span className="ticket-attachment-summary">
+                                  <Upload size={12} /> {t.attachments.length} attachment{t.attachments.length > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="ticket-project-cell">
+                              <span className="ticket-project-name">{resolveTicketProjectName(t)}</span>
+                              <span className="user-dept-badge">{t.project_code}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span
+                              className={`ticket-type-badge ${TICKET_TYPE_CLASS_MAP[t.type] || 'type-task'}`}
+                            >
+                              {t.type}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className={`priority-badge ${TICKET_PRIORITY_CLASS_MAP[t.priority] || 'priority-medium'}`}
+                            >
+                              {t.priority}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className={`status-tag ${TICKET_STATUS_CLASS_MAP[t.status] || 'ticket-status-closed'}`}
+                            >
+                              {t.status}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 500, color: '#334155' }}>
+                            {t.assigned_to || 'Unassigned'}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="ticket-view-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedTicketId(t.id);
+                              }}
+                              aria-label={`View details for ${t.ticket_code}`}
+                            >
+                              <Eye size={15} />
+                              <span>Details</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -580,30 +1001,22 @@ function AdminTickets() {
                 <div className="form-grid-2">
                   <div className="form-group-user">
                     <label>Issue Type</label>
-                    <select
-                      name="type"
+                    <CustomSelect
                       value={formData.type}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Bug">Bug</option>
-                      <option value="Incident">Incident</option>
-                      <option value="Feature">Feature</option>
-                      <option value="Task">Task</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, type: val }))}
+                      options={MODAL_TYPE_OPTIONS}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="form-group-user">
                     <label>Priority</label>
-                    <select
-                      name="priority"
+                    <CustomSelect
                       value={formData.priority}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Critical">Critical</option>
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}
+                      options={MODAL_PRIORITY_OPTIONS}
+                      variant="form"
+                    />
                   </div>
                 </div>
 
@@ -633,40 +1046,22 @@ function AdminTickets() {
                 <div className="form-grid-2">
                   <div className="form-group-user">
                     <label>Related Project</label>
-                    <select
-                      name="project_code"
+                    <CustomSelect
                       value={formData.project_code}
-                      onChange={handleInputChange}
-                    >
-                      {projects.length > 0 ? (
-                        projects.map((p) => (
-                          <option key={p.id} value={p.project_code}>
-                            {p.project_code} - {p.name}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="PRJ-QA-01">PRJ-QA-01 - Automation Suite</option>
-                      )}
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, project_code: val }))}
+                      options={projectOptions}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="form-group-user">
                     <label>Assign To</label>
-                    <select
-                      name="assigned_to"
+                    <CustomSelect
                       value={formData.assigned_to}
-                      onChange={handleInputChange}
-                    >
-                      {users.length > 0 ? (
-                        users.map((u) => (
-                          <option key={u.id} value={u.full_name || u.email}>
-                            {u.full_name || u.email} ({u.role || 'Member'})
-                          </option>
-                        ))
-                      ) : (
-                        <option value="Admin User">Admin User</option>
-                      )}
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, assigned_to: val }))}
+                      options={userOptions}
+                      variant="form"
+                    />
                   </div>
                 </div>
 
@@ -690,175 +1085,6 @@ function AdminTickets() {
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {selectedTicket && createPortal(
-                    <div
-                      className="ticket-modal-overlay ticket-detail-overlay"
-                      onMouseDown={(event) => {
-                        if (event.target === event.currentTarget && !statusUpdating) setSelectedTicket(null);
-                      }}
-                    >
-                      <section
-                        className="ticket-detail-card"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="ticket-detail-title"
-                      >
-                        <header className="ticket-detail-header">
-                          <div className="ticket-detail-heading">
-                            <span className="ticket-modal-heading-icon"><Ticket size={18} /></span>
-                            <div>
-                              <span className="ticket-detail-code">{selectedTicket.ticket_code}</span>
-                              <h2 id="ticket-detail-title">{selectedTicket.title}</h2>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="modal-close-btn"
-                            onClick={() => setSelectedTicket(null)}
-                            aria-label="Close ticket details"
-                            disabled={statusUpdating}
-                          >
-                            <X size={19} />
-                          </button>
-                        </header>
-
-                        <div className="ticket-detail-body">
-                          {detailError && <div className="user-error-banner">{detailError}</div>}
-                          <div className="ticket-detail-status-line">
-                            <span className={`status-tag ticket-status-${selectedTicket.status?.toLowerCase().replaceAll(' ', '-')}`}>
-                              {selectedTicket.status}
-                            </span>
-                            <span className={`ticket-type-badge type-${selectedTicket.type?.toLowerCase()}`}>
-                              {selectedTicket.type}
-                            </span>
-                            <span className={`priority-badge priority-${selectedTicket.priority?.toLowerCase()}`}>
-                              {selectedTicket.priority} priority
-                            </span>
-                          </div>
-
-                          <section className="ticket-detail-section">
-                            <h3>Description</h3>
-                            <p className="ticket-detail-description">
-                              {selectedTicket.description?.trim() || 'No description was added to this ticket.'}
-                            </p>
-                          </section>
-
-                          <section className="ticket-detail-section">
-                            <h3>Ticket information</h3>
-                            <div className="ticket-detail-grid">
-                              <div className="ticket-detail-field">
-                                <span><FileText size={14} /> Ticket ID</span>
-                                <strong>{selectedTicket.ticket_code}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><Ticket size={14} /> Related project</span>
-                                <strong>{selectedTicket.project_code || 'General'}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><UserRound size={14} /> Assigned to</span>
-                                <strong>{selectedTicket.assigned_to || 'Unassigned'}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><UserRound size={14} /> Reported by</span>
-                                <strong>{selectedTicket.reporter || 'Unknown'}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><CalendarDays size={14} /> Created</span>
-                                <strong>
-                                  {selectedTicket.created_at
-                                    ? new Date(selectedTicket.created_at).toLocaleString()
-                                    : 'Unknown'}
-                                </strong>
-                              </div>
-                            </div>
-                          </section>
-
-                          <section className="ticket-detail-section">
-                            <h3>Attachments</h3>
-                            {(selectedTicket.attachments || []).length ? (
-                              <div className="ticket-detail-attachments">
-                                {selectedTicket.attachments.map((attachment, index) => (
-                                  <article className="ticket-detail-attachment" key={`${attachment.name}-${index}`}>
-                                    {attachment.mediaType === 'image' ? (
-                                      <a href={attachment.url} target="_blank" rel="noreferrer" aria-label={`Open ${attachment.name}`}>
-                                        <img src={attachment.url} alt={attachment.name} />
-                                      </a>
-                                    ) : attachment.mediaType === 'video' ? (
-                                      <video src={attachment.url} controls preload="metadata" aria-label={attachment.name} />
-                                    ) : (
-                                      <FileText size={24} />
-                                    )}
-                                    <div className="ticket-attachment-caption">
-                                      <span>{attachment.name}</span>
-                                      <a href={attachment.url} target="_blank" rel="noreferrer" aria-label={`Open ${attachment.name}`}>
-                                        <ExternalLink size={14} />
-                                      </a>
-                                    </div>
-                                  </article>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="ticket-detail-muted">No attachments on this ticket.</p>
-                            )}
-                          </section>
-                        </div>
-
-                        <footer className="ticket-detail-actions">
-                          <div className="ticket-detail-action-group">
-                            {selectedTicket.status === 'Open' && (
-                              <button
-                                type="button"
-                                className="ticket-action-button secondary"
-                                onClick={() => handleStatusChange('In Progress')}
-                                disabled={statusUpdating}
-                              >
-                                <Clock3 size={15} /> Start work
-                              </button>
-                            )}
-                            {selectedTicket.status !== 'Resolved' && selectedTicket.status !== 'Closed' && (
-                              <button
-                                type="button"
-                                className="ticket-action-button success"
-                                onClick={() => handleStatusChange('Resolved')}
-                                disabled={statusUpdating}
-                              >
-                                <CircleCheck size={15} /> Resolve
-                              </button>
-                            )}
-                            {selectedTicket.status !== 'Closed' ? (
-                              <button
-                                type="button"
-                                className="ticket-action-button danger"
-                                onClick={() => handleStatusChange('Closed')}
-                                disabled={statusUpdating}
-                              >
-                                <Check size={15} /> Close ticket
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="ticket-action-button secondary"
-                                onClick={() => handleStatusChange('Open')}
-                                disabled={statusUpdating}
-                              >
-                                <RotateCcw size={15} /> Reopen
-                              </button>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            className="ticket-action-button plain"
-                            onClick={() => setSelectedTicket(null)}
-                            disabled={statusUpdating}
-                          >
-                            {statusUpdating ? 'Updating...' : 'Done'}
-                          </button>
-                        </footer>
-                      </section>
-                    </div>,
-                    document.body
                   )}
                 </div>
               </div>

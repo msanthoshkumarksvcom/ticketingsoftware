@@ -28,9 +28,27 @@ import {
   LogOut
 } from 'lucide-react';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import '../../styles/admin.css';
 import './ProjectLeadDashboard.css';
+
+const PLD_STATUS_OPTIONS = [
+  { value: 'All', label: 'All Statuses' },
+  { value: 'Open', label: 'Open' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Resolved', label: 'Resolved (Ready for QA)' },
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Reopened', label: 'Reopened' }
+];
+
+const PLD_SEVERITY_OPTIONS = [
+  { value: 'All', label: 'All Severities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
 
 export default function ProjectLeadDashboard() {
   const navigate = useNavigate();
@@ -217,6 +235,13 @@ export default function ProjectLeadDashboard() {
       return matchesSearch && matchesStatus && matchesSeverity && matchesProj;
     });
   }, [tickets, searchQuery, statusFilter, severityFilter, projectFilter]);
+
+  const pldProjectOptions = useMemo(() => {
+    return [
+      { value: 'All', label: 'All Projects' },
+      ...projects.map((p) => ({ value: String(p.id), label: p.name }))
+    ];
+  }, [projects]);
 
   const summary = dashboardData?.summary || {
     totalAssignedProjects: 0,
@@ -496,43 +521,31 @@ export default function ProjectLeadDashboard() {
                 />
               </div>
 
-              <div className="pld-filter-selects">
-                <select
+              <div className="pld-filter-selects" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <CustomSelect
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="pld-select"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Open">Open</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Resolved">Resolved (Ready for QA)</option>
-                  <option value="Closed">Closed</option>
-                  <option value="Reopened">Reopened</option>
-                </select>
+                  onChange={setStatusFilter}
+                  options={PLD_STATUS_OPTIONS}
+                  variant="filter"
+                  placeholder="All Statuses"
+                />
 
-                <select
+                <CustomSelect
                   value={severityFilter}
-                  onChange={(e) => setSeverityFilter(e.target.value)}
-                  className="pld-select"
-                >
-                  <option value="All">All Severities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                  onChange={setSeverityFilter}
+                  options={PLD_SEVERITY_OPTIONS}
+                  variant="filter"
+                  placeholder="All Severities"
+                />
 
                 {projects.length > 1 && (
-                  <select
+                  <CustomSelect
                     value={projectFilter}
-                    onChange={(e) => setProjectFilter(e.target.value)}
-                    className="pld-select"
-                  >
-                    <option value="All">All Projects</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={String(p.id)}>{p.name}</option>
-                    ))}
-                  </select>
+                    onChange={setProjectFilter}
+                    options={pldProjectOptions}
+                    variant="filter"
+                    placeholder="All Projects"
+                  />
                 )}
               </div>
             </div>
