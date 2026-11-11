@@ -3,6 +3,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import pool from '../db.js';
+import { getWrittenTestCaseRows } from './sheetMetrics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,16 +93,25 @@ export const logTicketHistory = async (ticketId, action, prevStatus, newStatus, 
 };
 
 // Helper: Send in-app notification
-export const sendInAppNotification = async (userId, title, message, type = 'info', link = '') => {
-  if (!userId) return;
+export const sendInAppNotification = async (userId, title, message, type = 'info', link = '', meta = {}) => {
+  if (!userId) return null;
+  const {
+    senderId = null,
+    senderName = null,
+    senderRole = null,
+    audience = 'system'
+  } = meta || {};
   try {
-    await pool.query(
-      `INSERT INTO notifications (user_id, title, message, type, link)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [userId, title, message, type, link]
+    const res = await pool.query(
+      `INSERT INTO notifications (user_id, title, message, type, link, sender_id, sender_name, sender_role, audience)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [userId, title, message, type, link, senderId, senderName, senderRole, audience]
     );
+    return res.rows[0] || null;
   } catch (err) {
     console.error('Error sending in-app notification:', err);
+    return null;
   }
 };
 
@@ -1698,12 +1708,12 @@ export function registerWorkflowRoutes(app, io) {
 
       if (projectIds.length > 0) {
         const sheetsRes = await pool.query(
-          `SELECT rows FROM project_sheets WHERE project_id = ANY($1::int[])`,
+          `SELECT columns, rows FROM project_sheets WHERE project_id = ANY($1::int[])`,
           [projectIds]
         );
 
         for (const sheet of sheetsRes.rows) {
-          const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
+          const rows = getWrittenTestCaseRows(sheet);
           for (const row of rows) {
             totalTestCases++;
             const st = String(row.col_status || row.status || '').toLowerCase().trim();
@@ -1824,13 +1834,189 @@ export function registerWorkflowRoutes(app, io) {
         `SELECT * FROM notifications 
          WHERE user_id = $1 
          ORDER BY created_at DESC 
-         LIMIT 30`,
+         LIMIT 50`,
         [user.id]
       );
       res.json(result.rows);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.get('/api/notifications/recipients', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      const result = await pool.query(
+        `SELECT id, emp_id, full_name, email, department, role, avatar, status
+         FROM users
+         WHERE COALESCE(status, 'Active') = 'Active' AND id != $1
+         ORDER BY full_name ASC NULLS LAST, id ASC`,
+        [user.id]
+      );
+      res.json(result.rows);
+    } catch (err) {
+      console.error('Error fetching notification recipients:', err);
+      res.status(500).json({ error: 'Failed to fetch recipients' });
+    }
+  });
+
+  app.get('/api/notifications/sent', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      const result = await pool.query(
+        `SELECT
+           MAX(n.id) AS id,
+           n.title,
+           n.message,
+           COALESCE(n.type, 'info') AS type,
+           COALESCE(n.audience, 'selected') AS audience,
+           COUNT(*)::int AS recipient_count,
+           STRING_AGG(COALESCE(u.full_name, u.email, 'User'), ', ' ORDER BY u.full_name) AS recipients_summary,
+           MAX(n.created_at) AS created_at
+         FROM notifications n
+         LEFT JOIN users u ON u.id = n.user_id
+         WHERE n.sender_id = $1
+         GROUP BY n.title, n.message, n.type, n.audience, DATE_TRUNC('second', n.created_at)
+         ORDER BY MAX(n.created_at) DESC
+         LIMIT 30`,
+        [user.id]
+      );
+      res.json(result.rows);
+    } catch (err) {
+      console.error('Error fetching sent notifications:', err);
+      res.status(500).json({ error: 'Failed to fetch sent notifications' });
+    }
+  });
+
+  app.post('/api/notifications/send', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const {
+      targetType = 'selected',
+      userIds = [],
+      title,
+      message,
+      type = 'info',
+      link = ''
+    } = req.body || {};
+
+    const cleanTitle = String(title || '').trim();
+    const cleanMessage = String(message || '').trim();
+    if (!cleanTitle || !cleanMessage) {
+      return res.status(400).json({ error: 'Notification title and message are required.' });
+    }
+    if (cleanTitle.length > 200) {
+      return res.status(400).json({ error: 'Title must be 200 characters or fewer.' });
+    }
+
+    const normalizedAudience = targetType === 'all' ? 'all' : 'selected';
+    const allowedTypes = ['info', 'success', 'warning', 'urgent'];
+    const normalizedType = allowedTypes.includes(String(type || '').toLowerCase())
+      ? String(type).toLowerCase()
+      : 'info';
+
+    const client = await pool.connect();
+    try {
+      let recipientRows = [];
+      if (normalizedAudience === 'all') {
+        const usersRes = await client.query(
+          `SELECT id, full_name, email FROM users WHERE COALESCE(status, 'Active') = 'Active' AND id != $1 ORDER BY id ASC`,
+          [user.id]
+        );
+        recipientRows = usersRes.rows;
+      } else {
+        const parsedIds = Array.from(
+          new Set(
+            (Array.isArray(userIds) ? userIds : [])
+              .map((v) => Number(v))
+              .filter((n) => Number.isInteger(n) && n > 0 && n !== Number(user.id))
+          )
+        );
+        if (parsedIds.length === 0) {
+          return res.status(400).json({ error: 'Please select at least one recipient user.' });
+        }
+        const usersRes = await client.query(
+          `SELECT id, full_name, email FROM users WHERE id = ANY($1::int[]) AND id != $2 ORDER BY id ASC`,
+          [parsedIds, user.id]
+        );
+        recipientRows = usersRes.rows;
+      }
+
+      if (recipientRows.length === 0) {
+        return res.status(400).json({ error: 'No matching recipients found.' });
+      }
+
+      const recipientIds = recipientRows.map((r) => r.id);
+      const senderName = user.full_name || user.email || 'Workspace User';
+      const senderRole = user.role || 'Member';
+
+      await client.query('BEGIN');
+      const insertRes = await client.query(
+        `INSERT INTO notifications (user_id, title, message, type, link, sender_id, sender_name, sender_role, audience)
+         SELECT uid, $2, $3, $4, $5, $6, $7, $8, $9
+         FROM UNNEST($1::int[]) AS uid
+         RETURNING *`,
+        [
+          recipientIds,
+          cleanTitle,
+          cleanMessage,
+          normalizedType,
+          String(link || ''),
+          user.id,
+          senderName,
+          senderRole,
+          normalizedAudience
+        ]
+      );
+      await client.query('COMMIT');
+
+      const createdNotifications = insertRes.rows;
+      if (io) {
+        createdNotifications.forEach((notif) => {
+          io.to(`user_${notif.user_id}`).emit('new_notification', notif);
+        });
+      }
+
+      res.status(201).json({
+        message:
+          normalizedAudience === 'all'
+            ? `Notification broadcasted to all ${createdNotifications.length} active users.`
+            : `Notification sent to ${createdNotifications.length} selected user${createdNotifications.length === 1 ? '' : 's'}.`,
+        deliveredCount: createdNotifications.length,
+        audience: normalizedAudience,
+        recipients: recipientRows,
+        createdAt: createdNotifications[0]?.created_at || new Date().toISOString()
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {}
+      console.error('Error sending notifications:', err);
+      res.status(500).json({ error: 'Failed to send notification.' });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.put('/api/notifications/read-all', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      await pool.query(
+        'UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE',
+        [user.id]
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+      res.status(500).json({ error: 'Failed to mark notifications as read' });
     }
   });
 

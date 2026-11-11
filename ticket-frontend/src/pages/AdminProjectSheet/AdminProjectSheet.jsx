@@ -1702,11 +1702,7 @@ export default function AdminProjectSheet() {
         { id: 'col_c', label: 'Category', width: 150, type: 'text' },
         { id: 'col_status', label: 'Status', width: 130, type: 'status' }
       ],
-      rows: [
-        { id: 'row-1', col_a: '01', col_b: 'Sample row entry', col_c: 'General', col_status: 'Untested' },
-        { id: 'row-2', col_a: '02', col_b: '', col_c: '', col_status: 'Untested' },
-        { id: 'row-3', col_a: '03', col_b: '', col_c: '', col_status: 'Untested' }
-      ]
+      rows: []
     };
 
     // Try creating via API if available

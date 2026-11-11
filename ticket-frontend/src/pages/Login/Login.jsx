@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { applyTheme } from '../../utils/theme';
 import './Login.css';
 
 const CubeLogo = () => (
@@ -106,6 +107,15 @@ function Login() {
         localStorage.setItem('userName', response.data.user.full_name || '');
         localStorage.setItem('userRole', response.data.user.role || 'QA Member');
         localStorage.setItem('userDepartment', response.data.user.department || '');
+        localStorage.setItem('userBio', response.data.user.bio || '');
+        if (response.data.user.avatar) {
+          localStorage.setItem('userAvatar', response.data.user.avatar);
+        } else {
+          localStorage.removeItem('userAvatar');
+        }
+        if (response.data.user.theme) {
+          applyTheme(response.data.user.theme);
+        }
       }
 
       const userRole = response.data.user?.role;

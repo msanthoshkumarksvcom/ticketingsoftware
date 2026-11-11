@@ -11,6 +11,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { registerWorkflowRoutes, getUserFromReq, sendInAppNotification } from './services/leadDevWorkflow.js';
+import { countWrittenTestCasesByProject, syncProjectTestCasesCount } from './services/sheetMetrics.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
@@ -95,7 +96,11 @@ app.post('/api/login', async (req, res) => {
         full_name: user.full_name,
         role: user.role,
         emp_id: user.emp_id,
-        department: user.department
+        department: user.department,
+        phone: user.phone || '',
+        avatar: user.avatar || null,
+        bio: user.bio || '',
+        theme: user.theme === 'dark' ? 'dark' : 'light'
       }
     });
 
@@ -115,7 +120,9 @@ app.get('/api/auth/me', async (req, res) => {
   try {
     const decoded = jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
     const userQuery = await pool.query(
-      'SELECT id, email, full_name, emp_id, department, role, status, avatar FROM users WHERE id = $1',
+      `SELECT id, email, full_name, emp_id, department, role, phone, status, avatar, bio, COALESCE(theme, 'light') as theme, created_at
+       FROM users
+       WHERE id = $1`,
       [decoded.userId]
     );
 
@@ -126,6 +133,132 @@ app.get('/api/auth/me', async (req, res) => {
     res.json({ user: userQuery.rows[0] });
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+
+const handleUpdateMyProfile = async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    const existingRes = await pool.query(
+      `SELECT id, email, full_name, emp_id, department, role, phone, status, avatar, bio, COALESCE(theme, 'light') as theme
+       FROM users WHERE id = $1`,
+      [decoded.userId]
+    );
+    if (existingRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const existing = existingRes.rows[0];
+
+    const { full_name, phone, bio, avatar, theme } = req.body || {};
+
+    let nextFullName = existing.full_name;
+    if (full_name !== undefined) {
+      const trimmedName = String(full_name).trim();
+      if (!trimmedName) {
+        return res.status(400).json({ error: 'Full name cannot be empty.' });
+      }
+      if (trimmedName.length > 150) {
+        return res.status(400).json({ error: 'Full name must be 150 characters or fewer.' });
+      }
+      nextFullName = trimmedName;
+    }
+
+    let nextPhone = existing.phone || '';
+    if (phone !== undefined) {
+      const trimmedPhone = String(phone || '').trim();
+      if (trimmedPhone.length > 30) {
+        return res.status(400).json({ error: 'Phone number must be 30 characters or fewer.' });
+      }
+      nextPhone = trimmedPhone;
+    }
+
+    let nextBio = existing.bio || '';
+    if (bio !== undefined) {
+      const bioStr = String(bio || '').trim();
+      if (bioStr.length > 1000) {
+        return res.status(400).json({ error: 'Bio must be 1000 characters or fewer.' });
+      }
+      nextBio = bioStr;
+    }
+
+    let nextAvatar = existing.avatar;
+    if (avatar !== undefined) {
+      if (avatar === null || avatar === '') {
+        nextAvatar = null;
+      } else {
+        const avatarStr = String(avatar);
+        if (avatarStr.length > 2 * 1024 * 1024) {
+          return res.status(400).json({ error: 'Profile image is too large (max 1.5 MB).' });
+        }
+        nextAvatar = avatarStr;
+      }
+    }
+
+    let nextTheme = existing.theme === 'dark' ? 'dark' : 'light';
+    if (theme !== undefined) {
+      if (theme !== 'light' && theme !== 'dark') {
+        return res.status(400).json({ error: 'Theme must be "light" or "dark".' });
+      }
+      nextTheme = theme;
+    }
+
+    const updated = await pool.query(
+      `UPDATE users
+       SET full_name = $1,
+           phone = $2,
+           bio = $3,
+           avatar = $4,
+           theme = $5
+       WHERE id = $6
+       RETURNING id, email, full_name, emp_id, department, role, phone, status, avatar, bio, COALESCE(theme, 'light') as theme, created_at`,
+      [nextFullName, nextPhone, nextBio, nextAvatar, nextTheme, decoded.userId]
+    );
+
+    res.json({
+      message: 'Profile updated successfully.',
+      user: updated.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Failed to update profile.' });
+  }
+};
+
+app.put('/api/auth/profile', handleUpdateMyProfile);
+app.put('/api/auth/me', handleUpdateMyProfile);
+
+app.put('/api/auth/theme', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    const decoded = jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+    const { theme } = req.body || {};
+    if (theme !== 'light' && theme !== 'dark') {
+      return res.status(400).json({ error: 'Theme must be "light" or "dark".' });
+    }
+
+    await pool.query('UPDATE users SET theme = $1 WHERE id = $2', [theme, decoded.userId]);
+    res.json({ message: 'Theme updated.', theme });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    console.error('Error updating user theme:', error);
+    res.status(500).json({ error: 'Failed to update theme.' });
   }
 });
 
@@ -188,7 +321,7 @@ app.get('/api/admin/users', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, emp_id, full_name, email, department, role, phone, status, avatar, created_at 
+      `SELECT id, emp_id, full_name, email, department, role, phone, status, avatar, bio, created_at 
        FROM users 
        ORDER BY emp_id ASC NULLS LAST, id ASC`
     );
@@ -536,7 +669,15 @@ app.get('/api/admin/projects', async (req, res) => {
     query += ` ORDER BY p.id ASC`;
 
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    const tcCountMap = await countWrittenTestCasesByProject(
+      pool,
+      result.rows.map((project) => project.id)
+    );
+    const enrichedProjects = result.rows.map((project) => ({
+      ...project,
+      test_cases: tcCountMap.get(project.id) ?? 0
+    }));
+    res.json(enrichedProjects);
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects from database.' });
@@ -808,9 +949,14 @@ app.put('/api/admin/projects/:id', async (req, res) => {
       }
     }
 
+    const liveTestCases = await syncProjectTestCasesCount(pool, id);
+
     res.json({
       message: 'Project updated successfully',
-      project: updated.rows[0]
+      project: {
+        ...updated.rows[0],
+        test_cases: liveTestCases
+      }
     });
   } catch (error) {
     console.error('Error updating project:', error);
@@ -920,8 +1066,10 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
     );
 
     if (sheetsRes.rows.length > 0) {
+      const liveTestCases = await syncProjectTestCasesCount(pool, id);
+      const enrichedProject = project ? { ...project, test_cases: liveTestCases } : { id, name: 'Project', test_cases: liveTestCases };
       return res.json({
-        project: project || { id, name: 'Project' },
+        project: enrichedProject,
         sheets: sheetsRes.rows
       });
     }
@@ -940,8 +1088,11 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
       createdSheets.push(insertRes.rows[0]);
     }
 
+    const liveTestCases = await syncProjectTestCasesCount(pool, id);
+    const enrichedProject = project ? { ...project, test_cases: liveTestCases } : { id, name: 'Project', test_cases: liveTestCases };
+
     res.json({
-      project: project || { id, name: 'Project' },
+      project: enrichedProject,
       sheets: createdSheets
     });
   } catch (error) {
@@ -983,7 +1134,11 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
       [id, finalName, tab_color || '#0F9D58', JSON.stringify(defaultCols), JSON.stringify(defaultRows), JSON.stringify(formatting || {})]
     );
 
-    res.status(201).json(insertRes.rows[0]);
+    const totalTestCases = await syncProjectTestCasesCount(pool, id);
+    res.status(201).json({
+      ...insertRes.rows[0],
+      project_test_cases: totalTestCases
+    });
   } catch (error) {
     console.error('Error creating sheet tab:', error);
     res.status(500).json({ error: 'Failed to create sheet tab.' });
@@ -1037,7 +1192,11 @@ app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
       ]
     );
 
-    res.json(updateRes.rows[0]);
+    const totalTestCases = await syncProjectTestCasesCount(pool, id);
+    res.json({
+      ...updateRes.rows[0],
+      project_test_cases: totalTestCases
+    });
   } catch (error) {
     console.error('Error updating sheet:', error);
     res.status(500).json({ error: 'Failed to update sheet.' });
@@ -1069,7 +1228,12 @@ app.delete('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
       return res.status(404).json({ error: 'Sheet tab not found.' });
     }
 
-    res.json({ message: 'Sheet deleted successfully', deletedId: sheetId });
+    const totalTestCases = await syncProjectTestCasesCount(pool, id);
+    res.json({
+      message: 'Sheet deleted successfully',
+      deletedId: sheetId,
+      project_test_cases: totalTestCases
+    });
   } catch (error) {
     console.error('Error deleting sheet:', error);
     res.status(500).json({ error: 'Failed to delete sheet.' });
@@ -2518,6 +2682,20 @@ const roomViewers = new Map();
 io.on('connection', (socket) => {
   let currentRoom = null;
   let currentUser = null;
+
+  socket.on('join_user_room', ({ userId }) => {
+    const numericId = Number(userId);
+    if (Number.isInteger(numericId) && numericId > 0) {
+      socket.join(`user_${numericId}`);
+    }
+  });
+
+  socket.on('leave_user_room', ({ userId }) => {
+    const numericId = Number(userId);
+    if (Number.isInteger(numericId) && numericId > 0) {
+      socket.leave(`user_${numericId}`);
+    }
+  });
 
   // 1. Join Sheet Room
   socket.on('join_sheet_room', ({ projectId, sheetId, user }) => {

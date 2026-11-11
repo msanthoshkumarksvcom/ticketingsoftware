@@ -192,11 +192,20 @@ function AdminProjects() {
   // Logout modal
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // User Profile
+  // User Profile & Unread Notifications
   const [userEmail] = useState(() => localStorage.getItem('userEmail') || 'manager@gmail.com');
   const displayName = userEmail ? userEmail.split('@')[0] : 'manager';
   const currentUserRole = localStorage.getItem('userRole') || 'Manager';
   const isQAMember = currentUserRole === 'QA Member';
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  useEffect(() => {
+    const handleUnreadCount = (event) => {
+      setUnreadNotificationsCount(Number(event.detail?.unreadCount || 0));
+    };
+    window.addEventListener('notifications-unread-count', handleUnreadCount);
+    return () => window.removeEventListener('notifications-unread-count', handleUnreadCount);
+  }, []);
 
   // Fetch projects from backend
   const fetchProjects = useCallback(async () => {
@@ -705,9 +714,19 @@ function AdminProjects() {
         {/* Top Utility Actions: Notification Bell + Profile */}
         <div className="pj-top-utility-bar">
           <div className="header-right pj-exact-header-right">
-            <button className="notification-bell pj-header-bell-btn" title="Notifications" aria-label="Notifications">
+            <button
+              type="button"
+              className="notification-bell pj-header-bell-btn"
+              title="Notifications"
+              aria-label="Notifications"
+              onClick={() => window.dispatchEvent(new Event('open-notifications-drawer'))}
+            >
               <Bell size={18} />
-              <span className="notification-count pj-bell-badge">1</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="notification-count pj-bell-badge">
+                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                </span>
+              )}
             </button>
 
             <div className="user-profile pj-header-profile" title="Administrator account">

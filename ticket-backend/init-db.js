@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import pool from './db.js';
+import { backfillAllProjectTestCasesCounts } from './services/sheetMetrics.js';
 
 export const initDatabase = async () => {
   try {
@@ -20,8 +21,15 @@ export const initDatabase = async () => {
         role VARCHAR(50) DEFAULT 'QA Member',
         phone VARCHAR(30),
         status VARCHAR(20) DEFAULT 'Active',
-        avatar TEXT
+        avatar TEXT,
+        bio TEXT DEFAULT '',
+        theme VARCHAR(20) DEFAULT 'light'
       );
+    `);
+
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'light';
     `);
 
     // 2. Projects
@@ -195,9 +203,18 @@ export const initDatabase = async () => {
         message TEXT,
         type VARCHAR(50),
         link VARCHAR(255),
+        sender_id INT REFERENCES users(id) ON DELETE SET NULL,
+        sender_name VARCHAR(150),
+        sender_role VARCHAR(50),
+        audience VARCHAR(30) DEFAULT 'selected',
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_name VARCHAR(150);
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_role VARCHAR(50);
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS audience VARCHAR(30) DEFAULT 'selected';
     `);
 
     // 5. Approvals
@@ -333,6 +350,8 @@ export const initDatabase = async () => {
       `);
       console.log('Default roles created: Manager, QA Lead, QA Member, Developer, Project Lead');
     }
+
+    await backfillAllProjectTestCasesCounts(pool);
 
     console.log('Database initialized successfully.');
   } catch (error) {

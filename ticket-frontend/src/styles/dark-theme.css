@@ -1,0 +1,302 @@
+/* Global Dark Theme Overrides (`data-theme="dark"`) */
+:root[data-theme='dark'],
+html[data-theme='dark'] {
+  --color-primary: #3b82f6;
+  --color-navy: #1e3a8a;
+  --color-canvas: #0b1120;
+  --color-surface: #111827;
+  --color-ink: #f1f5f9;
+  --color-muted: #94a3b8;
+  --color-line: #1e293b;
+  --color-primary-soft: rgba(59, 130, 246, 0.16);
+  --ink: #f1f5f9;
+  --muted: #94a3b8;
+  --line: #1e293b;
+  --canvas: #0b1120;
+  --indigo: #60a5fa;
+  color: #f1f5f9;
+  background: #0b1120;
+}
+
+html[data-theme='dark'] body,
+html[data-theme='dark'] #root,
+html[data-theme='dark'] .admin-layout,
+html[data-theme='dark'] .admin-layout .main-content,
+html[data-theme='dark'] .admin-layout .dashboard-container,
+html[data-theme='dark'] .pj-page-container,
+html[data-theme='dark'] .pld-container,
+html[data-theme='dark'] .dev-container,
+html[data-theme='dark'] .qa-dashboard-layout,
+html[data-theme='dark'] .role-dashboard-container,
+html[data-theme='dark'] .pjs-layout,
+html[data-theme='dark'] .project-workspace {
+  background: #0b1120;
+  color: #f1f5f9;
+}
+
+/* Sidebar */
+html[data-theme='dark'] .sidebar {
+  background: #090e1a;
+  border-right-color: #1e293b;
+}
+
+html[data-theme='dark'] .workspace-card {
+  background: rgba(30, 41, 59, 0.55);
+  border-color: #1e293b;
+}
+
+/* Top Headers & Utility Bars */
+html[data-theme='dark'] .admin-layout .header,
+html[data-theme='dark'] .header {
+  background: rgba(15, 23, 42, 0.94);
+  border-bottom-color: #1e293b;
+}
+
+html[data-theme='dark'] .pj-top-utility-bar,
+html[data-theme='dark'] .tickets-top-utility-bar {
+  background: transparent;
+}
+
+html[data-theme='dark'] .breadcrumb,
+html[data-theme='dark'] .user-role,
+html[data-theme='dark'] .pj-profile-role {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .breadcrumb strong,
+html[data-theme='dark'] .user-name,
+html[data-theme='dark'] .pj-profile-name {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .notification-bell,
+html[data-theme='dark'] .user-profile,
+html[data-theme='dark'] .pj-header-profile,
+html[data-theme='dark'] .pj-header-bell-btn,
+html[data-theme='dark'] .mobile-nav-toggle {
+  background: #111827;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .notification-bell:hover,
+html[data-theme='dark'] .pj-header-bell-btn:hover {
+  background: #1e293b;
+  border-color: #475569;
+  color: #ffffff;
+}
+
+html[data-theme='dark'] .profile-divider {
+  background: #1e293b;
+}
+
+/* Surfaces, Cards, Panels */
+html[data-theme='dark'] .admin-layout .stat-card,
+html[data-theme='dark'] .admin-layout .users-table-card,
+html[data-theme='dark'] .admin-layout .users-filter-bar,
+html[data-theme='dark'] .admin-layout .users-placeholder,
+html[data-theme='dark'] .admin-layout .users-page-heading,
+html[data-theme='dark'] .overview-card,
+html[data-theme='dark'] .ticket-folder-card,
+html[data-theme='dark'] .ticket-active-folder-banner,
+html[data-theme='dark'] .pj-metric-card,
+html[data-theme='dark'] .pj-card,
+html[data-theme='dark'] .pj-controls-bar,
+html[data-theme='dark'] .pj-table-card,
+html[data-theme='dark'] .um-header-container,
+html[data-theme='dark'] .um-stat-card,
+html[data-theme='dark'] .um-controls-bar,
+html[data-theme='dark'] .um-table-card,
+html[data-theme='dark'] .reports-header-card,
+html[data-theme='dark'] .kpi-card,
+html[data-theme='dark'] .chart-card,
+html[data-theme='dark'] .reports-table-card,
+html[data-theme='dark'] .dev-section-card,
+html[data-theme='dark'] .dev-proj-card,
+html[data-theme='dark'] .pld-card,
+html[data-theme='dark'] .qa-card,
+html[data-theme='dark'] .pw-card,
+html[data-theme='dark'] .pw-subcard,
+html[data-theme='dark'] .pw-doc-item,
+html[data-theme='dark'] .pw-links-card,
+html[data-theme='dark'] .pw-testing-request-card,
+html[data-theme='dark'] .ws-card {
+  background: #111827;
+  border-color: #1e293b;
+  color: #f1f5f9;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme='dark'] .pj-card-footer,
+html[data-theme='dark'] .pj-sub-metric,
+html[data-theme='dark'] .ticket-view-toggle,
+html[data-theme='dark'] .pj-view-switcher {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+html[data-theme='dark'] .pj-view-btn.active,
+html[data-theme='dark'] .ticket-view-toggle-btn.active {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+/* Typography Contrast */
+html[data-theme='dark'] h1,
+html[data-theme='dark'] h2,
+html[data-theme='dark'] h3,
+html[data-theme='dark'] h4,
+html[data-theme='dark'] .projects-header-info h2,
+html[data-theme='dark'] .pj-title-text h1,
+html[data-theme='dark'] .pj-card-title,
+html[data-theme='dark'] .stat-value,
+html[data-theme='dark'] .overview-card strong,
+html[data-theme='dark'] .approvals-table-card .ap-request-note-text {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .projects-header-info p,
+html[data-theme='dark'] .pj-card-desc,
+html[data-theme='dark'] .pj-metric-label,
+html[data-theme='dark'] .overview-card span,
+html[data-theme='dark'] .user-empty-state p {
+  color: #94a3b8;
+}
+
+/* Tables */
+html[data-theme='dark'] .admin-layout .users-table-card th,
+html[data-theme='dark'] .pj-table th,
+html[data-theme='dark'] .um-table thead th,
+html[data-theme='dark'] .qa-tickets-table th {
+  background: #0f172a;
+  color: #94a3b8;
+  border-bottom-color: #1e293b;
+}
+
+html[data-theme='dark'] .admin-layout .users-table-card td,
+html[data-theme='dark'] .pj-table td,
+html[data-theme='dark'] .um-table td,
+html[data-theme='dark'] .qa-tickets-table td {
+  color: #e2e8f0;
+  border-bottom-color: #1e293b;
+}
+
+html[data-theme='dark'] .admin-layout .users-table-card tbody tr:hover,
+html[data-theme='dark'] .pj-table tr:hover td,
+html[data-theme='dark'] .um-table tbody tr:hover {
+  background: #1e293b;
+}
+
+/* Form Controls */
+html[data-theme='dark'] .admin-layout input:not([type='checkbox']):not([type='radio']),
+html[data-theme='dark'] .admin-layout select,
+html[data-theme='dark'] .admin-layout textarea,
+html[data-theme='dark'] .users-search-box,
+html[data-theme='dark'] .pj-search-box,
+html[data-theme='dark'] .header-search {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+html[data-theme='dark'] .admin-layout input::placeholder,
+html[data-theme='dark'] .admin-layout textarea::placeholder {
+  color: #64748b;
+}
+
+html[data-theme='dark'] .users-search-box input,
+html[data-theme='dark'] .pj-search-box input,
+html[data-theme='dark'] .header-search input {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+/* Modals & Popovers */
+html[data-theme='dark'] .admin-layout .modal-content,
+html[data-theme='dark'] .admin-layout .modal-card-user,
+html[data-theme='dark'] .um-modal-card,
+html[data-theme='dark'] .ticket-modal-card,
+html[data-theme='dark'] .pj-del-modal-card,
+html[data-theme='dark'] .pj-modal-card,
+html[data-theme='dark'] .notif-drawer-card,
+html[data-theme='dark'] .notif-toast {
+  background: #111827;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+html[data-theme='dark'] .modal-header-user,
+html[data-theme='dark'] .modal-footer-user,
+html[data-theme='dark'] .pj-del-modal-header,
+html[data-theme='dark'] .pj-del-modal-footer,
+html[data-theme='dark'] .notif-drawer-header,
+html[data-theme='dark'] .notif-drawer-footer {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+html[data-theme='dark'] .modal-btn-cancel,
+html[data-theme='dark'] .btn-cancel-user,
+html[data-theme='dark'] .pj-del-btn-cancel,
+html[data-theme='dark'] .pj-dropdown-menu {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .pj-dropdown-item {
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .pj-dropdown-item:hover {
+  background: #334155;
+}
+
+/* Badges inside Dark Approvals/Tickets Tables */
+html[data-theme='dark'] .admin-layout .approvals-table-card .project-code-badge {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+html[data-theme='dark'] .admin-layout .approvals-table-card .user-dept-badge {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .admin-layout .approvals-table-card .priority-medium {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+html[data-theme='dark'] .admin-layout .approvals-table-card .priority-low {
+  background: #1e293b;
+  color: #94a3b8;
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .admin-layout .approvals-table-card .priority-high {
+  background: rgba(249, 115, 22, 0.16);
+  color: #fdba74;
+  border-color: rgba(249, 115, 22, 0.35);
+}
+
+html[data-theme='dark'] .admin-layout .approvals-table-card .priority-critical {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+html[data-theme='dark'] .admin-layout .approvals-table-card .status-in-progress {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+html[data-theme='dark'] .admin-layout .approvals-table-card .status-active {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.35);
+}
