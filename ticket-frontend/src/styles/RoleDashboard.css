@@ -32,38 +32,38 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.78rem;
+  font-size: var(--fs-badge, 0.71875rem);
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #60a5fa;
   background: rgba(96, 165, 250, 0.12);
   padding: 4px 12px;
-  border-radius: 999px;
+  border-radius: 9999px;
   border: 1px solid rgba(96, 165, 250, 0.2);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .role-welcome-card h1 {
-  font-size: 1.85rem;
-  font-weight: 700;
+  font-size: var(--fs-h1, 1.375rem);
+  font-weight: 800;
   color: #ffffff;
-  margin: 0 0 10px 0;
+  margin: 0 0 8px 0;
   letter-spacing: -0.02em;
 }
 
 .role-welcome-card p {
-  font-size: 0.95rem;
-  color: #94a3b8;
-  margin: 0 0 20px 0;
+  font-size: var(--fs-body, 0.84375rem);
+  color: #cbd5e1;
+  margin: 0 0 18px 0;
   line-height: 1.5;
 }
 
 .role-meta-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  font-size: 0.85rem;
+  gap: 14px;
+  font-size: var(--fs-label, 0.78125rem);
   color: #cbd5e1;
 }
 

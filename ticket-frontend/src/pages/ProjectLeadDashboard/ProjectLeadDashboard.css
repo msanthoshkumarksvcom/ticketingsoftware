@@ -44,7 +44,7 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   padding: 4px 10px;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: var(--fs-badge, 11.5px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -53,15 +53,15 @@
 }
 
 .pld-welcome-content h1 {
-  font-size: 24px;
+  font-size: var(--fs-h1, 1.375rem);
   font-weight: 800;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   letter-spacing: -0.02em;
 }
 
 .pld-welcome-content p {
   color: #CBD5E1;
-  font-size: 14px;
+  font-size: var(--fs-body, 0.84375rem);
   margin: 0 0 16px;
   max-width: 820px;
   line-height: 1.5;
@@ -80,8 +80,8 @@
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--radius-pill, 9999px);
+  font-size: var(--fs-label, 0.78125rem);
   font-weight: 600;
   color: #E2E8F0;
 }
