@@ -677,7 +677,7 @@ export default function AdminProjectSheet() {
       }
     }
 
-    const color = cellStyle.color || rowStyle.color || colStyle.color || allStyle.color || conditionalColor || '#202124';
+    const color = cellStyle.color || rowStyle.color || colStyle.color || allStyle.color || conditionalColor || '';
     const bgColor = cellStyle.bgColor || rowStyle.bgColor || colStyle.bgColor || allStyle.bgColor || conditionalBg || '';
 
     return {
@@ -758,7 +758,7 @@ export default function AdminProjectSheet() {
       italic: resolved.isItalic,
       underline: resolved.isUnderline,
       strikethrough: resolved.isStrikethrough,
-      color: resolved.color,
+      color: resolved.color || '#202124',
       bgColor: resolved.backgroundColor,
       align: resolved.textAlign,
       valign: resolved.verticalAlign,
@@ -2826,7 +2826,7 @@ export default function AdminProjectSheet() {
                             backgroundColor: isAllSelected ? undefined : (cellStyle.backgroundColor || undefined),
                             fontFamily: cellStyle.fontFamily,
                             fontSize: cellStyle.fontSize,
-                            color: cellStyle.color,
+                            color: cellStyle.color || undefined,
                             textAlign: cellStyle.textAlign,
                             verticalAlign: cellStyle.verticalAlign
                           }}

@@ -890,6 +890,7 @@
   padding: 0;
   border: 1px solid #e1e3e1;
   background: #ffffff;
+  color: var(--gs-text);
   height: 30px;
   vertical-align: middle;
   outline: none;
