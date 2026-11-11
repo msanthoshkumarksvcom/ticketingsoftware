@@ -3,8 +3,7 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 import { Bell, Check, CheckCheck, Globe, UserCheck, X, Clock } from 'lucide-react';
 import './NotificationCenter.css';
-
-const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+import { SOCKET_URL } from '../../utils/apiConfig';
 
 const TYPE_META = {
   info: { label: 'Info', className: 'notif-type-info' },

@@ -28,6 +28,7 @@ import {
 import { io } from 'socket.io-client';
 import CustomSelect from '../CustomSelect/CustomSelect';
 import './TicketDetailModal.css';
+import { API_BASE, SOCKET_URL } from '../../utils/apiConfig';
 
 // Prepend backend host for relative image uploads so they never break
 export const getFullImageUrl = (url) => {
@@ -36,9 +37,9 @@ export const getFullImageUrl = (url) => {
     return url;
   }
   if (url.startsWith('/')) {
-    return `http://localhost:5000${url}`;
+    return `${API_BASE}${url}`;
   }
-  return `http://localhost:5000/uploads/tickets/${url}`;
+  return `${API_BASE}/uploads/tickets/${url}`;
 };
 
 export default function TicketDetailModal({
@@ -111,7 +112,7 @@ export default function TicketDetailModal({
       }
 
       // Connect to Socket.IO for real-time developer lock & intimation
-      const socket = io('http://localhost:5000', {
+      const socket = io(SOCKET_URL, {
         transports: ['polling', 'websocket'],
         reconnection: true,
         timeout: 5000

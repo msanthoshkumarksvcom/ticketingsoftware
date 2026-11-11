@@ -50,6 +50,7 @@ import {
   Users
 } from 'lucide-react';
 import { io } from 'socket.io-client';
+import { SOCKET_URL } from '../../utils/apiConfig';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import RaiseBugTicketModal from '../../components/RaiseBugTicketModal/RaiseBugTicketModal';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
@@ -429,7 +430,7 @@ export default function AdminProjectSheet() {
   useEffect(() => {
     if (!projectId) return;
 
-    const socket = io('http://localhost:5000', {
+    const socket = io(SOCKET_URL, {
       transports: ['polling', 'websocket'],
       reconnection: true,
       timeout: 5000

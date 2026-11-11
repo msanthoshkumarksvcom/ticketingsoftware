@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE } from '../../utils/apiConfig';
 import {
   ArrowLeft,
   CalendarDays,
@@ -180,12 +181,12 @@ export default function AdminProjectWorkspace() {
     }
 
     const fileUrl = doc.file_url || '';
-    if ((fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) && !fileUrl.startsWith('http://localhost:5000/uploads/')) {
+    if ((fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) && !fileUrl.startsWith(`${API_BASE}/uploads/`) && !fileUrl.startsWith('http://localhost:5000/uploads/')) {
       return { url: fileUrl, isBlob: false };
     }
 
     const token = localStorage.getItem('token');
-    const endpoint = `http://localhost:5000/api/admin/projects/${projectId}/documents/${doc.id}/download${inline ? '?inline=1' : ''}`;
+    const endpoint = `${API_BASE}/api/admin/projects/${projectId}/documents/${doc.id}/download${inline ? '?inline=1' : ''}`;
     const response = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store'
