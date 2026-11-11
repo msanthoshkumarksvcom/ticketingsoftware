@@ -55,9 +55,6 @@ function AdminTickets() {
   const [formData, setFormData] = useState(initialTicketForm);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [statusUpdating, setStatusUpdating] = useState(false);
-  const [detailError, setDetailError] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
@@ -189,31 +186,6 @@ function AdminTickets() {
     }
   };
 
-  const handleStatusChange = async (status) => {
-    if (!selectedTicket || statusUpdating || selectedTicket.status === status) return;
-    const token = localStorage.getItem('token');
-    setStatusUpdating(true);
-    setDetailError('');
-
-    try {
-      const response = await axios.put(
-        `http://localhost:5000/api/admin/tickets/${selectedTicket.id}/status`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const updatedTicket = response.data.ticket;
-      setTickets((current) =>
-        current.map((ticket) => ticket.id === updatedTicket.id ? updatedTicket : ticket)
-      );
-      setSelectedTicket(updatedTicket);
-    } catch (error) {
-      console.error('Error updating ticket status:', error);
-      setDetailError(error.response?.data?.error || 'Unable to update ticket status. Please try again.');
-    } finally {
-      setStatusUpdating(false);
-    }
-  };
-
   const confirmLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
@@ -331,7 +303,6 @@ function AdminTickets() {
                   <button
                     className="btn-primary-action"
                     onClick={() => {
-                      setSelectedTicket(null);
                       setIsModalOpen(true);
                     }}
                   >
@@ -690,175 +661,6 @@ function AdminTickets() {
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {selectedTicket && createPortal(
-                    <div
-                      className="ticket-modal-overlay ticket-detail-overlay"
-                      onMouseDown={(event) => {
-                        if (event.target === event.currentTarget && !statusUpdating) setSelectedTicket(null);
-                      }}
-                    >
-                      <section
-                        className="ticket-detail-card"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="ticket-detail-title"
-                      >
-                        <header className="ticket-detail-header">
-                          <div className="ticket-detail-heading">
-                            <span className="ticket-modal-heading-icon"><Ticket size={18} /></span>
-                            <div>
-                              <span className="ticket-detail-code">{selectedTicket.ticket_code}</span>
-                              <h2 id="ticket-detail-title">{selectedTicket.title}</h2>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="modal-close-btn"
-                            onClick={() => setSelectedTicket(null)}
-                            aria-label="Close ticket details"
-                            disabled={statusUpdating}
-                          >
-                            <X size={19} />
-                          </button>
-                        </header>
-
-                        <div className="ticket-detail-body">
-                          {detailError && <div className="user-error-banner">{detailError}</div>}
-                          <div className="ticket-detail-status-line">
-                            <span className={`status-tag ticket-status-${selectedTicket.status?.toLowerCase().replaceAll(' ', '-')}`}>
-                              {selectedTicket.status}
-                            </span>
-                            <span className={`ticket-type-badge type-${selectedTicket.type?.toLowerCase()}`}>
-                              {selectedTicket.type}
-                            </span>
-                            <span className={`priority-badge priority-${selectedTicket.priority?.toLowerCase()}`}>
-                              {selectedTicket.priority} priority
-                            </span>
-                          </div>
-
-                          <section className="ticket-detail-section">
-                            <h3>Description</h3>
-                            <p className="ticket-detail-description">
-                              {selectedTicket.description?.trim() || 'No description was added to this ticket.'}
-                            </p>
-                          </section>
-
-                          <section className="ticket-detail-section">
-                            <h3>Ticket information</h3>
-                            <div className="ticket-detail-grid">
-                              <div className="ticket-detail-field">
-                                <span><FileText size={14} /> Ticket ID</span>
-                                <strong>{selectedTicket.ticket_code}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><Ticket size={14} /> Related project</span>
-                                <strong>{selectedTicket.project_code || 'General'}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><UserRound size={14} /> Assigned to</span>
-                                <strong>{selectedTicket.assigned_to || 'Unassigned'}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><UserRound size={14} /> Reported by</span>
-                                <strong>{selectedTicket.reporter || 'Unknown'}</strong>
-                              </div>
-                              <div className="ticket-detail-field">
-                                <span><CalendarDays size={14} /> Created</span>
-                                <strong>
-                                  {selectedTicket.created_at
-                                    ? new Date(selectedTicket.created_at).toLocaleString()
-                                    : 'Unknown'}
-                                </strong>
-                              </div>
-                            </div>
-                          </section>
-
-                          <section className="ticket-detail-section">
-                            <h3>Attachments</h3>
-                            {(selectedTicket.attachments || []).length ? (
-                              <div className="ticket-detail-attachments">
-                                {selectedTicket.attachments.map((attachment, index) => (
-                                  <article className="ticket-detail-attachment" key={`${attachment.name}-${index}`}>
-                                    {attachment.mediaType === 'image' ? (
-                                      <a href={attachment.url} target="_blank" rel="noreferrer" aria-label={`Open ${attachment.name}`}>
-                                        <img src={attachment.url} alt={attachment.name} />
-                                      </a>
-                                    ) : attachment.mediaType === 'video' ? (
-                                      <video src={attachment.url} controls preload="metadata" aria-label={attachment.name} />
-                                    ) : (
-                                      <FileText size={24} />
-                                    )}
-                                    <div className="ticket-attachment-caption">
-                                      <span>{attachment.name}</span>
-                                      <a href={attachment.url} target="_blank" rel="noreferrer" aria-label={`Open ${attachment.name}`}>
-                                        <ExternalLink size={14} />
-                                      </a>
-                                    </div>
-                                  </article>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="ticket-detail-muted">No attachments on this ticket.</p>
-                            )}
-                          </section>
-                        </div>
-
-                        <footer className="ticket-detail-actions">
-                          <div className="ticket-detail-action-group">
-                            {selectedTicket.status === 'Open' && (
-                              <button
-                                type="button"
-                                className="ticket-action-button secondary"
-                                onClick={() => handleStatusChange('In Progress')}
-                                disabled={statusUpdating}
-                              >
-                                <Clock3 size={15} /> Start work
-                              </button>
-                            )}
-                            {selectedTicket.status !== 'Resolved' && selectedTicket.status !== 'Closed' && (
-                              <button
-                                type="button"
-                                className="ticket-action-button success"
-                                onClick={() => handleStatusChange('Resolved')}
-                                disabled={statusUpdating}
-                              >
-                                <CircleCheck size={15} /> Resolve
-                              </button>
-                            )}
-                            {selectedTicket.status !== 'Closed' ? (
-                              <button
-                                type="button"
-                                className="ticket-action-button danger"
-                                onClick={() => handleStatusChange('Closed')}
-                                disabled={statusUpdating}
-                              >
-                                <Check size={15} /> Close ticket
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="ticket-action-button secondary"
-                                onClick={() => handleStatusChange('Open')}
-                                disabled={statusUpdating}
-                              >
-                                <RotateCcw size={15} /> Reopen
-                              </button>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            className="ticket-action-button plain"
-                            onClick={() => setSelectedTicket(null)}
-                            disabled={statusUpdating}
-                          >
-                            {statusUpdating ? 'Updating...' : 'Done'}
-                          </button>
-                        </footer>
-                      </section>
-                    </div>,
-                    document.body
                   )}
                 </div>
               </div>

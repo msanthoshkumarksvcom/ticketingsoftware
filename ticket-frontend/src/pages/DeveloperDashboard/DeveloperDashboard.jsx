@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 import {
   Code2,
   FolderKanban,
@@ -18,7 +19,8 @@ import {
   ChevronDown,
   Layers,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  Lock
 } from 'lucide-react';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
@@ -100,6 +102,45 @@ export default function DeveloperDashboard() {
     fetchMe();
     fetchStats();
     fetchTickets();
+
+    // Real-time synchronization for ticket locks and resolutions
+    const socket = io('http://localhost:5000', {
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      timeout: 5000
+    });
+
+    socket.on('ticket_lock_changed', (data) => {
+      if (data?.ticketId) {
+        setTickets((prev) =>
+          prev.map((t) => {
+            if (String(t.id) === String(data.ticketId)) {
+              return {
+                ...t,
+                locked_by: data.locked_by,
+                locked_by_id: data.locked_by_id,
+                locked_at: data.locked_at,
+                status: data.status || t.status
+              };
+            }
+            return t;
+          })
+        );
+      }
+    });
+
+    socket.on('ticket_updated', (updatedTicket) => {
+      if (updatedTicket?.id) {
+        setTickets((prev) =>
+          prev.map((t) => (String(t.id) === String(updatedTicket.id) ? { ...t, ...updatedTicket } : t))
+        );
+        fetchStats();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [navigate]);
 
   const confirmLogout = () => {
@@ -408,9 +449,31 @@ export default function DeveloperDashboard() {
                             </span>
                           </td>
                           <td>
-                            <span className={`dev-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                              {ticket.status}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span className={`dev-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
+                                {ticket.status}
+                              </span>
+                              {ticket.locked_by && ticket.status !== 'Resolved' && ticket.status !== 'Closed' && (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    fontSize: '10.5px',
+                                    fontWeight: '600',
+                                    color: '#b45309',
+                                    background: '#fef3c7',
+                                    border: '1px solid #fde68a',
+                                    borderRadius: '4px',
+                                    padding: '1px 6px',
+                                    width: 'fit-content'
+                                  }}
+                                  title={`Locked by ${ticket.locked_by}`}
+                                >
+                                  <Lock size={10} /> {ticket.locked_by}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <span className="dev-raised-by">{ticket.raised_by || 'QA Member'}</span>
@@ -422,7 +485,13 @@ export default function DeveloperDashboard() {
                               onClick={() => setSelectedTicketId(ticket.id)}
                             >
                               <Eye size={13} />
-                              <span>{isPendingFix ? 'Work on Defect' : 'View Report'}</span>
+                              <span>
+                                {isPendingFix
+                                  ? ticket.locked_by && ticket.locked_by.toLowerCase() !== displayName.toLowerCase()
+                                    ? `Locked (${ticket.locked_by.split(' ')[0]})`
+                                    : 'Work on Defect'
+                                  : 'View Report'}
+                              </span>
                             </button>
                           </td>
                         </tr>

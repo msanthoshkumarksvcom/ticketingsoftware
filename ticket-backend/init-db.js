@@ -158,6 +158,9 @@ export const initDatabase = async () => {
       ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopened_by VARCHAR(150);
       ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP;
       ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopen_comments TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS locked_by VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS locked_by_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP;
     `);
 
     // 4.1 Ticket History (Audit Log)
@@ -225,11 +228,16 @@ export const initDatabase = async () => {
         id SERIAL PRIMARY KEY,
         project_id INT REFERENCES projects(id) ON DELETE CASCADE,
         sheet_name VARCHAR(150) NOT NULL,
+        tab_color VARCHAR(50) DEFAULT '#0F9D58',
         columns JSONB NOT NULL DEFAULT '[]',
         rows JSONB NOT NULL DEFAULT '[]',
+        formatting JSONB NOT NULL DEFAULT '{}',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE project_sheets ADD COLUMN IF NOT EXISTS formatting JSONB NOT NULL DEFAULT '{}';
+      ALTER TABLE project_sheets ADD COLUMN IF NOT EXISTS tab_color VARCHAR(50) DEFAULT '#0F9D58';
     `);
 
     // 8. Project Documents

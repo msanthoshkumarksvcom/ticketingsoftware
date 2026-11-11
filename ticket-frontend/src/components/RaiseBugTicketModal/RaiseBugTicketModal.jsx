@@ -187,6 +187,7 @@ export default function RaiseBugTicketModal({
         project_code: project?.project_code || 'PRJ',
         project_name: project?.name,
         test_case_id: testCaseData?.col_id || testCaseData?.id || 'TC-001',
+        row_id: testCaseData?.id,
         module: testCaseData?.col_module || 'General',
         sub_module: testCaseData?.col_submodule || '',
         test_scenario: testCaseData?.col_title || title,

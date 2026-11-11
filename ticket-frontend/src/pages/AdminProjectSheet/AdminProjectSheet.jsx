@@ -369,6 +369,9 @@ export default function AdminProjectSheet() {
                 if (t.test_case_id) {
                   ticketMap.set(String(t.test_case_id).trim().toLowerCase(), t);
                 }
+                if (t.ticket_code) {
+                  ticketMap.set(String(t.ticket_code).trim().toLowerCase(), t);
+                }
               });
             }
 
@@ -376,14 +379,20 @@ export default function AdminProjectSheet() {
             const enrichedSheets = sheetsRes.data.sheets.map((sheet) => {
               if (!Array.isArray(sheet.rows)) return sheet;
               const enrichedRows = sheet.rows.map((row) => {
-                const tcKey = String(row.col_id || row.id || '').trim().toLowerCase();
-                if (ticketMap.has(tcKey)) {
-                  const t = ticketMap.get(tcKey);
+                const kCol = String(row.col_id || '').trim().toLowerCase();
+                const kId = String(row.id || '').trim().toLowerCase();
+                const kTicket = String(row.ticket_code || '').trim().toLowerCase();
+                const t = (kCol && ticketMap.get(kCol)) || 
+                          (kId && ticketMap.get(kId)) || 
+                          (kTicket && ticketMap.get(kTicket));
+                if (t) {
                   return {
                     ...row,
                     ticket_code: t.ticket_code,
                     ticket_id: t.id,
-                    ticket_status: t.status
+                    ticket_status: t.status,
+                    resolved_by: t.resolved_by || row.resolved_by,
+                    resolved_at: t.resolved_at || row.resolved_at
                   };
                 }
                 return row;
@@ -421,7 +430,9 @@ export default function AdminProjectSheet() {
     if (!projectId) return;
 
     const socket = io('http://localhost:5000', {
-      transports: ['websocket', 'polling']
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      timeout: 5000
     });
     socketRef.current = socket;
 
@@ -466,11 +477,56 @@ export default function AdminProjectSheet() {
     });
 
     socket.on('sheet_data_synced', (data) => {
-      if (Array.isArray(data?.sheets)) {
-        setSheets(data.sheets);
-        if (data.updatedBy) {
-          showLiveNotification(`Sheet synchronized by ${data.updatedBy}`);
+      if (data?.projectId && String(data.projectId) === String(projectId)) {
+        if (Array.isArray(data?.updatedSheets) && data.updatedSheets.length > 0) {
+          setSheets((prev) => {
+            const next = prev.map((s) => {
+              const matched = data.updatedSheets.find((us) => String(us.id) === String(s.id));
+              return matched ? { ...s, rows: matched.rows } : s;
+            });
+            const localKey = `pjs_sheets_${projectId}`;
+            localStorage.setItem(localKey, JSON.stringify(next));
+            return next;
+          });
+        } else if (Array.isArray(data?.sheets)) {
+          setSheets(data.sheets);
+        } else {
+          loadProjectSheets();
         }
+        if (data.updatedBy) {
+          showLiveNotification(data.message || `Sheet synchronized by ${data.updatedBy}`);
+        }
+      } else if (Array.isArray(data?.sheets)) {
+        setSheets(data.sheets);
+      }
+    });
+
+    socket.on('ticket_updated', (updatedTicket) => {
+      if (updatedTicket && (String(updatedTicket.project_id) === String(projectId) || updatedTicket.project_code === project?.project_code)) {
+        setSheets((prev) => {
+          const next = prev.map((s) => {
+            if (!Array.isArray(s.rows)) return s;
+            const updatedRows = s.rows.map((r) => {
+              const matchesTicket =
+                (r.ticket_code && r.ticket_code === updatedTicket.ticket_code) ||
+                (r.ticket_id && String(r.ticket_id) === String(updatedTicket.id)) ||
+                (updatedTicket.test_case_id && (r.col_id === updatedTicket.test_case_id || r.id === updatedTicket.test_case_id));
+              if (matchesTicket) {
+                return {
+                  ...r,
+                  ticket_status: updatedTicket.status,
+                  resolved_by: updatedTicket.resolved_by || r.resolved_by,
+                  resolved_at: updatedTicket.resolved_at || r.resolved_at
+                };
+              }
+              return r;
+            });
+            return { ...s, rows: updatedRows };
+          });
+          const localKey = `pjs_sheets_${projectId}`;
+          localStorage.setItem(localKey, JSON.stringify(next));
+          return next;
+        });
       }
     });
 
@@ -1902,24 +1958,19 @@ export default function AdminProjectSheet() {
 
       // If backend returned stamped updatedRows, apply them immediately to local state and broadcast via Socket.IO
       if (Array.isArray(res.data.updatedRows)) {
+        const localKey = `pjs_sheets_${projectId}`;
         setSheets((prevSheets) => {
           const nextSheets = [...prevSheets];
           nextSheets[activeSheetIndex] = {
             ...nextSheets[activeSheetIndex],
             rows: res.data.updatedRows
           };
-          if (socketRef.current && socketRef.current.connected) {
-            socketRef.current.emit('sheet_data_synced', {
-              projectId,
-              sheetId: currentSheet?.id,
-              sheets: nextSheets,
-              updatedBy: localStorage.getItem('userName') || 'Team Member'
-            });
-          }
+          localStorage.setItem(localKey, JSON.stringify(nextSheets));
+          persistSheetChanges(nextSheets);
           return nextSheets;
         });
       } else {
-        loadProjectSheets();
+        await loadProjectSheets();
       }
 
       setTimeout(() => {
@@ -2274,20 +2325,26 @@ export default function AdminProjectSheet() {
             {/* 1-Click Bulk Raise Tickets for Day / Sheet Run */}
             <button
               type="button"
-              className={`pjs-bulk-raise-btn ${pendingBulkCases.total > 0 ? 'has-pending' : ''}`}
+              className={`pjs-bulk-raise-btn ${pendingBulkCases.total > 0 ? 'has-pending' : 'all-raised'}`}
               onClick={() => {
                 if (pendingBulkCases.total === 0) {
-                  showToast('No failed or recommendation test cases found in this sheet.');
+                  showToast('All failed and recommendation test cases in this sheet already have tickets raised.');
                 } else {
                   setBulkResultNotice(null);
                   setBulkRaiseModalOpen(true);
                 }
               }}
-              title="Raise all failed and recommendation test cases as project tickets with a single click"
+              title={pendingBulkCases.total > 0 
+                ? `Raise ${pendingBulkCases.total} new unraised ticket(s) for this project` 
+                : 'All failed/recommendation test cases already have tickets raised'}
             >
               <Bug size={14} />
-              <span>Raise All Tickets</span>
-              <span className="pjs-bulk-badge">{pendingBulkCases.total}</span>
+              <span>{pendingBulkCases.total > 0 ? `Raise New Tickets (${pendingBulkCases.total})` : 'All Tickets Raised'}</span>
+              {pendingBulkCases.total > 0 ? (
+                <span className="pjs-bulk-badge">{pendingBulkCases.total}</span>
+              ) : (
+                <Check size={13} className="pjs-bulk-check-icon" />
+              )}
             </button>
 
             <button className="pjs-share-btn" onClick={handleExportCSV} title="Export CSV Spreadsheet">
@@ -2878,10 +2935,45 @@ export default function AdminProjectSheet() {
                                       e.stopPropagation();
                                       setSelectedTicketId(row.ticket_id || row.ticket_code);
                                     }}
-                                    title={`Linked Ticket: ${row.ticket_code} (${row.ticket_status || 'Open'}) - Click to view ticket`}
+                                    title={`Defect Ticket: ${row.ticket_code} [Status: ${row.ticket_status || 'Open'}${row.resolved_by ? `, Resolved by: ${row.resolved_by}` : ''}] - Click to view ticket & full evidence`}
                                   >
-                                    <Bug size={10} />
-                                    <span>{row.ticket_code}</span>
+                                    {row.ticket_status === 'Resolved' ? (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon resolved" />
+                                        <span className="pjs-badge-raised-tag resolved">Resolved:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        {row.resolved_by && <span className="pjs-badge-resolver">by {row.resolved_by.split(' ')[0]}</span>}
+                                        <span className="pjs-cell-ticket-status-pill resolved">Ready QA</span>
+                                      </>
+                                    ) : row.ticket_status === 'Closed' ? (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon closed" />
+                                        <span className="pjs-badge-raised-tag closed">Closed:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill closed">Verified ✓</span>
+                                      </>
+                                    ) : row.ticket_status === 'In Progress' ? (
+                                      <>
+                                        <Clock size={11} className="pjs-badge-check-icon in-progress" />
+                                        <span className="pjs-badge-raised-tag in-progress">Dev Fixing:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill in-progress">In Progress</span>
+                                      </>
+                                    ) : row.ticket_status === 'Reopened' ? (
+                                      <>
+                                        <RotateCcw size={11} className="pjs-badge-check-icon reopened" />
+                                        <span className="pjs-badge-raised-tag reopened">Reopened:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill reopened">Fix Rejected</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 size={11} className="pjs-badge-check-icon" />
+                                        <span className="pjs-badge-raised-tag">Raised:</span>
+                                        <span className="pjs-badge-code">{row.ticket_code}</span>
+                                        <span className="pjs-cell-ticket-status-pill">{row.ticket_status || 'Open'}</span>
+                                      </>
+                                    )}
                                   </button>
                                 ) : isFailOrRecRow ? (
                                   <button
@@ -2889,7 +2981,7 @@ export default function AdminProjectSheet() {
                                     className="pjs-cell-raise-bug-btn"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setSelectedFailTestCase(row);
+                                      setSelectedFailTestCase({ ...row, _rowIndex: rIdx });
                                       setRaiseBugModalOpen(true);
                                     }}
                                     title={`Click to raise ${isRecRow ? 'recommendation' : 'bug'} ticket for this case`}
@@ -3490,33 +3582,37 @@ export default function AdminProjectSheet() {
           testCaseData={selectedFailTestCase}
           onTicketCreated={(createdTicket) => {
             showToast(`Bug ticket ${createdTicket.ticket_code} created successfully!`);
+            const targetColId = selectedFailTestCase?.col_id ? String(selectedFailTestCase.col_id).trim().toLowerCase() : '';
+            const targetRowId = selectedFailTestCase?.id ? String(selectedFailTestCase.id).trim().toLowerCase() : '';
+
+            const targetIndex = selectedFailTestCase?._rowIndex;
+
             setSheets((prevSheets) => {
               const next = [...prevSheets];
               const tSheet = { ...next[activeSheetIndex] };
               if (Array.isArray(tSheet.rows)) {
-                tSheet.rows = tSheet.rows.map(r => {
-                  const rKey = String(r.col_id || r.id || '').trim().toLowerCase();
-                  const targetKey = String(selectedFailTestCase?.col_id || selectedFailTestCase?.id || '').trim().toLowerCase();
-                  if (rKey === targetKey) {
+                tSheet.rows = tSheet.rows.map((r, rIdx) => {
+                  const rCol = String(r.col_id || '').trim().toLowerCase();
+                  const rId = String(r.id || '').trim().toLowerCase();
+                  const isMatch = (targetIndex !== undefined && rIdx === targetIndex) ||
+                                  (targetColId && (rCol === targetColId || rId === targetColId)) ||
+                                  (targetRowId && (rId === targetRowId || rCol === targetRowId));
+                  if (isMatch) {
                     return {
                       ...r,
                       ticket_code: createdTicket.ticket_code,
                       ticket_id: createdTicket.id,
-                      ticket_status: 'Open'
+                      ticket_status: createdTicket.status || 'Open',
+                      ticket_raised_at: new Date().toISOString()
                     };
                   }
                   return r;
                 });
                 next[activeSheetIndex] = tSheet;
               }
-              if (socketRef.current && socketRef.current.connected) {
-                socketRef.current.emit('sheet_data_synced', {
-                  projectId,
-                  sheetId: currentSheet?.id,
-                  sheets: next,
-                  updatedBy: localStorage.getItem('userName') || 'Team Member'
-                });
-              }
+              const localKey = `pjs_sheets_${projectId}`;
+              localStorage.setItem(localKey, JSON.stringify(next));
+              persistSheetChanges(next);
               return next;
             });
           }}
@@ -3535,16 +3631,24 @@ export default function AdminProjectSheet() {
                 const tSheet = { ...next[activeSheetIndex] };
                 if (Array.isArray(tSheet.rows)) {
                   tSheet.rows = tSheet.rows.map(r => {
-                    if (r.ticket_code === updatedTicket.ticket_code || r.ticket_id === updatedTicket.id) {
+                    const matches = (r.ticket_code && r.ticket_code === updatedTicket.ticket_code) ||
+                                    (r.ticket_id && String(r.ticket_id) === String(updatedTicket.id)) ||
+                                    (updatedTicket.test_case_id && (r.col_id === updatedTicket.test_case_id || r.id === updatedTicket.test_case_id));
+                    if (matches) {
                       return {
                         ...r,
-                        ticket_status: updatedTicket.status
+                        ticket_status: updatedTicket.status,
+                        resolved_by: updatedTicket.resolved_by || r.resolved_by,
+                        resolved_at: updatedTicket.resolved_at || r.resolved_at
                       };
                     }
                     return r;
                   });
                   next[activeSheetIndex] = tSheet;
                 }
+                const localKey = `pjs_sheets_${projectId}`;
+                localStorage.setItem(localKey, JSON.stringify(next));
+                persistSheetChanges(next);
                 return next;
               });
             }}
