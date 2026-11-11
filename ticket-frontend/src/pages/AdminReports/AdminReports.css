@@ -1,10 +1,82 @@
-/* Reports Workspace Styles */
+/* ==========================================================================
+   REPORTS WORKSPACE STYLES - BLUE & DARK NAVY EXECUTIVE DESIGN SYSTEM
+   Strictly adheres to .agent/skills/frontend-ui-design-system/SKILL.md
+   ========================================================================== */
+
 .reports-layout {
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
+/* ==========================================================================
+   1. Executive Header & Live Sync Banner
+   ========================================================================== */
+.reports-header-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 20px 26px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.reports-header-text h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.02em;
+}
+
+.reports-header-text p {
+  font-size: 0.875rem;
+  color: #64748B;
+  margin: 0;
+}
+
+.reports-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reports-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  color: #1E40AF;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.reports-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563EB;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+  animation: pulse-ring 1.8s infinite;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+/* ==========================================================================
+   2. KPI Summary Cards (Clean & High-Contrast)
+   ========================================================================== */
 .reports-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -12,85 +84,1205 @@
 }
 
 .report-kpi-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.report-kpi-title {
-  font-size: 0.85rem;
-  color: #64748b;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+.report-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
 }
 
-.report-kpi-val {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #0f172a;
+.report-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  background: #2563EB;
 }
 
-.reports-charts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 20px;
+.report-kpi-card.kpi-success::before {
+  background: #10B981;
 }
 
-.report-chart-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.report-kpi-card.kpi-amber::before {
+  background: #F59E0B;
 }
 
-.report-chart-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #0f172a;
+.report-kpi-card.kpi-purple::before {
+  background: #7C3AED;
+}
+
+.report-kpi-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.breakdown-list {
+.report-kpi-title {
+  font-size: 0.75rem;
+  color: #64748B;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.report-kpi-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.report-kpi-val {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.report-kpi-sub {
+  font-size: 0.78rem;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   3. Interactive Report Switcher Bar (Exclusive View Selector)
+   ========================================================================== */
+.reports-view-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reports-tab-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.report-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #475569;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.report-nav-tab:hover {
+  color: #0F172A;
+  background: #FFFFFF;
+  border-color: #CBD5E1;
+}
+
+.report-nav-tab.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.report-nav-tab.active .tab-count-pill {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+.tab-count-pill {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #E2E8F0;
+  color: #334155;
+  transition: all 0.18s ease;
+}
+
+.reports-view-hint {
+  font-size: 0.76rem;
+  color: #64748B;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ==========================================================================
+   4. Collapsible Report Accordion Cards (Exclusive Expand/Collapse)
+   ========================================================================== */
+.report-accordion-card {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-accordion-card.is-expanded {
+  border-color: #CBD5E1;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+/* Accordion Header (Interactive Trigger) */
+.report-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  background: #FFFFFF;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid transparent;
+}
+
+.report-accordion-card.is-expanded .report-accordion-header {
+  background: #F8FAFC;
+  border-bottom-color: #E2E8F0;
+}
+
+.report-accordion-header:hover {
+  background: #F8FAFC;
+}
+
+.report-accordion-title-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.accordion-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  color: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.accordion-icon-box.emerald {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #059669;
+}
+
+.report-accordion-header:hover .accordion-icon-box {
+  transform: scale(1.05);
+}
+
+.accordion-title-text h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+
+.accordion-title-text p {
+  font-size: 0.78rem;
+  color: #64748B;
+  margin: 2px 0 0 0;
+}
+
+.accordion-badge {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  font-weight: 700;
+  border: 1px solid #DBEAFE;
+}
+
+.accordion-badge.emerald {
+  background: #ECFDF5;
+  color: #047857;
+  border-color: #A7F3D0;
+}
+
+.report-accordion-meta-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.accordion-quick-stat {
+  font-size: 0.8rem;
+  color: #475569;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.accordion-chevron-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #F1F5F9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, color 0.2s ease;
+}
+
+.report-accordion-card.is-expanded .accordion-chevron-circle {
+  transform: rotate(180deg);
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+/* Accordion Body */
+.report-accordion-body {
+  padding: 20px 22px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   5. Clean Toolbar & Search Filtering
+   ========================================================================== */
+.report-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
-.breakdown-row {
+.report-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 7px 12px;
+  min-width: 280px;
+  transition: all 0.15s ease;
+}
+
+.report-search-box:focus-within {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.report-search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  font-size: 0.84rem;
+  color: #0F172A;
+}
+
+.report-search-clear {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.report-search-clear:hover {
+  color: #475569;
+}
+
+.report-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.report-btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #FFFFFF;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  color: #1E293B;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.report-btn-export:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+/* ==========================================================================
+   6. Modern Executive Data Table (Clean, Uncluttered)
+   ========================================================================== */
+.report-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+
+.report-modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.report-modern-table th {
+  background: #F8FAFC;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 16px;
+  border-bottom: 1.5px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+.report-modern-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+  color: #1E293B;
+}
+
+.report-modern-table tr:last-child td {
+  border-bottom: none;
+}
+
+.report-modern-table tbody tr {
+  transition: background-color 0.12s ease;
+}
+
+.report-modern-table tbody tr:hover td {
+  background: #F8FAFC;
+}
+
+/* 6A. Project Identification Column */
+.proj-info-col {
   display: flex;
   flex-direction: column;
+  gap: 3px;
+  min-width: 180px;
+}
+
+.proj-code-tag {
+  font-weight: 800;
+  color: #1D4ED8;
+  font-size: 0.78rem;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  padding: 1px 6px;
+  border-radius: 5px;
+  width: fit-content;
+  letter-spacing: 0.02em;
+}
+
+.proj-title-text {
+  font-weight: 700;
+  color: #0F172A;
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+
+.proj-lead-sub {
+  font-size: 0.73rem;
+  color: #64748B;
+  display: flex;
+  align-items: center;
   gap: 4px;
 }
 
-.breakdown-label-row {
+/* 6B. Total Volume Stat Column */
+.volume-stat-col {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #334155;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.breakdown-bar-bg {
-  height: 8px;
-  background: #f1f5f9;
+.volume-number {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1;
+}
+
+.volume-subtext {
+  font-size: 0.72rem;
+  color: #64748B;
+}
+
+/* ==========================================================================
+   7. Modern Segmented Progress Bar (Zero-Clutter Solution)
+   ========================================================================== */
+.segmented-progress-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.segmented-progress-track {
+  width: 100%;
+  height: 7px;
+  background: #F1F5F9;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: flex;
+  border: 1px solid #E2E8F0;
+}
+
+.seg-slice {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.seg-pass {
+  background: #10B981; /* Emerald green */
+}
+
+.seg-fail {
+  background: #EF4444; /* Crisp red */
+}
+
+.seg-rec {
+  background: #F59E0B; /* Amber warning */
+}
+
+.seg-prog {
+  background: #3B82F6; /* Sky blue */
+}
+
+.seg-untested {
+  background: #CBD5E1; /* Muted slate */
+}
+
+/* Sleek Minimal Text Legend */
+.segmented-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  color: #475569;
+}
+
+.legend-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-dot.dot-pass { background: #10B981; }
+.legend-dot.dot-fail { background: #EF4444; }
+.legend-dot.dot-rec { background: #F59E0B; }
+.legend-dot.dot-prog { background: #3B82F6; }
+.legend-dot.dot-untested { background: #94A3B8; }
+
+.legend-stat.stat-fail {
+  color: #DC2626;
+}
+
+.legend-stat.stat-rec {
+  color: #D97706;
+}
+
+/* ==========================================================================
+   8. Pass Rate Pill Badges
+   ========================================================================== */
+.pass-rate-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: -0.01em;
+  min-width: 50px;
+}
+
+.pass-rate-pill.rate-high {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+.pass-rate-pill.rate-medium {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.pass-rate-pill.rate-low {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+/* ==========================================================================
+   9. Defect Tickets & Developer Resolution Columns
+   ========================================================================== */
+.defect-summary-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 120px;
+}
+
+.defect-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.defect-meta-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+}
+
+.defect-open-highlight {
+  color: #DC2626;
+  font-weight: 700;
+}
+
+.defect-prog-highlight {
+  color: #2563EB;
+  font-weight: 600;
+}
+
+/* Developer Resolution Compact Chips */
+.dev-resolutions-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.dev-resolution-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  color: #334155;
+  width: fit-content;
+}
+
+.dev-avatar-tiny {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #EFF6FF;
+  color: #1E40AF;
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dev-resolved-count {
+  background: #DCFCE7;
+  color: #15803D;
+  padding: 1px 5px;
   border-radius: 4px;
+  font-weight: 800;
+  font-size: 0.68rem;
+}
+
+/* QA Verified Closed Chip */
+.qa-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  color: #1E40AF;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.qa-verified-badge.none {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+/* Empty Cell Placeholder */
+.cell-empty-dash {
+  font-size: 0.85rem;
+  color: #CBD5E1;
+}
+
+/* ==========================================================================
+   10. QA Member User Row Styling
+   ========================================================================== */
+.qa-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 190px;
+}
+
+.qa-circle-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #EFF6FF;
+  border: 1.5px solid #DBEAFE;
+  color: #1E3A8A;
+  font-weight: 800;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qa-info-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.qa-name-heading {
+  font-weight: 700;
+  color: #0F172A;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qa-role-pill {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #F1F5F9;
+  color: #475569;
+  font-weight: 600;
+}
+
+.qa-email-sub {
+  font-size: 0.73rem;
+  color: #64748B;
+}
+
+.qa-proj-chips-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 260px;
+}
+
+.qa-proj-chip {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   11. Empty State Card
+   ========================================================================== */
+.report-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  background: #FFFFFF;
+}
+
+.report-empty-state h4 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 12px 0 4px 0;
+}
+
+.report-empty-state p {
+  font-size: 0.84rem;
+  color: #64748B;
+  margin: 0;
+  max-width: 380px;
+}
+
+/* ==========================================================================
+   12. QA Daily Work Period Filters & Daily Output Tracking
+   ========================================================================== */
+.qa-daily-filter-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.qa-period-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.qa-period-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.qa-period-btn:hover {
+  background: #EFF6FF;
+  border-color: #93C5FD;
+  color: #1E40AF;
+}
+
+.qa-period-btn.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
+}
+
+.qa-date-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.qa-date-picker-wrap input[type="date"] {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.78rem;
+  color: #0F172A;
+  font-family: inherit;
+}
+
+/* Today Output Quick Banner */
+.qa-today-output-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  border-radius: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.today-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.today-banner-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: #2563EB;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.today-banner-text strong {
+  font-size: 0.85rem;
+  color: #1E3A8A;
+  font-weight: 800;
+}
+
+.today-banner-text span {
+  font-size: 0.76rem;
+  color: #3B82F6;
+  margin-left: 6px;
+}
+
+.today-banner-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.today-chip {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.today-chip.tested {
+  background: #FFFFFF;
+  color: #1E3A8A;
+  border: 1px solid #DBEAFE;
+}
+
+.today-chip.passed {
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.today-chip.bugs {
+  background: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+/* QA Member Cell Last Active Tag */
+.qa-last-active-tag {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  font-weight: 600;
+  border: 1px solid #DBEAFE;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.qa-last-active-tag.today {
+  background: #DCFCE7;
+  color: #15803D;
+  border-color: #BBF7D0;
+}
+
+/* Button to view daily log */
+.btn-view-daily-log {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #2563EB;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-view-daily-log:hover {
+  background: #EFF6FF;
+  border-color: #2563EB;
+}
+
+/* ==========================================================================
+   13. Daily Activity History Modal
+   ========================================================================== */
+.daily-log-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.daily-log-modal-content {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 18px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+  width: 100%;
+  max-width: 820px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalScaleUp 0.18s ease-out;
+}
+
+@keyframes modalScaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.daily-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1.5px solid #E2E8F0;
+  background: #F8FAFC;
+}
+
+.daily-modal-title-stack h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0;
+}
+
+.daily-modal-title-stack p {
+  font-size: 0.8rem;
+  color: #64748B;
+  margin: 2px 0 0 0;
+}
+
+.daily-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s ease;
+}
+
+.daily-modal-close-btn:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.daily-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.daily-user-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #F1F5F9;
+  border-radius: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.daily-user-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.daily-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #2563EB;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.daily-user-info strong {
+  font-size: 0.9rem;
+  color: #0F172A;
+}
+
+.daily-user-info span {
+  font-size: 0.76rem;
+  color: #64748B;
+  display: block;
+}
+
+.daily-table-container {
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
   overflow: hidden;
 }
 
-.breakdown-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.4s ease;
+.daily-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.daily-log-table th {
+  background: #F8FAFC;
+  padding: 10px 14px;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  border-bottom: 1.5px solid #E2E8F0;
+}
+
+.daily-log-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+
+.daily-log-table tr:last-child td {
+  border-bottom: none;
+}
+
+.daily-date-cell {
+  font-weight: 700;
+  color: #0F172A;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.daily-modal-footer {
+  padding: 14px 24px;
+  border-top: 1.5px solid #E2E8F0;
+  background: #F8FAFC;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ==========================================================================
+   14. Responsive Breakpoints
+   ========================================================================== */
+@media (max-width: 768px) {
+  .reports-header-card {
+    padding: 16px;
+  }
+  .report-accordion-header {
+    padding: 14px 16px;
+  }
+  .report-accordion-body {
+    padding: 16px;
+  }
+  .report-search-box {
+    min-width: 100%;
+  }
+  .reports-tab-group {
+    width: 100%;
+  }
+  .report-nav-tab {
+    flex: 1;
+    justify-content: center;
+  }
+  .qa-daily-filter-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
