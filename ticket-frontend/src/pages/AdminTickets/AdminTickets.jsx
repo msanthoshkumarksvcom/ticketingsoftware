@@ -22,12 +22,52 @@ import {
   X
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import FolderEmblem from '../AdminProjects/FolderEmblem';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import '../AdminProjects/AdminProjects.css';
 import './AdminTickets.css';
+
+const TICKET_STATUS_OPTIONS = [
+  { value: 'All', label: 'All Statuses' },
+  { value: 'Open', label: 'Open' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Resolved', label: 'Resolved' },
+  { value: 'Reopened', label: 'Reopened' },
+  { value: 'Closed', label: 'Closed' }
+];
+
+const TICKET_PRIORITY_OPTIONS = [
+  { value: 'All', label: 'All Priorities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
+
+const TICKET_TYPE_OPTIONS = [
+  { value: 'All', label: 'All Types' },
+  { value: 'Bug', label: 'Bug' },
+  { value: 'Incident', label: 'Incident' },
+  { value: 'Feature', label: 'Feature' },
+  { value: 'Task', label: 'Task' }
+];
+
+const MODAL_TYPE_OPTIONS = [
+  { value: 'Bug', label: 'Bug' },
+  { value: 'Incident', label: 'Incident' },
+  { value: 'Feature', label: 'Feature' },
+  { value: 'Task', label: 'Task' }
+];
+
+const MODAL_PRIORITY_OPTIONS = [
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
 
 const initialTicketForm = {
   title: '',
@@ -146,6 +186,26 @@ function AdminTickets() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const projectOptions = useMemo(() => {
+    if (!projects || projects.length === 0) {
+      return [{ value: 'PRJ-QA-01', label: 'PRJ-QA-01 - Automation Suite' }];
+    }
+    return projects.map((p) => ({
+      value: p.project_code,
+      label: `${p.project_code} - ${p.name}`
+    }));
+  }, [projects]);
+
+  const userOptions = useMemo(() => {
+    if (!users || users.length === 0) {
+      return [{ value: 'Admin User', label: 'Admin User' }];
+    }
+    return users.map((u) => ({
+      value: u.full_name || u.email,
+      label: `${u.full_name || u.email} (${u.role || 'Member'})`
+    }));
+  }, [users]);
 
   const handleOpenRaiseModal = () => {
     setFormError('');
@@ -665,42 +725,29 @@ function AdminTickets() {
 
               {!isShowingFoldersGrid && (
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <select
-                    className="users-filter-select"
+                  <CustomSelect
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="Open">Open</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Resolved">Resolved</option>
-                    <option value="Reopened">Reopened</option>
-                    <option value="Closed">Closed</option>
-                  </select>
+                    onChange={setStatusFilter}
+                    options={TICKET_STATUS_OPTIONS}
+                    variant="filter"
+                    placeholder="All Statuses"
+                  />
 
-                  <select
-                    className="users-filter-select"
+                  <CustomSelect
                     value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                  >
-                    <option value="All">All Priorities</option>
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
+                    onChange={setPriorityFilter}
+                    options={TICKET_PRIORITY_OPTIONS}
+                    variant="filter"
+                    placeholder="All Priorities"
+                  />
 
-                  <select
-                    className="users-filter-select"
+                  <CustomSelect
                     value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                  >
-                    <option value="All">All Types</option>
-                    <option value="Bug">Bug</option>
-                    <option value="Incident">Incident</option>
-                    <option value="Feature">Feature</option>
-                    <option value="Task">Task</option>
-                  </select>
+                    onChange={setTypeFilter}
+                    options={TICKET_TYPE_OPTIONS}
+                    variant="filter"
+                    placeholder="All Types"
+                  />
                 </div>
               )}
             </div>
@@ -954,30 +1001,22 @@ function AdminTickets() {
                 <div className="form-grid-2">
                   <div className="form-group-user">
                     <label>Issue Type</label>
-                    <select
-                      name="type"
+                    <CustomSelect
                       value={formData.type}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Bug">Bug</option>
-                      <option value="Incident">Incident</option>
-                      <option value="Feature">Feature</option>
-                      <option value="Task">Task</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, type: val }))}
+                      options={MODAL_TYPE_OPTIONS}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="form-group-user">
                     <label>Priority</label>
-                    <select
-                      name="priority"
+                    <CustomSelect
                       value={formData.priority}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Critical">Critical</option>
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}
+                      options={MODAL_PRIORITY_OPTIONS}
+                      variant="form"
+                    />
                   </div>
                 </div>
 
@@ -1007,40 +1046,22 @@ function AdminTickets() {
                 <div className="form-grid-2">
                   <div className="form-group-user">
                     <label>Related Project</label>
-                    <select
-                      name="project_code"
+                    <CustomSelect
                       value={formData.project_code}
-                      onChange={handleInputChange}
-                    >
-                      {projects.length > 0 ? (
-                        projects.map((p) => (
-                          <option key={p.id} value={p.project_code}>
-                            {p.project_code} - {p.name}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="PRJ-QA-01">PRJ-QA-01 - Automation Suite</option>
-                      )}
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, project_code: val }))}
+                      options={projectOptions}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="form-group-user">
                     <label>Assign To</label>
-                    <select
-                      name="assigned_to"
+                    <CustomSelect
                       value={formData.assigned_to}
-                      onChange={handleInputChange}
-                    >
-                      {users.length > 0 ? (
-                        users.map((u) => (
-                          <option key={u.id} value={u.full_name || u.email}>
-                            {u.full_name || u.email} ({u.role || 'Member'})
-                          </option>
-                        ))
-                      ) : (
-                        <option value="Admin User">Admin User</option>
-                      )}
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, assigned_to: val }))}
+                      options={userOptions}
+                      variant="form"
+                    />
                   </div>
                 </div>
 

@@ -27,10 +27,64 @@ import {
   X
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import FolderEmblem from './FolderEmblem';
 import ProjectSpreadsheetView from './ProjectSpreadsheetView';
 import '../../styles/admin.css';
 import './AdminProjects.css';
+
+const PJ_TYPE_OPTIONS = [
+  { value: 'All Departments', label: 'All Project Types' },
+  { value: 'Website', label: 'Website' },
+  { value: 'Mobile App', label: 'Mobile App' },
+  { value: 'Web and Mobile', label: 'Web and Mobile' },
+  { value: 'Desktop App', label: 'Desktop App' }
+];
+
+const PJ_STATUS_OPTIONS = [
+  { value: 'All Statuses', label: 'All Statuses' },
+  { value: 'Active', label: 'Active' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Planning', label: 'Planning' },
+  { value: 'Completed', label: 'Completed' },
+  { value: 'On Hold', label: 'On Hold' }
+];
+
+const PJ_PRIORITY_OPTIONS = [
+  { value: 'All Priorities', label: 'All Priorities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
+
+const PJ_SORT_OPTIONS = [
+  { value: 'Last Updated', label: 'Sort by: Last Updated' },
+  { value: 'Name', label: 'Sort by: Name' },
+  { value: 'Date', label: 'Sort by: Date' }
+];
+
+const MODAL_PROJECT_TYPE_OPTIONS = [
+  { value: 'Website', label: 'Website' },
+  { value: 'Mobile App', label: 'Mobile App' },
+  { value: 'Web and Mobile', label: 'Web and Mobile' },
+  { value: 'Desktop App', label: 'Desktop App' }
+];
+
+const MODAL_PROJECT_PRIORITY_OPTIONS = [
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
+
+const MODAL_PROJECT_STATUS_OPTIONS = [
+  { value: 'Active', label: 'Active' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Planning', label: 'Planning' },
+  { value: 'Not Started', label: 'Not Started' },
+  { value: 'Completed', label: 'Completed' }
+];
 
 // Default empty projects array
 const EXACT_DEFAULT_PROJECTS = [];
@@ -185,6 +239,13 @@ function AdminProjects() {
       }
     });
   }, []);
+
+  const leadOptions = useMemo(() => {
+    return projectLeads.map((lead) => ({
+      value: String(lead.id),
+      label: `${lead.full_name} (${lead.role || 'Member'}) - ${lead.email}`
+    }));
+  }, [projectLeads]);
 
   // Dropdown context menu state
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -826,53 +887,30 @@ function AdminProjects() {
               />
             </div>
 
-            <div className="pj-dropdown-group">
-              {/* All Project Types */}
-              <div className="pj-custom-select-wrap">
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  aria-label="Filter by project type"
-                >
-                  <option value="All Departments">All Project Types</option>
-                  <option value="Website">Website</option>
-                  <option value="Mobile App">Mobile App</option>
-                  <option value="Web and Mobile">Web and Mobile</option>
-                  <option value="Desktop App">Desktop App</option>
-                </select>
-                <ChevronDown size={14} />
-              </div>
+            <div className="pj-dropdown-group" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <CustomSelect
+                value={departmentFilter}
+                onChange={setDepartmentFilter}
+                options={PJ_TYPE_OPTIONS}
+                variant="filter"
+                placeholder="All Project Types"
+              />
 
-              {/* All Statuses */}
-              <div className="pj-custom-select-wrap">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  aria-label="Filter by status"
-                >
-                  <option value="All Statuses">All Statuses</option>
-                  <option value="Active">Active</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Planning">Planning</option>
-                  <option value="Not Started">Not Started</option>
-                  <option value="Completed">Completed</option>
-                </select>
-                <ChevronDown size={14} />
-              </div>
+              <CustomSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={PJ_STATUS_OPTIONS}
+                variant="filter"
+                placeholder="All Statuses"
+              />
 
-              {/* Sort by: Last Updated */}
-              <div className="pj-custom-select-wrap">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  aria-label="Sort projects"
-                >
-                  <option value="Last Updated">Sort by: Last Updated</option>
-                  <option value="Name">Sort by: Name</option>
-                  <option value="Date">Sort by: Date</option>
-                </select>
-                <ChevronDown size={14} />
-              </div>
+              <CustomSelect
+                value={sortBy}
+                onChange={setSortBy}
+                options={PJ_SORT_OPTIONS}
+                variant="filter"
+                placeholder="Sort by"
+              />
             </div>
           </section>
 
@@ -1288,18 +1326,13 @@ function AdminProjects() {
                     <label>
                       Project Type <span className="req-star" style={{ color: '#EF4444' }}>*</span>
                     </label>
-                    <select
-                      name="department"
+                    <CustomSelect
                       value={formData.department}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">-- Select Project Type --</option>
-                      <option value="Website">Website</option>
-                      <option value="Mobile App">Mobile App</option>
-                      <option value="Web and Mobile">Web and Mobile</option>
-                      <option value="Desktop App">Desktop App</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, department: val }))}
+                      options={MODAL_PROJECT_TYPE_OPTIONS}
+                      variant="form"
+                      placeholder="-- Select Project Type --"
+                    />
                   </div>
 
                   <div className="pj-form-group">
@@ -1322,11 +1355,9 @@ function AdminProjects() {
                     <label>
                       Project Lead <span className="req-star" style={{ color: '#EF4444' }}>*</span>
                     </label>
-                    <select
-                      name="project_lead_id"
-                      value={formData.project_lead_id || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                    <CustomSelect
+                      value={String(formData.project_lead_id || '')}
+                      onChange={(val) => {
                         const leadObj = projectLeads.find((l) => String(l.id) === String(val));
                         setFormData((prev) => ({
                           ...prev,
@@ -1334,52 +1365,34 @@ function AdminProjects() {
                           lead_name: leadObj ? leadObj.full_name : ''
                         }));
                       }}
-                      required
-                    >
-                      <option value="">-- Select Project Lead --</option>
-                      {projectLeads.map((lead) => (
-                        <option key={lead.id} value={lead.id}>
-                          {lead.full_name} ({lead.role || 'Member'}) - {lead.email}
-                        </option>
-                      ))}
-                    </select>
+                      options={leadOptions}
+                      variant="form"
+                      placeholder="-- Select Project Lead --"
+                    />
                   </div>
 
                   <div className="pj-form-group">
                     <label>
                       Priority <span className="req-star" style={{ color: '#EF4444' }}>*</span>
                     </label>
-                    <select
-                      name="priority"
+                    <CustomSelect
                       value={formData.priority || 'Medium'}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">-- Select Priority --</option>
-                      <option value="Critical">Critical</option>
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}
+                      options={MODAL_PROJECT_PRIORITY_OPTIONS}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="pj-form-group">
                     <label>
                       Status <span className="req-star" style={{ color: '#EF4444' }}>*</span>
                     </label>
-                    <select
-                      name="status"
+                    <CustomSelect
                       value={formData.status}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">-- Select Status --</option>
-                      <option value="Active">Active</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Planning">Planning</option>
-                      <option value="Not Started">Not Started</option>
-                      <option value="Completed">Completed</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, status: val }))}
+                      options={MODAL_PROJECT_STATUS_OPTIONS}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="pj-form-group">

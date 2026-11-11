@@ -25,9 +25,27 @@ import {
   Lock
 } from 'lucide-react';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import '../../styles/admin.css';
 import './DeveloperDashboard.css';
+
+const DEV_STATUS_OPTIONS = [
+  { value: 'All', label: 'All Statuses' },
+  { value: 'Open', label: 'Open' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Resolved', label: 'Resolved (Pending QA)' },
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Reopened', label: 'Reopened' }
+];
+
+const DEV_SEVERITY_OPTIONS = [
+  { value: 'All', label: 'All Severities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
 
 export default function DeveloperDashboard() {
   const navigate = useNavigate();
@@ -192,6 +210,16 @@ export default function DeveloperDashboard() {
 
     return Array.from(map.values());
   }, [assignedProjects, tickets]);
+
+  const devProjectOptions = useMemo(() => {
+    return [
+      { value: 'All', label: 'All Projects' },
+      ...projectFolderTabs.map((pf) => ({
+        value: pf.key,
+        label: `${pf.name} (${pf.code})`
+      }))
+    ];
+  }, [projectFolderTabs]);
 
   // Filtered Tickets
   const filteredTickets = useMemo(() => {
@@ -467,45 +495,31 @@ export default function DeveloperDashboard() {
                 />
               </div>
 
-              <div className="dev-filter-selects">
-                <select
+              <div className="dev-filter-selects" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <CustomSelect
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="dev-select"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Open">Open</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Resolved">Resolved (Pending QA)</option>
-                  <option value="Closed">Closed</option>
-                  <option value="Reopened">Reopened</option>
-                </select>
+                  onChange={setStatusFilter}
+                  options={DEV_STATUS_OPTIONS}
+                  variant="filter"
+                  placeholder="All Statuses"
+                />
 
-                <select
+                <CustomSelect
                   value={severityFilter}
-                  onChange={(e) => setSeverityFilter(e.target.value)}
-                  className="dev-select"
-                >
-                  <option value="All">All Severities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                  onChange={setSeverityFilter}
+                  options={DEV_SEVERITY_OPTIONS}
+                  variant="filter"
+                  placeholder="All Severities"
+                />
 
                 {projectFolderTabs.length > 1 && (
-                  <select
+                  <CustomSelect
                     value={projectFilter}
-                    onChange={(e) => setProjectFilter(e.target.value)}
-                    className="dev-select"
-                  >
-                    <option value="All">All Projects</option>
-                    {projectFolderTabs.map((pf) => (
-                      <option key={pf.key} value={pf.key}>
-                        {pf.name} ({pf.code})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setProjectFilter}
+                    options={devProjectOptions}
+                    variant="filter"
+                    placeholder="All Projects"
+                  />
                 )}
               </div>
             </div>

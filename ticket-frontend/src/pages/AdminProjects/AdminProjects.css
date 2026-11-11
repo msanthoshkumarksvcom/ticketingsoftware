@@ -227,11 +227,11 @@
 }
 
 .pj-custom-select-wrap select {
-  height: 42px;
+  height: 38px;
   padding: 0 34px 0 14px;
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 9px;
   font-size: 13px;
   font-weight: 500;
   color: #0f172a;
@@ -239,12 +239,18 @@
   appearance: none;
   outline: none;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   transition: all 0.15s ease;
 }
 
+.pj-custom-select-wrap select:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
 .pj-custom-select-wrap select:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .pj-custom-select-wrap svg {
@@ -1048,12 +1054,11 @@
 }
 
 .pj-form-group input,
-.pj-form-group select,
 .pj-form-group textarea {
   width: 100%;
-  padding: 10px 14px;
+  padding: 9px 13px;
   border: 1.5px solid #cbd5e1;
-  border-radius: 10px;
+  border-radius: 9px;
   font-size: 13.5px;
   color: #0f172a;
   background: #ffffff;
@@ -1062,10 +1067,44 @@
   transition: all 0.15s ease;
 }
 
+.pj-form-group select {
+  width: 100%;
+  height: 40px;
+  padding: 0 34px 0 13px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #0f172a;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 15px 15px;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.pj-form-group select:hover {
+  border-color: #94a3b8;
+  background-color: #f8fafc;
+}
+
 .pj-form-group input:focus,
-.pj-form-group select:focus,
 .pj-form-group textarea:focus {
   border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.pj-form-group select:focus {
+  border-color: #2563eb;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232563EB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 

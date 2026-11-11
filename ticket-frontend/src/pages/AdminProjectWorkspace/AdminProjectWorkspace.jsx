@@ -33,6 +33,14 @@ import {
   Send
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
+
+const TESTING_PRIORITY_OPTIONS = [
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import './AdminProjectWorkspace.css';
@@ -1576,17 +1584,13 @@ export default function AdminProjectWorkspace() {
                   <div className="pw-test-req-row">
                     <div className="pw-form-group" style={{ minWidth: '180px' }}>
                       <label htmlFor="pw-testing-priority">Request Priority</label>
-                      <select
+                      <CustomSelect
                         id="pw-testing-priority"
-                        className="pw-select"
                         value={testingPriority}
-                        onChange={(e) => setTestingPriority(e.target.value)}
-                      >
-                        <option value="Critical">Critical</option>
-                        <option value="High">High</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Low">Low</option>
-                      </select>
+                        onChange={setTestingPriority}
+                        options={TESTING_PRIORITY_OPTIONS}
+                        variant="filter"
+                      />
                     </div>
 
                     <div className="pw-form-group" style={{ flex: 1 }}>
@@ -1706,19 +1710,19 @@ export default function AdminProjectWorkspace() {
                 )}
                 <div className="pw-form-group">
                   <label>Select Project Lead *</label>
-                  <select
-                    className="pw-select"
+                  <CustomSelect
                     value={selectedLeadId}
-                    onChange={(e) => setSelectedLeadId(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Choose Project Lead --</option>
-                    {availableLeads.map((lead) => (
-                      <option key={lead.id} value={lead.id}>
-                        {lead.full_name} ({lead.email}) {lead.emp_id ? `[${lead.emp_id}]` : ''} - {lead.role || 'Member'}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedLeadId}
+                    options={[
+                      { value: '', label: '-- Choose Project Lead --' },
+                      ...availableLeads.map((lead) => ({
+                        value: String(lead.id),
+                        label: `${lead.full_name} (${lead.email}) ${lead.emp_id ? `[${lead.emp_id}]` : ''} - ${lead.role || 'Member'}`
+                      }))
+                    ]}
+                    variant="form"
+                    placeholder="-- Choose Project Lead --"
+                  />
                 </div>
               </div>
               <div className="pw-modal-footer">

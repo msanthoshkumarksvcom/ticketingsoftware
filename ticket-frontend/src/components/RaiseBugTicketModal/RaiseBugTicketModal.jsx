@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
   Clock
 } from 'lucide-react';
+import CustomSelect from '../CustomSelect/CustomSelect';
 import './RaiseBugTicketModal.css';
 
 const SEVERITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
@@ -315,41 +316,32 @@ export default function RaiseBugTicketModal({
                 {/* Severity, Priority, Category Row */}
                 <div className="rbt-field-group">
                   <label className="rbt-label">Severity <span className="rbt-req">*</span></label>
-                  <select
-                    className="rbt-select"
+                  <CustomSelect
                     value={severity}
-                    onChange={(e) => setSeverity(e.target.value)}
-                  >
-                    {SEVERITY_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                    onChange={setSeverity}
+                    options={SEVERITY_OPTIONS}
+                    variant="form"
+                  />
                 </div>
 
                 <div className="rbt-field-group">
                   <label className="rbt-label">Priority <span className="rbt-req">*</span></label>
-                  <select
-                    className="rbt-select"
+                  <CustomSelect
                     value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                  >
-                    {PRIORITY_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                    onChange={setPriority}
+                    options={PRIORITY_OPTIONS}
+                    variant="form"
+                  />
                 </div>
 
                 <div className="rbt-field-group">
                   <label className="rbt-label">Bug Category <span className="rbt-req">*</span></label>
-                  <select
-                    className="rbt-select"
+                  <CustomSelect
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  >
-                    {CATEGORY_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                    onChange={setCategory}
+                    options={CATEGORY_OPTIONS}
+                    variant="form"
+                  />
                 </div>
 
                 {/* Actual Result Observed */}
