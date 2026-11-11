@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
+  AlertTriangle,
   Bell,
   Building2,
   Calendar,
@@ -145,6 +146,9 @@ function AdminProjects() {
   const [editId, setEditId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [deletingProject, setDeletingProject] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [projectLeads, setProjectLeads] = useState([]);
 
   useEffect(() => {
@@ -527,20 +531,37 @@ function AdminProjects() {
     }
   };
 
-  const handleDeleteProject = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this project?')) return;
+  const handleDeleteProject = (idOrProject) => {
+    const target =
+      idOrProject && typeof idOrProject === 'object'
+        ? idOrProject
+        : projects.find((p) => p.id === idOrProject) || { id: idOrProject };
+    if (!target?.id) return;
+    setDeleteError('');
+    setProjectToDelete(target);
+    setActiveMenuId(null);
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete?.id) return;
+    setDeletingProject(true);
+    setDeleteError('');
     const token = localStorage.getItem('token');
     try {
       if (token) {
-        await axios.delete(`http://localhost:5000/api/admin/projects/${id}`, {
+        await axios.delete(`http://localhost:5000/api/admin/projects/${projectToDelete.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
       }
+      setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
+      setProjectToDelete(null);
     } catch (err) {
-      console.warn('API delete failed, removing locally:', err.message);
+      setDeleteError(
+        err.response?.data?.error || err.message || 'Failed to delete project. Please try again.'
+      );
+    } finally {
+      setDeletingProject(false);
     }
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    setActiveMenuId(null);
   };
 
   const handleToggleStatus = (project) => {
@@ -681,16 +702,8 @@ function AdminProjects() {
 
       {/* Main Content Pane */}
       <main className="main-content">
-        {/* Exact Header Bar */}
-        <header className="header pj-exact-header">
-          {/* Breadcrumb: Workspace > Projects */}
-          <div className="breadcrumb pj-exact-breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">&gt;</span>
-            <strong>Projects</strong>
-          </div>
-
-          {/* Right Header: Notification Bell + Profile */}
+        {/* Top Utility Actions: Notification Bell + Profile */}
+        <div className="pj-top-utility-bar">
           <div className="header-right pj-exact-header-right">
             <button className="notification-bell pj-header-bell-btn" title="Notifications" aria-label="Notifications">
               <Bell size={18} />
@@ -706,7 +719,7 @@ function AdminProjects() {
               <ChevronDown size={14} className="profile-chevron pj-profile-chevron" />
             </div>
           </div>
-        </header>
+        </div>
 
         {/* Projects Page Container */}
         <div className="pj-page-container">
@@ -718,7 +731,6 @@ function AdminProjects() {
               </div>
               <div className="pj-title-text">
                 <h1>Projects Directory</h1>
-                <p>Organize, manage, and track all QA projects in one place.</p>
               </div>
             </div>
 
@@ -858,10 +870,6 @@ function AdminProjects() {
                   <span className="pj-metric-number">{stats.total}</span>
                 </div>
               </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill up">&uarr; 14%</span>
-                <span className="pj-trend-subtext">vs last month</span>
-              </div>
             </div>
 
             {/* Card 2: In Progress */}
@@ -874,10 +882,6 @@ function AdminProjects() {
                   <span className="pj-metric-label">In Progress</span>
                   <span className="pj-metric-number">{stats.inProgress}</span>
                 </div>
-              </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill up">&uarr; 25%</span>
-                <span className="pj-trend-subtext">vs last month</span>
               </div>
             </div>
 
@@ -892,10 +896,6 @@ function AdminProjects() {
                   <span className="pj-metric-number">{stats.notStarted}</span>
                 </div>
               </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill down">&darr; 0%</span>
-                <span className="pj-trend-subtext">vs last month</span>
-              </div>
             </div>
 
             {/* Card 4: Completed */}
@@ -908,10 +908,6 @@ function AdminProjects() {
                   <span className="pj-metric-label">Completed</span>
                   <span className="pj-metric-number">{stats.completed}</span>
                 </div>
-              </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill up">&uarr; 100%</span>
-                <span className="pj-trend-subtext">vs last month</span>
               </div>
             </div>
           </section>
@@ -973,62 +969,39 @@ function AdminProjects() {
                       </span>
 
                       {/* Three-dots menu */}
-                      <div className="pj-card-menu-wrap">
-                        <button
-                          className="pj-btn-more"
-                          onClick={() =>
-                            setActiveMenuId(activeMenuId === project.id ? null : project.id)
-                          }
-                          aria-label="Project actions"
-                          title="More options"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
+                      {!isQAMember && (
+                        <div className="pj-card-menu-wrap">
+                          <button
+                            className="pj-btn-more"
+                            onClick={() =>
+                              setActiveMenuId(activeMenuId === project.id ? null : project.id)
+                            }
+                            aria-label="Project actions"
+                            title="More options"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
 
-                        {activeMenuId === project.id && (
-                          <div className="pj-dropdown-menu">
-                            <button
-                              className="pj-dropdown-item"
-                              onClick={() => openProjectWorkspace(project)}
-                            >
-                              <Folder size={14} />
-                              <span>View Workspace</span>
-                            </button>
-                            <button
-                              className="pj-dropdown-item"
-                              onClick={() => navigate(`/admin/projects/${project.id}/sheet`)}
-                            >
-                              <FileSpreadsheet size={14} />
-                              <span>Open Sheet Module</span>
-                            </button>
-                            {!isQAMember && (
-                              <>
-                                <button
-                                  className="pj-dropdown-item"
-                                  onClick={() => openEditModal(project)}
-                                >
-                                  <Edit2 size={14} />
-                                  <span>Edit Details</span>
-                                </button>
-                                <button
-                                  className="pj-dropdown-item"
-                                  onClick={() => handleToggleStatus(project)}
-                                >
-                                  <PlayCircle size={14} />
-                                  <span>Change Status</span>
-                                </button>
-                                <button
-                                  className="pj-dropdown-item danger"
-                                  onClick={() => handleDeleteProject(project.id)}
-                                >
-                                  <Trash2 size={14} />
-                                  <span>Delete</span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                          {activeMenuId === project.id && (
+                            <div className="pj-dropdown-menu">
+                              <button
+                                className="pj-dropdown-item"
+                                onClick={() => openEditModal(project)}
+                              >
+                                <Edit2 size={14} />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                className="pj-dropdown-item danger"
+                                onClick={() => handleDeleteProject(project.id)}
+                              >
+                                <Trash2 size={14} />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1466,6 +1439,68 @@ function AdminProjects() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE PROJECT CONFIRMATION MODAL */}
+      {projectToDelete && (
+        <div
+          className="pj-del-modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !deletingProject) {
+              setProjectToDelete(null);
+            }
+          }}
+        >
+          <div
+            className="pj-del-modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-project-title"
+          >
+            <div className="pj-del-modal-header">
+              <h3 id="delete-project-title" className="pj-del-modal-title">
+                <AlertTriangle size={20} color="#dc2626" /> Delete Project
+              </h3>
+              <button
+                type="button"
+                className="pj-del-modal-close"
+                onClick={() => setProjectToDelete(null)}
+                disabled={deletingProject}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="pj-del-modal-body">
+              {deleteError && <div className="pj-del-error-banner">{deleteError}</div>}
+              <p style={{ margin: 0, fontSize: '0.94rem', color: '#334155', lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete project{' '}
+                <strong>{projectToDelete.name || 'this project'}</strong>
+                {projectToDelete.project_code ? ` (${projectToDelete.project_code})` : ''}?
+              </p>
+            </div>
+
+            <div className="pj-del-modal-footer">
+              <button
+                type="button"
+                className="pj-del-btn-cancel"
+                disabled={deletingProject}
+                onClick={() => setProjectToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="pj-del-btn-danger"
+                disabled={deletingProject}
+                onClick={confirmDeleteProject}
+              >
+                {deletingProject ? 'Deleting...' : 'Delete Project'}
+              </button>
+            </div>
           </div>
         </div>
       )}

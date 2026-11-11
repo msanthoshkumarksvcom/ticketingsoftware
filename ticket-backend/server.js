@@ -1319,36 +1319,47 @@ app.get('/api/admin/tickets', async (req, res) => {
   try {
     let query = `
       SELECT t.*, 
-             p.name as project_name, p.lead_name as project_lead_name, p.project_lead_id
+             p.id as matched_project_id,
+             p.project_code as matched_project_code,
+             p.name as project_name,
+             p.lead_name as project_lead_name,
+             p.project_lead_id,
+             p.department as project_department,
+             p.status as project_status,
+             p.folder_color as project_folder_color
       FROM tickets t
-      LEFT JOIN projects p ON p.id = t.project_id OR p.project_code = t.project_code
+      LEFT JOIN projects p ON p.id = t.project_id OR (t.project_id IS NULL AND LOWER(p.project_code) = LOWER(t.project_code))
       WHERE 1=1
     `;
     const params = [];
 
     if (user.role === 'Developer') {
       params.push(user.id);
-      params.push(user.full_name);
-      params.push(user.email);
+      params.push(user.full_name || '');
+      params.push(user.email || '');
       query += ` AND (
         t.assigned_developer_id = $1 
         OR LOWER(t.assigned_to) = LOWER($2) 
         OR LOWER(t.assigned_to) = LOWER($3)
-        OR t.project_id IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $1)
+        OR COALESCE(t.project_id, p.id) IN (
+          SELECT project_id FROM project_developer_assignments WHERE developer_id = $1 AND status = 'Active'
+        )
       )`;
     } else if (user.role === 'Project Lead') {
       params.push(user.id);
-      params.push(user.full_name);
+      params.push(user.full_name || '');
       query += ` AND (
         p.project_lead_id = $1 
         OR LOWER(p.lead_name) = LOWER($2)
-        OR t.project_id IN (SELECT project_id FROM project_lead_assignments WHERE project_lead_id = $1)
+        OR COALESCE(t.project_id, p.id) IN (
+          SELECT project_id FROM project_lead_assignments WHERE project_lead_id = $1
+        )
       )`;
     }
 
     if (project_id) {
       params.push(project_id);
-      query += ` AND t.project_id = $${params.length}`;
+      query += ` AND COALESCE(t.project_id, p.id) = $${params.length}`;
     }
 
     if (status) {
@@ -1360,16 +1371,19 @@ app.get('/api/admin/tickets', async (req, res) => {
 
     const result = await pool.query(query, params);
     res.json(result.rows.map((row) => {
+      const { matched_project_id, matched_project_code, ...ticketRow } = row;
       let atts = [];
       try {
-        atts = typeof row.attachments === 'string' ? JSON.parse(row.attachments) : (row.attachments || []);
+        atts = typeof ticketRow.attachments === 'string' ? JSON.parse(ticketRow.attachments) : (ticketRow.attachments || []);
       } catch (e) { atts = []; }
       let resAtts = [];
       try {
-        resAtts = typeof row.resolution_attachments === 'string' ? JSON.parse(row.resolution_attachments) : (row.resolution_attachments || []);
+        resAtts = typeof ticketRow.resolution_attachments === 'string' ? JSON.parse(ticketRow.resolution_attachments) : (ticketRow.resolution_attachments || []);
       } catch (e) { resAtts = []; }
       return {
-        ...row,
+        ...ticketRow,
+        project_id: ticketRow.project_id || matched_project_id || null,
+        project_code: ticketRow.project_code || matched_project_code || 'General',
         attachments: Array.isArray(atts) ? atts : [],
         resolution_attachments: Array.isArray(resAtts) ? resAtts : []
       };
@@ -1382,18 +1396,12 @@ app.get('/api/admin/tickets', async (req, res) => {
 
 // Admin Tickets: Create new ticket
 app.post('/api/admin/tickets', async (req, res) => {
-  const authorization = req.headers.authorization;
-  if (!authorization?.startsWith('Bearer ')) {
+  const user = await getUserFromReq(req);
+  if (!user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  try {
-    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-
-  const { title, description, project_code, assigned_to, priority, type, status, reporter, attachments } = req.body;
+  const { title, description, project_id, project_code, assigned_to, priority, type, status, reporter, attachments } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Ticket title is required.' });
@@ -1403,26 +1411,71 @@ app.post('/api/admin/tickets', async (req, res) => {
     const ticket_code = await generateTicketCode();
     const safeAttachments = Array.isArray(attachments) ? attachments : [];
 
+    // Resolve matching project record so ticket always links to its project folder
+    let matchedProject = null;
+    if (project_id) {
+      const pRes = await pool.query(
+        'SELECT id, project_code, name, lead_name, project_lead_id, department, status, folder_color FROM projects WHERE id = $1 LIMIT 1',
+        [project_id]
+      );
+      matchedProject = pRes.rows[0] || null;
+    } else if (project_code) {
+      const pRes = await pool.query(
+        'SELECT id, project_code, name, lead_name, project_lead_id, department, status, folder_color FROM projects WHERE LOWER(project_code) = LOWER($1) LIMIT 1',
+        [String(project_code).trim()]
+      );
+      matchedProject = pRes.rows[0] || null;
+    }
+
+    // Resolve optional assigned user id/email when matched
+    let assignedUser = null;
+    if (assigned_to && !['Unassigned', 'Project Team'].includes(String(assigned_to).trim())) {
+      const uRes = await pool.query(
+        'SELECT id, full_name, email FROM users WHERE LOWER(full_name) = LOWER($1) OR LOWER(email) = LOWER($1) LIMIT 1',
+        [String(assigned_to).trim()]
+      );
+      assignedUser = uRes.rows[0] || null;
+    }
+
+    const reporterName = reporter || user.full_name || user.email || 'Admin User';
+    const resolvedProjectId = matchedProject ? matchedProject.id : null;
+    const resolvedProjectCode = matchedProject ? matchedProject.project_code : (project_code || 'General');
+
     const result = await pool.query(
-      `INSERT INTO tickets (ticket_code, title, description, project_code, assigned_to, priority, type, status, reporter, attachments)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO tickets (
+         ticket_code, title, description, project_id, project_code,
+         assigned_to, assigned_developer_id, assigned_developer_name, assigned_developer_email,
+         priority, type, status, reporter, raised_by, raised_by_id, raised_at, attachments
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14, CURRENT_TIMESTAMP, $15)
        RETURNING *`,
       [
         ticket_code,
         title.trim(),
         description || '',
-        project_code || 'General',
-        assigned_to || 'Unassigned',
+        resolvedProjectId,
+        resolvedProjectCode,
+        assignedUser ? assignedUser.full_name : (assigned_to || 'Unassigned'),
+        assignedUser ? assignedUser.id : null,
+        assignedUser ? assignedUser.full_name : null,
+        assignedUser ? assignedUser.email : null,
         priority || 'Medium',
         type || 'Bug',
         status || 'Open',
-        reporter || 'Admin User',
+        reporterName,
+        user.id,
         JSON.stringify(safeAttachments)
       ]
     );
 
     const newTicket = {
       ...result.rows[0],
+      project_name: matchedProject ? matchedProject.name : null,
+      project_lead_name: matchedProject ? matchedProject.lead_name : null,
+      project_lead_id: matchedProject ? matchedProject.project_lead_id : null,
+      project_department: matchedProject ? matchedProject.department : null,
+      project_status: matchedProject ? matchedProject.status : null,
+      project_folder_color: matchedProject ? matchedProject.folder_color : null,
       attachments: Array.isArray(result.rows[0].attachments) ? result.rows[0].attachments : []
     };
 

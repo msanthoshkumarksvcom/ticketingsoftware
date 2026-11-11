@@ -1758,7 +1758,7 @@ export function registerWorkflowRoutes(app, io) {
     try {
       // 1. Projects assigned to developer
       const projectsRes = await pool.query(
-        `SELECT p.id, p.project_code, p.name, p.status, p.progress, p.lead_name,
+        `SELECT p.id, p.project_code, p.name, p.status, p.progress, p.lead_name, p.lead_name as project_lead_name,
                 pda.assigned_at
          FROM projects p
          JOIN project_developer_assignments pda ON pda.project_id = p.id
@@ -1769,19 +1769,21 @@ export function registerWorkflowRoutes(app, io) {
 
       // 2. Tickets assigned to developer OR for projects developer is allocated to
       const ticketsRes = await pool.query(
-        `SELECT t.*, p.name as project_name
+        `SELECT t.*, p.id as matched_project_id, p.name as project_name, p.project_code as matched_project_code
          FROM tickets t
-         LEFT JOIN projects p ON p.id = t.project_id OR p.project_code = t.project_code
+         LEFT JOIN projects p ON p.id = t.project_id OR (t.project_id IS NULL AND LOWER(p.project_code) = LOWER(t.project_code))
          WHERE (t.assigned_developer_id = $1 
             OR LOWER(t.assigned_to) = LOWER($2) 
             OR LOWER(t.assigned_to) = LOWER($3)
-            OR t.project_id IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $1))
+            OR COALESCE(t.project_id, p.id) IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $1 AND status = 'Active'))
          ORDER BY t.id DESC`,
-        [user.id, user.full_name, user.email]
+        [user.id, user.full_name || '', user.email || '']
       );
 
-      const tickets = ticketsRes.rows.map(row => ({
+      const tickets = ticketsRes.rows.map(({ matched_project_id, matched_project_code, ...row }) => ({
         ...row,
+        project_id: row.project_id || matched_project_id || null,
+        project_code: row.project_code || matched_project_code || 'General',
         attachments: typeof row.attachments === 'string' ? JSON.parse(row.attachments || '[]') : (row.attachments || [])
       }));
 

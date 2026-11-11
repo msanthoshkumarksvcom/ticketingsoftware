@@ -4,6 +4,8 @@ import axios from 'axios';
 import { io } from 'socket.io-client';
 import {
   Code2,
+  Folder,
+  FolderOpen,
   FolderKanban,
   Ticket,
   CheckCircle2,
@@ -151,6 +153,46 @@ export default function DeveloperDashboard() {
   const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'Developer');
   const avatarLabel = displayName.charAt(0).toUpperCase();
 
+  const assignedProjects = stats?.projects || [];
+
+  const getTicketProjectKey = (ticket) => {
+    if (ticket.project_id) return `id-${ticket.project_id}`;
+    if (ticket.project_code && ticket.project_code.toLowerCase() !== 'general') {
+      return `code-${ticket.project_code.trim().toLowerCase()}`;
+    }
+    return 'general';
+  };
+
+  const projectFolderTabs = useMemo(() => {
+    const map = new Map();
+    assignedProjects.forEach((p) => {
+      const key = `id-${p.id}`;
+      map.set(key, {
+        key,
+        projectId: p.id,
+        name: p.name || p.project_code || 'Project',
+        code: p.project_code || 'N/A',
+        count: 0
+      });
+    });
+
+    tickets.forEach((t) => {
+      const key = getTicketProjectKey(t);
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          projectId: t.project_id || null,
+          name: t.project_name || (key === 'general' ? 'General Tickets' : t.project_code || 'Project'),
+          code: t.project_code || 'General',
+          count: 0
+        });
+      }
+      map.get(key).count += 1;
+    });
+
+    return Array.from(map.values());
+  }, [assignedProjects, tickets]);
+
   // Filtered Tickets
   const filteredTickets = useMemo(() => {
     return tickets.filter((t) => {
@@ -160,11 +202,13 @@ export default function DeveloperDashboard() {
         t.ticket_code?.toLowerCase().includes(q) ||
         t.title?.toLowerCase().includes(q) ||
         t.test_case_id?.toLowerCase().includes(q) ||
-        t.module?.toLowerCase().includes(q);
+        t.module?.toLowerCase().includes(q) ||
+        t.project_name?.toLowerCase().includes(q) ||
+        t.project_code?.toLowerCase().includes(q);
 
       const matchesStatus = statusFilter === 'All' || t.status === statusFilter;
       const matchesSeverity = severityFilter === 'All' || t.severity === severityFilter;
-      const matchesProj = projectFilter === 'All' || String(t.project_id) === projectFilter;
+      const matchesProj = projectFilter === 'All' || getTicketProjectKey(t) === projectFilter;
 
       return matchesSearch && matchesStatus && matchesSeverity && matchesProj;
     });
@@ -179,8 +223,6 @@ export default function DeveloperDashboard() {
     closedTickets: tickets.filter((t) => t.status === 'Closed').length,
     reopenedTickets: tickets.filter((t) => t.status === 'Reopened').length
   };
-
-  const assignedProjects = stats?.projects || [];
 
   return (
     <div className="admin-layout">
@@ -306,28 +348,62 @@ export default function DeveloperDashboard() {
               <div className="dev-section-header">
                 <div>
                   <h2>My Assigned Projects</h2>
-                  <p>Projects you are allocated to by Project Leads. You have access to defect tickets for these projects.</p>
+                  <p>Select a project folder to filter your bug tickets below, or open its dedicated Ticket Folder workspace.</p>
                 </div>
               </div>
               <div className="dev-projects-grid">
-                {assignedProjects.map((proj) => (
-                  <div key={proj.id} className="dev-proj-card">
-                    <div className="dev-proj-top">
-                      <span className="dev-proj-code">{proj.project_code}</span>
-                      <span className={`dev-badge ${(proj.status || 'active').toLowerCase().replace(/\s+/g, '-')}`}>
-                        {proj.status || 'Active'}
-                      </span>
+                {assignedProjects.map((proj) => {
+                  const projKey = `id-${proj.id}`;
+                  const isSelected = projectFilter === projKey;
+                  const projTickets = tickets.filter((t) => getTicketProjectKey(t) === projKey);
+
+                  return (
+                    <div
+                      key={proj.id}
+                      className={`dev-proj-card ${isSelected ? 'is-selected' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setProjectFilter((prev) => (prev === projKey ? 'All' : projKey))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setProjectFilter((prev) => (prev === projKey ? 'All' : projKey));
+                        }
+                      }}
+                    >
+                      <div className="dev-proj-top">
+                        <span className="dev-proj-code" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          {isSelected ? <FolderOpen size={12} /> : <Folder size={12} />}
+                          {proj.project_code}
+                        </span>
+                        <span className={`dev-badge ${(proj.status || 'active').toLowerCase().replace(/\s+/g, '-')}`}>
+                          {proj.status || 'Active'}
+                        </span>
+                      </div>
+                      <h4>{proj.name}</h4>
+                      <div className="dev-proj-lead-info">
+                        <span>Project Lead:</span>
+                        <strong>{proj.project_lead_name || proj.lead_name || 'Unassigned'}</strong>
+                      </div>
+                      <div className="dev-proj-card-footer">
+                        <span className="dev-proj-ticket-count">
+                          <Ticket size={12} /> {projTickets.length} Ticket{projTickets.length === 1 ? '' : 's'}
+                        </span>
+                        <button
+                          type="button"
+                          className="dev-proj-open-folder-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/tickets?projectId=${proj.id}`);
+                          }}
+                        >
+                          <FolderOpen size={12} />
+                          <span>Open Folder</span>
+                        </button>
+                      </div>
                     </div>
-                    <h4>{proj.name}</h4>
-                    <div className="dev-proj-lead-info">
-                      <span>Project Lead:</span>
-                      <strong>{proj.project_lead_name || 'Unassigned'}</strong>
-                    </div>
-                    <div className="dev-proj-assigned-date">
-                      Assigned on {new Date(proj.assigned_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -338,11 +414,46 @@ export default function DeveloperDashboard() {
               <div>
                 <h2>My Assigned Bug Tickets</h2>
                 <p>
-                  Defects raised from failed test executions requiring your engineering fix. Open any ticket to review the test case steps, error screenshots, and submit your resolution.
+                  Defects organized by project folder. Select a project folder tab or open any ticket to review steps and submit your resolution.
                 </p>
               </div>
               <div className="dev-ticket-count-pill">{filteredTickets.length} Tickets</div>
             </div>
+
+            {/* Project Folder Tabs */}
+            {projectFolderTabs.length > 0 && (
+              <div className="dev-folder-tabs" role="tablist" aria-label="Filter tickets by project folder">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={projectFilter === 'All'}
+                  className={`dev-folder-tab ${projectFilter === 'All' ? 'active' : ''}`}
+                  onClick={() => setProjectFilter('All')}
+                >
+                  <Folder size={14} />
+                  <span>All Project Folders</span>
+                  <span className="dev-folder-tab-count">{tickets.length}</span>
+                </button>
+                {projectFolderTabs.map((pf) => {
+                  const isActive = projectFilter === pf.key;
+                  return (
+                    <button
+                      key={pf.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className={`dev-folder-tab ${isActive ? 'active' : ''}`}
+                      onClick={() => setProjectFilter(isActive ? 'All' : pf.key)}
+                    >
+                      {isActive ? <FolderOpen size={14} /> : <Folder size={14} />}
+                      <span>{pf.name}</span>
+                      <span className="dev-folder-tab-code">{pf.code}</span>
+                      <span className="dev-folder-tab-count">{pf.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Filter Bar */}
             <div className="dev-filters-bar">
@@ -350,7 +461,7 @@ export default function DeveloperDashboard() {
                 <Search size={15} />
                 <input
                   type="text"
-                  placeholder="Search by ticket ID, defect title, module, test case..."
+                  placeholder="Search by ticket ID, defect title, module, test case, project..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -382,15 +493,17 @@ export default function DeveloperDashboard() {
                   <option value="Low">Low</option>
                 </select>
 
-                {assignedProjects.length > 1 && (
+                {projectFolderTabs.length > 1 && (
                   <select
                     value={projectFilter}
                     onChange={(e) => setProjectFilter(e.target.value)}
                     className="dev-select"
                   >
                     <option value="All">All Projects</option>
-                    {assignedProjects.map((p) => (
-                      <option key={p.id} value={String(p.id)}>{p.name}</option>
+                    {projectFolderTabs.map((pf) => (
+                      <option key={pf.key} value={pf.key}>
+                        {pf.name} ({pf.code})
+                      </option>
                     ))}
                   </select>
                 )}
@@ -432,7 +545,12 @@ export default function DeveloperDashboard() {
                             <span className="dev-ticket-code-tag">{ticket.ticket_code}</span>
                           </td>
                           <td>
-                            <span className="dev-ticket-proj">{ticket.project_name || ticket.project_code}</span>
+                            <div className="dev-ticket-proj-stack">
+                              <span className="dev-ticket-proj-name">{ticket.project_name || 'General'}</span>
+                              {ticket.project_code && (
+                                <span className="dev-ticket-proj-code">{ticket.project_code}</span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <div className="dev-ticket-title-col">
