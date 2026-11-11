@@ -15,9 +15,32 @@ import {
   XCircle
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import '../AdminProjects/AdminProjects.css';
+
+const APPROVAL_STATUS_OPTIONS = [
+  { value: 'All', label: 'All Statuses' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Approved', label: 'Approved' },
+  { value: 'Rejected', label: 'Rejected' }
+];
+
+const APPROVAL_PRIORITY_OPTIONS = [
+  { value: 'All', label: 'All Priorities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
+
+const MODAL_PRIORITY_OPTIONS = [
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
 
 const initialApprovalForm = {
   req_code: '',
@@ -296,29 +319,22 @@ function AdminApprovals() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <select
-                  className="users-filter-select"
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <CustomSelect
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                  onChange={setStatusFilter}
+                  options={APPROVAL_STATUS_OPTIONS}
+                  variant="filter"
+                  placeholder="All Statuses"
+                />
 
-                <select
-                  className="users-filter-select"
+                <CustomSelect
                   value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                >
-                  <option value="All">All Priorities</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                  onChange={setPriorityFilter}
+                  options={APPROVAL_PRIORITY_OPTIONS}
+                  variant="filter"
+                  placeholder="All Priorities"
+                />
               </div>
             </div>
 
@@ -506,16 +522,12 @@ function AdminApprovals() {
 
                   <div className="form-group-user">
                     <label>Priority</label>
-                    <select
-                      name="priority"
+                    <CustomSelect
                       value={formData.priority}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Critical">Critical</option>
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}
+                      options={MODAL_PRIORITY_OPTIONS}
+                      variant="form"
+                    />
                   </div>
                 </div>
 

@@ -152,7 +152,6 @@ input[type="password"],
 input[type="number"],
 input[type="search"],
 input[type="date"],
-select,
 textarea {
   font-family: inherit;
   font-size: var(--fs-body);
@@ -169,12 +168,66 @@ input[type="password"]:focus,
 input[type="number"]:focus,
 input[type="search"]:focus,
 input[type="date"]:focus,
-select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: var(--focus-ring);
   background: #FFFFFF;
+}
+
+/* ==========================================================================
+   UNIVERSAL MODERN SELECT & DROPDOWN STANDARDS (Across Entire Application)
+   Eliminates clumsy browser/OS defaults with crisp custom chevron & focus ring
+   ========================================================================== */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font-family: inherit;
+  font-size: var(--fs-body, 13.5px);
+  font-weight: 500;
+  color: var(--color-ink, #0F172A);
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 15px 15px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 9px;
+  height: 38px;
+  padding: 0 34px 0 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+select:hover:not(:disabled) {
+  border-color: #94A3B8;
+  background-color: #F8FAFC;
+}
+
+select:focus {
+  outline: none;
+  border-color: #2563EB !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232563EB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+select:disabled {
+  background-color: #F1F5F9;
+  border-color: #E2E8F0;
+  color: #94A3B8;
+  cursor: not-allowed;
+  opacity: 0.8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+select option {
+  background-color: #FFFFFF;
+  color: #0F172A;
+  padding: 8px 12px;
+  font-size: 13.5px;
 }
 
 input::placeholder,
@@ -1133,14 +1186,40 @@ table tbody tr:hover td,
 }
 
 .users-filter-select {
-  min-width: 126px;
-  min-height: 40px;
-  padding: 0 30px 0 11px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: #fff;
-  color: #334155;
-  font-size: 11px;
+  min-width: 136px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 32px 0 12px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 9px;
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 14px;
+  color: #1E293B;
+  font-size: 13px;
+  font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: all 0.15s ease;
+}
+
+.users-filter-select:hover {
+  border-color: #94A3B8;
+  background-color: #F8FAFC;
+  color: #0F172A;
+}
+
+.users-filter-select:focus {
+  outline: none;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232563EB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 .users-filter-bar > div[style] {
@@ -2532,18 +2611,52 @@ body:has(.login-container) #root {
   font-size: 11.5px;
 }
 
-.admin-layout .pj-form-group input,
+.admin-layout .pj-form-group input {
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  border: 1.5px solid #CBD5E1;
+}
+
 .admin-layout .pj-form-group select {
-  min-height: 35px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  font-size: 12px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 34px 0 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1.5px solid #CBD5E1;
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 15px 15px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-layout .pj-form-group select:hover {
+  border-color: #94A3B8;
+  background-color: #F8FAFC;
+}
+
+.admin-layout .pj-form-group select:focus {
+  outline: none;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232563EB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 .admin-layout .pj-form-group textarea {
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  border: 1.5px solid #CBD5E1;
 }
 
 .admin-layout .pj-modal-footer {
@@ -2656,18 +2769,46 @@ body:has(.login-container) #root {
 }
 
 .admin-layout .form-group-user input,
-.admin-layout .form-group-user select,
 .admin-layout .form-group-user textarea {
   width: 100%;
   min-width: 0;
-  min-height: 35px;
-  padding: 7px 10px;
-  border: 1px solid #CBD5E1;
-  border-radius: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 9px;
   background: #FFFFFF;
   color: var(--color-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
+}
+
+.admin-layout .form-group-user select {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 34px 0 12px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 9px;
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 15px 15px;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-layout .form-group-user select:hover {
+  border-color: #94A3B8;
+  background-color: #F8FAFC;
 }
 
 .admin-layout .form-group-user input:focus,
@@ -2675,7 +2816,11 @@ body:has(.login-container) #root {
 .admin-layout .form-group-user textarea:focus {
   border-color: var(--color-primary);
   outline: 0;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, .11);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.admin-layout .form-group-user select:focus {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232563EB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 .admin-layout .modal-footer-user {

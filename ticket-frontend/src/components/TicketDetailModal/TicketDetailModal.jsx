@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import {
   X,
@@ -26,6 +26,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { io } from 'socket.io-client';
+import CustomSelect from '../CustomSelect/CustomSelect';
 import './TicketDetailModal.css';
 
 // Prepend backend host for relative image uploads so they never break
@@ -833,18 +834,21 @@ export default function TicketDetailModal({
                   <div className="tdm-side-card">
                     <h3>Assigned Developer</h3>
                     <div className="tdm-assign-box">
-                      <select
-                        className="tdm-select"
-                        value={selectedDevId}
-                        onChange={(e) => setSelectedDevId(e.target.value)}
-                      >
-                        <option value="">Unassigned</option>
-                        {availableDevelopers.map((dev) => (
-                          <option key={dev.id} value={dev.id}>
-                            {dev.full_name} ({dev.email})
-                          </option>
-                        ))}
-                      </select>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <CustomSelect
+                          value={selectedDevId}
+                          onChange={setSelectedDevId}
+                          options={[
+                            { value: '', label: 'Unassigned' },
+                            ...availableDevelopers.map((dev) => ({
+                              value: String(dev.id),
+                              label: `${dev.full_name} (${dev.email})`
+                            }))
+                          ]}
+                          variant="filter"
+                          placeholder="Unassigned"
+                        />
+                      </div>
                       <button
                         type="button"
                         className="tdm-btn-assign"

@@ -13,9 +13,38 @@ import {
   X
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import '../AdminProjects/AdminProjects.css';
+
+const ENV_FILTER_OPTIONS = [
+  { value: 'All', label: 'All Environments' },
+  { value: 'Production', label: 'Production' },
+  { value: 'Staging', label: 'Staging' },
+  { value: 'QA Environment', label: 'QA Environment' },
+  { value: 'Development', label: 'Development' }
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'All', label: 'All Statuses' },
+  { value: 'Pending Review', label: 'Pending Review' },
+  { value: 'Approved', label: 'Approved' },
+  { value: 'Deployed', label: 'Deployed' },
+  { value: 'Rejected', label: 'Rejected' }
+];
+
+const MODAL_ENV_OPTIONS = [
+  { value: 'Staging', label: 'Staging' },
+  { value: 'Production', label: 'Production' },
+  { value: 'QA Environment', label: 'QA Environment' },
+  { value: 'Development', label: 'Development' }
+];
+
+const MODAL_STATUS_OPTIONS = [
+  { value: 'Pending Review', label: 'Pending Review' },
+  { value: 'Approved', label: 'Approved' }
+];
 
 const initialDeploymentForm = {
   deploy_code: '',
@@ -233,30 +262,22 @@ function AdminDeployments() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <select
-                  className="users-filter-select"
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <CustomSelect
                   value={envFilter}
-                  onChange={(e) => setEnvFilter(e.target.value)}
-                >
-                  <option value="All">All Environments</option>
-                  <option value="Production">Production</option>
-                  <option value="Staging">Staging</option>
-                  <option value="QA Environment">QA Environment</option>
-                  <option value="Development">Development</option>
-                </select>
+                  onChange={setEnvFilter}
+                  options={ENV_FILTER_OPTIONS}
+                  variant="filter"
+                  placeholder="All Environments"
+                />
 
-                <select
-                  className="users-filter-select"
+                <CustomSelect
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Pending Review">Pending Review</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Deployed">Deployed</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                  onChange={setStatusFilter}
+                  options={STATUS_FILTER_OPTIONS}
+                  variant="filter"
+                  placeholder="All Statuses"
+                />
               </div>
             </div>
 
@@ -386,16 +407,12 @@ function AdminDeployments() {
 
                   <div className="form-group-user">
                     <label>Target Environment</label>
-                    <select
-                      name="environment"
+                    <CustomSelect
                       value={formData.environment}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Staging">Staging</option>
-                      <option value="Production">Production</option>
-                      <option value="QA Environment">QA Environment</option>
-                      <option value="Development">Development</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, environment: val }))}
+                      options={MODAL_ENV_OPTIONS}
+                      variant="form"
+                    />
                   </div>
                 </div>
 
@@ -449,14 +466,12 @@ function AdminDeployments() {
 
                   <div className="form-group-user">
                     <label>Initial Status</label>
-                    <select
-                      name="status"
+                    <CustomSelect
                       value={formData.status}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Pending Review">Pending Review</option>
-                      <option value="Approved">Approved</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, status: val }))}
+                      options={MODAL_STATUS_OPTIONS}
+                      variant="form"
+                    />
                   </div>
                 </div>
               </div>
