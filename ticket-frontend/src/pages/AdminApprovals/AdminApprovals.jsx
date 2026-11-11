@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
+  CheckCircle2,
   CheckSquare,
   ChevronDown,
   Clock,
@@ -10,7 +11,8 @@ import {
   Plus,
   RefreshCw,
   Search,
-  X
+  X,
+  XCircle
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import '../../styles/admin.css';
@@ -20,8 +22,7 @@ import '../AdminProjects/AdminProjects.css';
 const initialApprovalForm = {
   req_code: '',
   title: '',
-  category: 'Access Request',
-  requested_by: 'Admin User',
+  requested_by: '',
   priority: 'Medium',
   status: 'Pending',
   details: ''
@@ -38,8 +39,41 @@ function AdminApprovals() {
   const [formData, setFormData] = useState(initialApprovalForm);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [updatingId, setUpdatingId] = useState(null);
+  const [actionError, setActionError] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [userEmail] = useState(() => localStorage.getItem('userEmail') || '');
+  const currentUserName = (localStorage.getItem('userName') || (userEmail ? userEmail.split('@')[0] : '') || 'Administrator').trim();
+  const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
+  const creatorLabel = `${currentUserName} (${currentUserRole})`;
+  const canReviewRequests = ['QA Lead', 'Manager', 'Super Admin', 'Admin'].includes(currentUserRole);
+  const canCreateRequest = currentUserRole !== 'QA Lead';
+
+  const openCreateRequestModal = async () => {
+    if (!canCreateRequest) return;
+    const maxId = approvals.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
+    const fallbackCode = `REQ-TST-${String(maxId + 1).padStart(3, '0')}`;
+    setFormError('');
+    setFormData({
+      ...initialApprovalForm,
+      req_code: fallbackCode,
+      requested_by: creatorLabel
+    });
+    setIsModalOpen(true);
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const { data } = await axios.get('http://localhost:5000/api/admin/approvals/next-code', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (data?.req_code) {
+        setFormData((prev) => ({ ...prev, req_code: data.req_code }));
+      }
+    } catch {
+      // Keep optimistic sequential code fallback if preview endpoint is unreachable
+    }
+  };
 
   const fetchApprovals = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -77,15 +111,11 @@ function AdminApprovals() {
 
   const handleCreateApproval = async (e) => {
     e.preventDefault();
+    if (!canCreateRequest) return;
     setFormError('');
 
-    if (!formData.req_code.trim()) {
-      setFormError('Please enter a Request Code (e.g. REQ-501).');
-      return;
-    }
-
     if (!formData.title.trim()) {
-      setFormError('Please enter a Title for the request.');
+      setFormError('Please enter a Project Name.');
       return;
     }
 
@@ -95,7 +125,12 @@ function AdminApprovals() {
     try {
       const response = await axios.post(
         'http://localhost:5000/api/admin/approvals',
-        formData,
+        {
+          title: formData.title.trim(),
+          project_name: formData.title.trim(),
+          priority: formData.priority,
+          details: formData.details
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -112,6 +147,29 @@ function AdminApprovals() {
     }
   };
 
+  const handleUpdateApprovalStatus = async (approvalId, nextStatus) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setUpdatingId(approvalId);
+    setActionError('');
+    try {
+      const response = await axios.put(
+        `http://localhost:5000/api/admin/approvals/${approvalId}/status`,
+        { status: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data?.approval) {
+        setApprovals((prev) =>
+          prev.map((item) => (item.id === approvalId ? response.data.approval : item))
+        );
+      }
+    } catch (error) {
+      setActionError(error.response?.data?.error || `Failed to mark request as ${nextStatus}.`);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const confirmLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
@@ -123,9 +181,12 @@ function AdminApprovals() {
     const matchesSearch =
       !query ||
       a.req_code?.toLowerCase().includes(query) ||
+      a.details?.toLowerCase().includes(query) ||
       a.title?.toLowerCase().includes(query) ||
       a.requested_by?.toLowerCase().includes(query) ||
-      a.category?.toLowerCase().includes(query);
+      a.category?.toLowerCase().includes(query) ||
+      a.project_name?.toLowerCase().includes(query) ||
+      a.project_code?.toLowerCase().includes(query);
 
     const matchesStatus = statusFilter === 'All' || a.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || a.priority === priorityFilter;
@@ -170,12 +231,10 @@ function AdminApprovals() {
 
       {/* Main Content Area */}
       <main className="main-content">
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">/</span>
-            <strong>Approvals & Requests</strong>
-          </div>
+        <div
+          className="pj-top-utility-bar"
+          style={{ maxWidth: '1440px', padding: '18px clamp(18px, 3vw, 40px) 0' }}
+        >
           <div className="header-right">
             <button
               className="notification-bell"
@@ -190,31 +249,40 @@ function AdminApprovals() {
               <div className="avatar">{avatarLabel}</div>
               <div className="user-info">
                 <span className="user-name">{displayName}</span>
-                <span className="user-role">Administrator</span>
+                <span className="user-role">{currentUserRole}</span>
               </div>
               <ChevronDown size={15} className="profile-chevron" />
             </div>
           </div>
-        </header>
+        </div>
 
         <div className="dashboard-container">
           <div className="projects-layout">
             {/* Header Card */}
             <div className="projects-header-row">
               <div className="projects-header-info">
-                <h2>Approvals & Requests</h2>
-                <p>Manage access escalations, infrastructure allocations, and permission changes.</p>
+                <h2 style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-0.035em', lineHeight: 1.2, margin: 0 }}>
+                  Approvals & Requests
+                </h2>
               </div>
-              <div className="users-header-actions">
-                <button
-                  className="btn-primary-action"
-                  onClick={() => setIsModalOpen(true)}
-                >
-                  <Plus size={18} />
-                  <span>Create Request</span>
-                </button>
-              </div>
+              {canCreateRequest && (
+                <div className="users-header-actions">
+                  <button
+                    className="btn-primary-action"
+                    onClick={openCreateRequestModal}
+                  >
+                    <Plus size={18} />
+                    <span>Create Request</span>
+                  </button>
+                </div>
+              )}
             </div>
+
+            {actionError && (
+              <div className="user-error-banner" style={{ marginBottom: '12px' }}>
+                {actionError}
+              </div>
+            )}
 
             {/* Filter Bar */}
             <div className="users-filter-bar">
@@ -222,7 +290,7 @@ function AdminApprovals() {
                 <Search size={16} color="#64748b" />
                 <input
                   type="text"
-                  placeholder="Search request code, title, requested by..."
+                  placeholder="Search request code, project, request note, requested by..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -255,29 +323,30 @@ function AdminApprovals() {
             </div>
 
             {/* Approvals Table */}
-            <div className="users-table-card">
+            <div className="users-table-card approvals-table-card">
               <table className="users-table">
                 <thead>
                   <tr>
                     <th>Request Code</th>
-                    <th>Request Summary</th>
+                    <th>Request Note</th>
                     <th>Category</th>
                     <th>Requested By</th>
                     <th>Priority</th>
                     <th>Status</th>
                     <th>Submitted</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>
                         Loading requests...
                       </td>
                     </tr>
                   ) : filteredApprovals.length === 0 ? (
                     <tr>
-                      <td colSpan="7">
+                      <td colSpan="8">
                         <div className="user-empty-state">
                           <CheckSquare size={40} style={{ opacity: 0.35, marginBottom: '10px' }} />
                           <p>No approval requests found matching your filters.</p>
@@ -290,20 +359,18 @@ function AdminApprovals() {
                         <td>
                           <span className="project-code-badge">{a.req_code}</span>
                         </td>
-                        <td>
-                          <div className="project-name-cell">
-                            <span>{a.title}</span>
-                            {a.details && (
-                              <span className="project-desc-small" title={a.details}>
-                                {a.details}
-                              </span>
-                            )}
-                          </div>
+                        <td className="ap-request-note-cell">
+                          <span
+                            className="ap-request-note-text"
+                            title={a.details || a.title || ''}
+                          >
+                            {a.details?.trim() || a.title || '—'}
+                          </span>
                         </td>
                         <td>
                           <span className="user-dept-badge">{a.category}</span>
                         </td>
-                        <td style={{ fontWeight: 500 }}>{a.requested_by}</td>
+                        <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{a.requested_by}</td>
                         <td>
                           <span
                             className={`priority-badge ${
@@ -332,8 +399,64 @@ function AdminApprovals() {
                             {a.status}
                           </span>
                         </td>
-                        <td style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                        <td style={{ color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>
                           {a.created_at ? new Date(a.created_at).toLocaleDateString() : 'Recent'}
+                        </td>
+                        <td>
+                          {a.status === 'Pending' && canReviewRequests ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateApprovalStatus(a.id, 'Approved')}
+                                disabled={updatingId === a.id}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #86EFAC',
+                                  background: '#DCFCE7',
+                                  color: '#15803D',
+                                  fontSize: '11.5px',
+                                  lineHeight: 1.25,
+                                  fontWeight: 700,
+                                  whiteSpace: 'nowrap',
+                                  cursor: updatingId === a.id ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                <CheckCircle2 size={12} />
+                                <span>Approve</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateApprovalStatus(a.id, 'Rejected')}
+                                disabled={updatingId === a.id}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #FCA5A5',
+                                  background: '#FEE2E2',
+                                  color: '#B91C1C',
+                                  fontSize: '11.5px',
+                                  lineHeight: 1.25,
+                                  fontWeight: 700,
+                                  whiteSpace: 'nowrap',
+                                  cursor: updatingId === a.id ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                <XCircle size={12} />
+                                <span>Reject</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '11.5px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              {a.reviewed_by ? `By ${a.reviewed_by}` : '—'}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -346,7 +469,7 @@ function AdminApprovals() {
       </main>
 
       {/* Create Request Modal */}
-      {isModalOpen && (
+      {canCreateRequest && isModalOpen && (
         <div
           className="modal-overlay-user"
           onMouseDown={(e) => {
@@ -371,64 +494,13 @@ function AdminApprovals() {
 
                 <div className="form-grid-2">
                   <div className="form-group-user">
-                    <label>Request Code *</label>
+                    <label>Request Code</label>
                     <input
                       type="text"
                       name="req_code"
-                      placeholder="e.g. REQ-504"
-                      required
                       value={formData.req_code}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="form-group-user">
-                    <label>Category</label>
-                    <select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Access Request">Access Request</option>
-                      <option value="Permission Change">Permission Change</option>
-                      <option value="Resource Allocation">Resource Allocation</option>
-                      <option value="Data Access">Data Access</option>
-                      <option value="Budget Approval">Budget Approval</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group-user">
-                  <label>Title *</label>
-                  <input
-                    type="text"
-                    name="title"
-                    placeholder="Short description of the item needing approval"
-                    required
-                    value={formData.title}
-                    onChange={handleInputChange}
-                  />
-                </div>
-
-                <div className="form-group-user">
-                  <label>Justification & Details</label>
-                  <input
-                    type="text"
-                    name="details"
-                    placeholder="Provide context or links for the approver..."
-                    value={formData.details}
-                    onChange={handleInputChange}
-                  />
-                </div>
-
-                <div className="form-grid-2">
-                  <div className="form-group-user">
-                    <label>Requested By</label>
-                    <input
-                      type="text"
-                      name="requested_by"
-                      value={formData.requested_by}
-                      onChange={handleInputChange}
+                      readOnly
+                      style={{ background: '#F8FAFC', color: '#475569', cursor: 'not-allowed' }}
                     />
                   </div>
 
@@ -445,6 +517,40 @@ function AdminApprovals() {
                       <option value="Low">Low</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="form-group-user">
+                  <label>Project Name *</label>
+                  <input
+                    type="text"
+                    name="title"
+                    placeholder="Enter project name"
+                    required
+                    value={formData.title}
+                    onChange={handleInputChange}
+                  />
+                </div>
+
+                <div className="form-group-user">
+                  <label>Notes</label>
+                  <input
+                    type="text"
+                    name="details"
+                    placeholder="Enter testing notes or request details..."
+                    value={formData.details}
+                    onChange={handleInputChange}
+                  />
+                </div>
+
+                <div className="form-group-user">
+                  <label>Requested By</label>
+                  <input
+                    type="text"
+                    name="requested_by"
+                    value={formData.requested_by || creatorLabel}
+                    readOnly
+                    style={{ background: '#F8FAFC', color: '#475569', cursor: 'not-allowed' }}
+                  />
                 </div>
               </div>
 

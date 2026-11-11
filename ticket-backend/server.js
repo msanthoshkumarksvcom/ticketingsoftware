@@ -7,13 +7,19 @@ import pool from './db.js';
 import { sendWelcomeEmail, generateTemporaryPassword } from './services/emailService.js';
 import { initDatabase } from './init-db.js';
 import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { registerWorkflowRoutes, getUserFromReq } from './services/leadDevWorkflow.js';
+import { registerWorkflowRoutes, getUserFromReq, sendInAppNotification } from './services/leadDevWorkflow.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const documentsUploadsDir = path.join(__dirname, 'uploads', 'documents');
+if (!fs.existsSync(documentsUploadsDir)) {
+  fs.mkdirSync(documentsUploadsDir, { recursive: true });
+}
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -37,8 +43,8 @@ const DEFAULT_USER_PASSWORD = 'Welcome@123';
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ limit: '150mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Basic test route
@@ -507,6 +513,12 @@ app.get('/api/admin/projects', async (req, res) => {
              COALESCE(p.team_members, 0) as team_members,
              COALESCE(p.folder_color, 'blue') as folder_color,
              COALESCE(p.folder_icon, 'folder') as folder_icon,
+             COALESCE(p.application_url, '') as application_url,
+             COALESCE(p.application_github_link, '') as application_github_link,
+             COALESCE(p.links_locked, FALSE) as links_locked,
+             p.links_locked_by, p.links_locked_at,
+             COALESCE(p.documents_locked, FALSE) as documents_locked,
+             p.documents_locked_by, p.documents_locked_at,
              COALESCE((SELECT COUNT(*) FROM project_developer_assignments WHERE project_id = p.id AND status = 'Active'), 0) as assigned_devs_count
       FROM projects p
     `;
@@ -826,7 +838,16 @@ app.delete('/api/admin/projects/:id', async (req, res) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
+    const docFilesRes = await pool.query(
+      'SELECT file_url FROM project_documents WHERE project_id = $1',
+      [id]
+    );
+
     await pool.query('DELETE FROM projects WHERE id = $1', [id]);
+
+    for (const row of docFilesRes.rows) {
+      deleteDocumentFileFromDisk(row.file_url);
+    }
 
     res.json({
       message: 'Project deleted successfully',
@@ -1055,6 +1076,235 @@ app.delete('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
   }
 });
 
+const normalizeSafeUrl = (rawValue) => {
+  const trimmed = typeof rawValue === 'string' ? rawValue.trim() : '';
+  if (!trimmed) return { valid: true, value: '' };
+  if (/^(javascript|vbscript|data):/i.test(trimmed)) {
+    return { valid: false, error: 'Only http:// and https:// URLs are allowed.' };
+  }
+  const candidate = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const parsed = new URL(candidate);
+    const validHost = parsed.hostname === 'localhost' || parsed.hostname.includes('.');
+    if (!['http:', 'https:'].includes(parsed.protocol) || !validHost) {
+      return { valid: false, error: 'Please enter a valid URL (e.g. https://example.com).' };
+    }
+    return { valid: true, value: /^https?:\/\//i.test(trimmed) ? trimmed : parsed.toString() };
+  } catch {
+    return { valid: false, error: 'Please enter a valid URL (e.g. https://example.com).' };
+  }
+};
+
+const findProjectWithRoles = async (projectIdOrCode, user) => {
+  const projRes = await pool.query(
+    `SELECT id, project_code, name, project_lead_id, lead_name,
+            COALESCE(application_url, '') as application_url,
+            COALESCE(application_github_link, '') as application_github_link,
+            COALESCE(links_locked, FALSE) as links_locked,
+            links_locked_by, links_locked_at,
+            COALESCE(documents_locked, FALSE) as documents_locked,
+            documents_locked_by, documents_locked_at
+     FROM projects
+     WHERE id::text = $1 OR project_code = $1`,
+    [projectIdOrCode]
+  );
+  if (projRes.rows.length === 0) return null;
+
+  const proj = projRes.rows[0];
+  const isManager = ['Manager', 'Super Admin', 'Admin'].includes(user.role);
+  const isAssignedLead = Boolean(
+    (proj.project_lead_id && String(proj.project_lead_id) === String(user.id)) ||
+    (proj.lead_name && user.full_name && proj.lead_name.trim().toLowerCase() === user.full_name.trim().toLowerCase()) ||
+    (proj.lead_name && user.email && proj.lead_name.trim().toLowerCase() === user.email.trim().toLowerCase())
+  );
+  const isProjectLead = user.role === 'Project Lead' && (isAssignedLead || (!proj.project_lead_id && !proj.lead_name));
+  const isQAMember = user.role === 'QA Member';
+
+  return {
+    proj,
+    isManager,
+    isProjectLead,
+    isQAMember,
+    canLockOrRequest: isManager || isProjectLead,
+    canEditDocsAndLinks: !isQAMember
+  };
+};
+
+const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx', 'apk'];
+const DOCUMENT_ALLOWED_MESSAGE = 'Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX, APK.';
+const DOCUMENT_MIME_TYPES = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv',
+  txt: 'text/plain',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  apk: 'application/vnd.android.package-archive'
+};
+
+const getDocumentMaxBytes = (ext) => (ext === 'apk' ? 100 * 1024 * 1024 : 25 * 1024 * 1024);
+
+const formatDocumentByteSize = (bytes) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const resolveDiskDocPath = (fileUrl) => {
+  if (typeof fileUrl !== 'string' || !fileUrl.startsWith('/uploads/documents/')) return null;
+  const safeBase = path.basename(fileUrl);
+  if (!safeBase || safeBase === '.' || safeBase === '..') return null;
+  return path.join(documentsUploadsDir, safeBase);
+};
+
+const deleteDocumentFileFromDisk = (fileUrl) => {
+  const diskPath = resolveDiskDocPath(fileUrl);
+  if (!diskPath) return;
+  try {
+    if (fs.existsSync(diskPath)) {
+      fs.unlinkSync(diskPath);
+    }
+  } catch (err) {
+    console.warn('Could not delete document file from disk:', err.message);
+  }
+};
+
+const extractDataUrlBuffer = (dataUrl) => {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+  const commaIdx = dataUrl.indexOf(',');
+  if (commaIdx === -1) return null;
+  const header = dataUrl.slice(0, commaIdx);
+  const payload = dataUrl.slice(commaIdx + 1).trim();
+  const mimeMatch = header.match(/^data:([^;]*)/i);
+  const mime = mimeMatch && mimeMatch[1] ? mimeMatch[1] : 'application/octet-stream';
+  const buffer = payload
+    ? (header.includes(';base64')
+      ? Buffer.from(payload, 'base64')
+      : Buffer.from(decodeURIComponent(payload), 'utf8'))
+    : Buffer.alloc(0);
+  return { mime, buffer };
+};
+
+const buildStoredDocumentFilename = (originalName, ext) => {
+  const rawBase = path.basename(originalName || 'document', `.${ext}`);
+  const safeBase = rawBase.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60) || 'document';
+  return `${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${safeBase}.${ext}`;
+};
+
+const enrichDocumentRow = (row) => {
+  if (!row) return row;
+  const diskPath = resolveDiskDocPath(row.file_url);
+  if (diskPath) {
+    try {
+      const stat = fs.statSync(diskPath);
+      return { ...row, byte_size: stat.size, is_empty: stat.size === 0 };
+    } catch {
+      return { ...row, byte_size: 0, is_empty: true };
+    }
+  }
+  if (typeof row.file_url === 'string' && row.file_url.startsWith('data:')) {
+    const commaIdx = row.file_url.indexOf(',');
+    const payloadLen = commaIdx === -1 ? 0 : row.file_url.slice(commaIdx + 1).trim().length;
+    return { ...row, is_empty: payloadLen === 0 };
+  }
+  return { ...row, is_empty: !row.file_url };
+};
+
+const insertProjectDocumentRecord = async ({ projId, name, fileUrl, fileSize, fileType, user }) => {
+  const result = await pool.query(
+    `INSERT INTO project_documents (project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [
+      projId,
+      name.trim(),
+      fileUrl,
+      fileSize || 'Unknown',
+      fileType,
+      user.full_name || 'Admin',
+      user.id
+    ]
+  );
+
+  await pool.query(
+    `UPDATE projects 
+     SET documents = (SELECT COUNT(*) FROM project_documents WHERE project_id = $1)
+     WHERE id = $1`,
+    [projId]
+  );
+
+  return enrichDocumentRow(result.rows[0]);
+};
+
+const streamRequestToDisk = (req, destPath, maxBytes, maxSizeMb) =>
+  new Promise((resolve, reject) => {
+    const writeStream = fs.createWriteStream(destPath);
+    let totalBytes = 0;
+    let settled = false;
+
+    const cleanupFile = () => {
+      try {
+        if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
+      } catch {
+        // ignore cleanup errors
+      }
+    };
+
+    const fail = (statusCode, message) => {
+      if (settled) return;
+      settled = true;
+      writeStream.destroy();
+      cleanupFile();
+      req.resume();
+      const err = new Error(message);
+      err.statusCode = statusCode;
+      reject(err);
+    };
+
+    req.on('data', (chunk) => {
+      if (settled) return;
+      totalBytes += chunk.length;
+      if (totalBytes > maxBytes) {
+        fail(413, `File is too large. Maximum allowed size is ${maxSizeMb} MB.`);
+        return;
+      }
+      if (!writeStream.write(chunk)) {
+        req.pause();
+      }
+    });
+
+    writeStream.on('drain', () => {
+      if (!settled) req.resume();
+    });
+
+    req.on('aborted', () => fail(499, 'Upload aborted by client.'));
+    req.on('error', (err) => fail(500, err.message || 'Upload stream failed.'));
+    writeStream.on('error', (err) => fail(500, err.message || 'Failed to save uploaded file.'));
+
+    req.on('end', () => {
+      if (!settled) writeStream.end();
+    });
+
+    writeStream.on('finish', () => {
+      if (settled) return;
+      if (totalBytes === 0) {
+        fail(400, 'Cannot upload an empty (0 B) file. Please select a valid non-empty file.');
+        return;
+      }
+      settled = true;
+      resolve(totalBytes);
+    });
+
+    req.resume();
+  });
+
 // GET /api/admin/projects/:id/documents - Get project documents
 app.get('/api/admin/projects/:id/documents', async (req, res) => {
   const authorization = req.headers.authorization;
@@ -1081,20 +1331,162 @@ app.get('/api/admin/projects/:id/documents', async (req, res) => {
     const projId = projRes.rows[0].id;
 
     const docsRes = await pool.query(
-      `SELECT id, project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at 
+      `SELECT id, project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at,
+              COALESCE(is_locked, FALSE) as is_locked, locked_by, locked_at
        FROM project_documents 
        WHERE project_id = $1 
        ORDER BY uploaded_at DESC`,
       [projId]
     );
-    res.json(docsRes.rows);
+    res.json(docsRes.rows.map(enrichDocumentRow));
   } catch (error) {
     console.error('Error fetching project documents:', error);
     res.status(500).json({ error: 'Failed to fetch project documents.' });
   }
 });
 
-// POST /api/admin/projects/:id/documents - Upload document (Manager & assigned Project Lead only)
+// GET /api/admin/projects/:id/documents/:docId/download - Stream binary download/preview cleanly
+app.get('/api/admin/projects/:id/documents/:docId/download', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { id, docId } = req.params;
+
+  try {
+    const projRes = await pool.query(
+      'SELECT id FROM projects WHERE id::text = $1 OR project_code = $1',
+      [id]
+    );
+    if (projRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+    const projId = projRes.rows[0].id;
+
+    const docRes = await pool.query(
+      'SELECT id, project_id, name, file_url, file_type FROM project_documents WHERE id = $1 AND project_id = $2',
+      [docId, projId]
+    );
+    if (docRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Document not found.' });
+    }
+
+    const doc = docRes.rows[0];
+    const ext = doc.name?.split('.').pop()?.toLowerCase() || '';
+    const dispositionType = req.query.inline === '1' ? 'inline' : 'attachment';
+    const fallbackName = (doc.name || 'download').replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+
+    const diskPath = resolveDiskDocPath(doc.file_url);
+    if (diskPath) {
+      if (!fs.existsSync(diskPath)) {
+        return res.status(404).json({ error: 'Stored file could not be found on server.' });
+      }
+      const stat = fs.statSync(diskPath);
+      if (stat.size === 0) {
+        return res.status(422).json({ error: `Document "${doc.name}" is empty (0 bytes). Please delete and re-upload a valid file.` });
+      }
+      const mimeType = DOCUMENT_MIME_TYPES[ext] || 'application/octet-stream';
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', stat.size);
+      res.setHeader('Content-Disposition', `${dispositionType}; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(doc.name || 'download')}`);
+      res.setHeader('Cache-Control', 'no-store');
+      return fs.createReadStream(diskPath).pipe(res);
+    }
+
+    if (typeof doc.file_url === 'string' && doc.file_url.startsWith('data:')) {
+      const decoded = extractDataUrlBuffer(doc.file_url);
+      if (!decoded || decoded.buffer.length === 0) {
+        return res.status(422).json({ error: `Document "${doc.name}" contains 0 bytes because an empty file was uploaded earlier. Please delete it and upload a non-empty file.` });
+      }
+      const mimeType = DOCUMENT_MIME_TYPES[ext] || decoded.mime || 'application/octet-stream';
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', decoded.buffer.length);
+      res.setHeader('Content-Disposition', `${dispositionType}; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(doc.name || 'download')}`);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(decoded.buffer);
+    }
+
+    return res.status(400).json({ error: 'Direct download is only available for uploaded files.' });
+  } catch (error) {
+    console.error('Error downloading document:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to download document.' });
+    }
+  }
+});
+
+// POST /api/admin/projects/:id/documents/upload - Stream binary document upload to disk (supports large APKs)
+app.post('/api/admin/projects/:id/documents/upload', async (req, res) => {
+  req.pause();
+  const user = await getUserFromReq(req);
+  if (!user) {
+    req.resume();
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { id } = req.params;
+  const rawNameHeader = req.headers['x-file-name'] || req.query.filename || '';
+  let fileName = '';
+  try {
+    fileName = decodeURIComponent(String(rawNameHeader)).trim();
+  } catch {
+    fileName = String(rawNameHeader).trim();
+  }
+
+  if (!fileName) {
+    req.resume();
+    return res.status(400).json({ error: 'File name is required.' });
+  }
+
+  const fileExt = fileName.split('.').pop()?.toLowerCase();
+  if (!fileExt || !ALLOWED_DOCUMENT_EXTENSIONS.includes(fileExt)) {
+    req.resume();
+    return res.status(400).json({ error: DOCUMENT_ALLOWED_MESSAGE });
+  }
+
+  try {
+    const ctx = await findProjectWithRoles(id, user);
+    if (!ctx) {
+      req.resume();
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+    if (!ctx.canEditDocsAndLinks) {
+      req.resume();
+      return res.status(403).json({ error: 'Access denied. QA Members are not permitted to upload project documents.' });
+    }
+    if (ctx.proj.documents_locked) {
+      req.resume();
+      return res.status(423).json({ error: 'Uploaded documents are locked (read-only). Ask a Project Lead or Manager to unlock them first.' });
+    }
+
+    const maxBytes = getDocumentMaxBytes(fileExt);
+    const maxSizeMb = Math.round(maxBytes / (1024 * 1024));
+    const storedFilename = buildStoredDocumentFilename(fileName, fileExt);
+    const destPath = path.join(documentsUploadsDir, storedFilename);
+
+    const totalBytes = await streamRequestToDisk(req, destPath, maxBytes, maxSizeMb);
+    const fileUrl = `/uploads/documents/${storedFilename}`;
+    const fileSize = String(req.headers['x-file-size'] || '').trim() || formatDocumentByteSize(totalBytes);
+    const fileType = String(req.headers['x-file-type'] || '').trim() || fileExt.toUpperCase();
+
+    const doc = await insertProjectDocumentRecord({
+      projId: ctx.proj.id,
+      name: fileName,
+      fileUrl,
+      fileSize,
+      fileType,
+      user
+    });
+
+    res.status(201).json(doc);
+  } catch (error) {
+    console.error('Error streaming document upload:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to upload document.' });
+  }
+});
+
+// POST /api/admin/projects/:id/documents - Upload document via JSON (All roles except QA Member, unless locked)
 app.post('/api/admin/projects/:id/documents', async (req, res) => {
   const user = await getUserFromReq(req);
   if (!user) {
@@ -1108,65 +1500,60 @@ app.post('/api/admin/projects/:id/documents', async (req, res) => {
     return res.status(400).json({ error: 'Document name and file data are required.' });
   }
 
-  const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx'];
   const fileExt = name.split('.').pop()?.toLowerCase();
-  if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
-    return res.status(400).json({ error: 'Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX.' });
+  if (!fileExt || !ALLOWED_DOCUMENT_EXTENSIONS.includes(fileExt)) {
+    return res.status(400).json({ error: DOCUMENT_ALLOWED_MESSAGE });
   }
 
   try {
-    const projRes = await pool.query(
-      'SELECT id, project_lead_id, lead_name FROM projects WHERE id::text = $1 OR project_code = $1',
-      [id]
-    );
-    if (projRes.rows.length === 0) {
+    const ctx = await findProjectWithRoles(id, user);
+    if (!ctx) {
       return res.status(404).json({ error: 'Project not found.' });
     }
-    const proj = projRes.rows[0];
-    const projId = proj.id;
 
-    const isManager = ['Manager', 'Super Admin', 'Admin'].includes(user.role);
-    const isAssignedLead = Boolean(
-      (proj.project_lead_id && String(proj.project_lead_id) === String(user.id)) ||
-      (proj.lead_name && user.full_name && proj.lead_name.trim().toLowerCase() === user.full_name.trim().toLowerCase()) ||
-      (proj.lead_name && user.email && proj.lead_name.trim().toLowerCase() === user.email.trim().toLowerCase())
-    );
-
-    if (!isManager && !isAssignedLead) {
-      return res.status(403).json({ error: 'Access denied. Document upload is restricted to the Manager and the assigned Project Lead.' });
+    if (!ctx.canEditDocsAndLinks) {
+      return res.status(403).json({ error: 'Access denied. QA Members are not permitted to upload project documents.' });
     }
 
-    const result = await pool.query(
-      `INSERT INTO project_documents (project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [
-        projId,
-        name.trim(),
-        file_url,
-        file_size || 'Unknown',
-        file_type || fileExt.toUpperCase(),
-        user.full_name || 'Admin',
-        user.id
-      ]
-    );
+    if (ctx.proj.documents_locked) {
+      return res.status(423).json({ error: 'Uploaded documents are locked (read-only). Ask a Project Lead or Manager to unlock them first.' });
+    }
 
-    // Sync projects.documents count
-    await pool.query(
-      `UPDATE projects 
-       SET documents = (SELECT COUNT(*) FROM project_documents WHERE project_id = $1)
-       WHERE id = $1`,
-      [projId]
-    );
+    let finalFileUrl = file_url;
+    let finalFileSize = file_size;
 
-    res.status(201).json(result.rows[0]);
+    if (typeof file_url === 'string' && file_url.startsWith('data:')) {
+      const decoded = extractDataUrlBuffer(file_url);
+      if (!decoded || decoded.buffer.length === 0) {
+        return res.status(400).json({ error: 'Cannot upload an empty (0 B) file. Please select a valid non-empty file.' });
+      }
+      const maxBytes = getDocumentMaxBytes(fileExt);
+      if (decoded.buffer.length > maxBytes) {
+        return res.status(413).json({ error: `File is too large. Maximum allowed size is ${Math.round(maxBytes / (1024 * 1024))} MB.` });
+      }
+      const storedFilename = buildStoredDocumentFilename(name, fileExt);
+      fs.writeFileSync(path.join(documentsUploadsDir, storedFilename), decoded.buffer);
+      finalFileUrl = `/uploads/documents/${storedFilename}`;
+      finalFileSize = file_size || formatDocumentByteSize(decoded.buffer.length);
+    }
+
+    const doc = await insertProjectDocumentRecord({
+      projId: ctx.proj.id,
+      name,
+      fileUrl: finalFileUrl,
+      fileSize: finalFileSize,
+      fileType: file_type || fileExt.toUpperCase(),
+      user
+    });
+
+    res.status(201).json(doc);
   } catch (error) {
     console.error('Error uploading document:', error);
     res.status(500).json({ error: 'Failed to upload document.' });
   }
 });
 
-// DELETE /api/admin/projects/:id/documents/:docId - Delete document (Manager & assigned Project Lead only)
+// DELETE /api/admin/projects/:id/documents/:docId - Delete document (All except QA Member, when unlocked)
 app.delete('/api/admin/projects/:id/documents/:docId', async (req, res) => {
   const user = await getUserFromReq(req);
   if (!user) {
@@ -1176,48 +1563,373 @@ app.delete('/api/admin/projects/:id/documents/:docId', async (req, res) => {
   const { id, docId } = req.params;
 
   try {
-    const projRes = await pool.query(
-      'SELECT id, project_lead_id, lead_name FROM projects WHERE id::text = $1 OR project_code = $1',
-      [id]
-    );
-    if (projRes.rows.length === 0) {
+    const ctx = await findProjectWithRoles(id, user);
+    if (!ctx) {
       return res.status(404).json({ error: 'Project not found.' });
     }
-    const proj = projRes.rows[0];
-    const projId = proj.id;
 
-    const isManager = ['Manager', 'Super Admin', 'Admin'].includes(user.role);
-    const isAssignedLead = Boolean(
-      (proj.project_lead_id && String(proj.project_lead_id) === String(user.id)) ||
-      (proj.lead_name && user.full_name && proj.lead_name.trim().toLowerCase() === user.full_name.trim().toLowerCase()) ||
-      (proj.lead_name && user.email && proj.lead_name.trim().toLowerCase() === user.email.trim().toLowerCase())
-    );
-
-    if (!isManager && !isAssignedLead) {
-      return res.status(403).json({ error: 'Access denied. Only the Manager and the assigned Project Lead can delete documents.' });
+    if (!ctx.canEditDocsAndLinks) {
+      return res.status(403).json({ error: 'Access denied. QA Members cannot delete project documents.' });
     }
 
-    const delRes = await pool.query(
-      'DELETE FROM project_documents WHERE id = $1 AND project_id = $2 RETURNING id',
-      [docId, projId]
+    const docRes = await pool.query(
+      'SELECT id, file_url, COALESCE(is_locked, FALSE) as is_locked FROM project_documents WHERE id = $1 AND project_id = $2',
+      [docId, ctx.proj.id]
     );
-
-    if (delRes.rows.length === 0) {
+    if (docRes.rows.length === 0) {
       return res.status(404).json({ error: 'Document not found.' });
     }
+
+    if (ctx.proj.documents_locked || docRes.rows[0].is_locked) {
+      return res.status(423).json({ error: 'This document is locked (read-only). Ask a Project Lead or Manager to unlock it first.' });
+    }
+
+    await pool.query(
+      'DELETE FROM project_documents WHERE id = $1 AND project_id = $2',
+      [docId, ctx.proj.id]
+    );
+    deleteDocumentFileFromDisk(docRes.rows[0].file_url);
 
     // Sync projects.documents count
     await pool.query(
       `UPDATE projects 
        SET documents = (SELECT COUNT(*) FROM project_documents WHERE project_id = $1)
        WHERE id = $1`,
-      [projId]
+      [ctx.proj.id]
     );
 
     res.json({ message: 'Document deleted successfully', deletedId: docId });
   } catch (error) {
     console.error('Error deleting document:', error);
     res.status(500).json({ error: 'Failed to delete document.' });
+  }
+});
+
+// PUT /api/admin/projects/:id/documents/:docId/lock - Lock/Unlock an individual document (Project Lead & Manager only)
+app.put('/api/admin/projects/:id/documents/:docId/lock', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  const { id, docId } = req.params;
+  const nextLocked = Boolean(req.body?.locked);
+
+  try {
+    const ctx = await findProjectWithRoles(id, user);
+    if (!ctx) return res.status(404).json({ error: 'Project not found.' });
+
+    if (!ctx.canLockOrRequest) {
+      return res.status(403).json({ error: 'Access denied. Only Project Lead and Manager can lock or unlock files.' });
+    }
+
+    const lockerName = nextLocked ? (user.full_name || user.email || user.role) : null;
+    const lockedAt = nextLocked ? new Date() : null;
+
+    const updated = await pool.query(
+      `UPDATE project_documents
+       SET is_locked = $1, locked_by = $2, locked_at = $3
+       WHERE id = $4 AND project_id = $5
+       RETURNING id, project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at, is_locked, locked_by, locked_at`,
+      [nextLocked, lockerName, lockedAt, docId, ctx.proj.id]
+    );
+
+    if (updated.rows.length === 0) {
+      return res.status(404).json({ error: 'Document not found.' });
+    }
+
+    res.json({
+      message: nextLocked ? 'File locked (read-only).' : 'File unlocked.',
+      document: updated.rows[0]
+    });
+  } catch (error) {
+    console.error('Error toggling document lock:', error);
+    res.status(500).json({ error: 'Failed to update file lock state.' });
+  }
+});
+
+// GET /api/admin/projects/:id/links - Get project application URL, GitHub link & lock metadata
+app.get('/api/admin/projects/:id/links', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  try {
+    const ctx = await findProjectWithRoles(req.params.id, user);
+    if (!ctx) return res.status(404).json({ error: 'Project not found.' });
+
+    const { proj } = ctx;
+    res.json({
+      application_url: proj.application_url || '',
+      application_github_link: proj.application_github_link || '',
+      links_locked: Boolean(proj.links_locked),
+      links_locked_by: proj.links_locked_by || null,
+      links_locked_at: proj.links_locked_at || null,
+      documents_locked: Boolean(proj.documents_locked),
+      documents_locked_by: proj.documents_locked_by || null,
+      documents_locked_at: proj.documents_locked_at || null
+    });
+  } catch (error) {
+    console.error('Error fetching project links:', error);
+    res.status(500).json({ error: 'Failed to fetch project links.' });
+  }
+});
+
+// PUT /api/admin/projects/:id/links - Save application URL & GitHub link (All except QA Member, when unlocked)
+app.put('/api/admin/projects/:id/links', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  try {
+    const ctx = await findProjectWithRoles(req.params.id, user);
+    if (!ctx) return res.status(404).json({ error: 'Project not found.' });
+
+    if (!ctx.canEditDocsAndLinks) {
+      return res.status(403).json({ error: 'Access denied. QA Members have read-only access to project links.' });
+    }
+
+    if (ctx.proj.links_locked) {
+      return res.status(423).json({ error: 'Application links are locked (read-only). Ask a Project Lead or Manager to unlock them first.' });
+    }
+
+    const appUrlCheck = normalizeSafeUrl(req.body?.application_url);
+    if (!appUrlCheck.valid) {
+      return res.status(400).json({ error: `Application URL: ${appUrlCheck.error}` });
+    }
+
+    const githubUrlCheck = normalizeSafeUrl(req.body?.application_github_link);
+    if (!githubUrlCheck.valid) {
+      return res.status(400).json({ error: `Application GitHub Link: ${githubUrlCheck.error}` });
+    }
+
+    const updated = await pool.query(
+      `UPDATE projects
+       SET application_url = $1, application_github_link = $2
+       WHERE id = $3
+       RETURNING id, application_url, application_github_link, links_locked, links_locked_by, links_locked_at, documents_locked, documents_locked_by, documents_locked_at`,
+      [appUrlCheck.value, githubUrlCheck.value, ctx.proj.id]
+    );
+
+    res.json({
+      message: 'Project links saved successfully.',
+      links: updated.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating project links:', error);
+    res.status(500).json({ error: 'Failed to save project links.' });
+  }
+});
+
+// PUT /api/admin/projects/:id/locks - Toggle lock on entered link fields or all uploaded files (Project Lead & Manager only)
+app.put('/api/admin/projects/:id/locks', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  const { target = 'all', locked = true, application_url, application_github_link } = req.body || {};
+  const nextLocked = Boolean(locked);
+
+  try {
+    const ctx = await findProjectWithRoles(req.params.id, user);
+    if (!ctx) return res.status(404).json({ error: 'Project not found.' });
+
+    if (!ctx.canLockOrRequest) {
+      return res.status(403).json({ error: 'Access denied. Only Project Lead and Manager can lock or unlock project files and fields.' });
+    }
+
+    const lockerName = nextLocked ? (user.full_name || user.email || user.role) : null;
+    const lockedAt = nextLocked ? new Date() : null;
+
+    let nextAppUrl = ctx.proj.application_url || '';
+    let nextGithubUrl = ctx.proj.application_github_link || '';
+
+    // Save pending URL inputs cleanly when locking links if they were currently unlocked
+    if ((target === 'links' || target === 'all') && nextLocked && !ctx.proj.links_locked) {
+      if (application_url !== undefined) {
+        const check = normalizeSafeUrl(application_url);
+        if (!check.valid) return res.status(400).json({ error: `Application URL: ${check.error}` });
+        nextAppUrl = check.value;
+      }
+      if (application_github_link !== undefined) {
+        const check = normalizeSafeUrl(application_github_link);
+        if (!check.valid) return res.status(400).json({ error: `Application GitHub Link: ${check.error}` });
+        nextGithubUrl = check.value;
+      }
+    }
+
+    if (target === 'links' || target === 'all') {
+      await pool.query(
+        `UPDATE projects
+         SET application_url = $1,
+             application_github_link = $2,
+             links_locked = $3,
+             links_locked_by = $4,
+             links_locked_at = $5
+         WHERE id = $6`,
+        [nextAppUrl, nextGithubUrl, nextLocked, lockerName, lockedAt, ctx.proj.id]
+      );
+    }
+
+    if (target === 'documents' || target === 'all') {
+      await pool.query(
+        `UPDATE projects
+         SET documents_locked = $1,
+             documents_locked_by = $2,
+             documents_locked_at = $3
+         WHERE id = $4`,
+        [nextLocked, lockerName, lockedAt, ctx.proj.id]
+      );
+
+      if (!nextLocked) {
+        await pool.query(
+          `UPDATE project_documents
+           SET is_locked = FALSE, locked_by = NULL, locked_at = NULL
+           WHERE project_id = $1`,
+          [ctx.proj.id]
+        );
+      }
+    }
+
+    const refreshed = await pool.query(
+      `SELECT COALESCE(application_url, '') as application_url,
+              COALESCE(application_github_link, '') as application_github_link,
+              COALESCE(links_locked, FALSE) as links_locked,
+              links_locked_by, links_locked_at,
+              COALESCE(documents_locked, FALSE) as documents_locked,
+              documents_locked_by, documents_locked_at
+       FROM projects
+       WHERE id = $1`,
+      [ctx.proj.id]
+    );
+
+    res.json({
+      message: nextLocked ? 'Locked successfully (read-only).' : 'Unlocked successfully (editable).',
+      links: refreshed.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating project lock state:', error);
+    res.status(500).json({ error: 'Failed to update lock status.' });
+  }
+});
+
+const generateNextApprovalReqCode = async () => {
+  const maxRes = await pool.query('SELECT COALESCE(MAX(id), 0) as max_id FROM approvals');
+  let seq = parseInt(maxRes.rows[0].max_id, 10) + 1;
+  let reqCode = `REQ-TST-${String(seq).padStart(3, '0')}`;
+  while (true) {
+    const dup = await pool.query('SELECT id FROM approvals WHERE req_code = $1', [reqCode]);
+    if (dup.rows.length === 0) break;
+    seq += 1;
+    reqCode = `REQ-TST-${String(seq).padStart(3, '0')}`;
+  }
+  return reqCode;
+};
+
+// GET /api/admin/projects/:id/testing-requests - List testing requests for a project (Project Lead & Manager only)
+app.get('/api/admin/projects/:id/testing-requests', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  try {
+    const ctx = await findProjectWithRoles(req.params.id, user);
+    if (!ctx) return res.status(404).json({ error: 'Project not found.' });
+
+    if (!ctx.canLockOrRequest) {
+      return res.status(403).json({ error: 'Access denied. Only Project Lead and Manager can view testing requests here.' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, req_code, title, category, requested_by, requested_by_role, priority, status, details,
+              project_id, project_code, project_name, application_url, application_github_link,
+              reviewed_by, reviewed_at, review_notes, created_at
+       FROM approvals
+       WHERE project_id = $1 AND category = 'Start Testing'
+       ORDER BY id DESC`,
+      [ctx.proj.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching project testing requests:', error);
+    res.status(500).json({ error: 'Failed to load testing requests.' });
+  }
+});
+
+// POST /api/admin/projects/:id/testing-request - Raise request to start testing (Project Lead & Manager -> QA Lead Approvals & Requests)
+app.post('/api/admin/projects/:id/testing-request', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  const { priority = 'High', details = '' } = req.body || {};
+
+  try {
+    const ctx = await findProjectWithRoles(req.params.id, user);
+    if (!ctx) return res.status(404).json({ error: 'Project not found.' });
+
+    if (!ctx.canLockOrRequest) {
+      return res.status(403).json({ error: 'Access denied. Only Project Lead and Manager can raise a request for testing.' });
+    }
+
+    const { proj } = ctx;
+
+    const pendingCheck = await pool.query(
+      `SELECT id, req_code FROM approvals WHERE project_id = $1 AND category = 'Start Testing' AND status = 'Pending' LIMIT 1`,
+      [proj.id]
+    );
+    if (pendingCheck.rows.length > 0) {
+      return res.status(400).json({
+        error: `A testing request (${pendingCheck.rows[0].req_code}) for this project is already pending QA Lead approval.`
+      });
+    }
+
+    // Generate unique sequential REQ-TST-XXX code
+    const reqCode = await generateNextApprovalReqCode();
+
+    const requesterLabel = `${user.full_name || user.email} (${user.role})`;
+    const cleanDetails = (details || '').trim() || `Requesting QA Lead approval to start QA testing for ${proj.name} (${proj.project_code}).`;
+
+    const inserted = await pool.query(
+      `INSERT INTO approvals (
+         req_code, title, category, requested_by, requested_by_id, requested_by_role,
+         priority, status, details, project_id, project_code, project_name,
+         application_url, application_github_link
+       )
+       VALUES ($1, $2, 'Start Testing', $3, $4, $5, $6, 'Pending', $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
+      [
+        reqCode,
+        `Start Testing Request: ${proj.name} (${proj.project_code})`,
+        requesterLabel,
+        user.id,
+        user.role,
+        priority || 'High',
+        cleanDetails,
+        proj.id,
+        proj.project_code,
+        proj.name,
+        proj.application_url || '',
+        proj.application_github_link || ''
+      ]
+    );
+
+    // Notify all active QA Leads
+    const qaLeads = await pool.query(
+      `SELECT id FROM users WHERE role = 'QA Lead' AND status = 'Active'`
+    );
+    await Promise.all(
+      qaLeads.rows.map((lead) =>
+        sendInAppNotification(
+          lead.id,
+          'Testing Request Received',
+          `${requesterLabel} raised a request (${reqCode}) to start testing for "${proj.name}" (${proj.project_code}).`,
+          'testing_request',
+          '/admin/approvals'
+        )
+      )
+    );
+
+    res.status(201).json({
+      message: 'Testing request sent to QA Lead Approvals & Requests module.',
+      approval: inserted.rows[0]
+    });
+  } catch (error) {
+    console.error('Error creating project testing request:', error);
+    res.status(500).json({ error: 'Failed to submit testing request.' });
   }
 });
 
@@ -1549,7 +2261,9 @@ app.get('/api/admin/approvals', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, req_code, title, category, requested_by, priority, status, details, created_at 
+      `SELECT id, req_code, title, category, requested_by, requested_by_id, requested_by_role,
+              priority, status, details, project_id, project_code, project_name,
+              application_url, application_github_link, reviewed_by, reviewed_at, review_notes, created_at 
        FROM approvals 
        ORDER BY id DESC`
     );
@@ -1560,43 +2274,64 @@ app.get('/api/admin/approvals', async (req, res) => {
   }
 });
 
-// Admin Approvals: Create new approval request
-app.post('/api/admin/approvals', async (req, res) => {
-  const authorization = req.headers.authorization;
-  if (!authorization?.startsWith('Bearer ')) {
+// Admin Approvals: Preview next auto-generated request code
+app.get('/api/admin/approvals/next-code', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
   try {
-    jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+    const reqCode = await generateNextApprovalReqCode();
+    res.json({ req_code: reqCode });
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.error('Error generating next approval code:', error);
+    res.status(500).json({ error: 'Failed to generate next request code.' });
+  }
+});
+
+// Admin Approvals: Create new approval request
+app.post('/api/admin/approvals', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const { req_code, title, category, requested_by, priority, status, details } = req.body;
+  if (user.role === 'QA Lead') {
+    return res.status(403).json({ error: 'Access denied. QA Lead cannot create requests here.' });
+  }
 
-  if (!req_code || !title) {
-    return res.status(400).json({ error: 'Request Code and Title are required.' });
+  const { title, project_name, category, priority, status, details } = req.body || {};
+  const cleanProjectName = (project_name || title || '').trim();
+
+  if (!cleanProjectName) {
+    return res.status(400).json({ error: 'Project Name is required.' });
   }
 
   try {
-    const existing = await pool.query('SELECT * FROM approvals WHERE req_code = $1', [req_code]);
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ error: 'An approval with this Request Code already exists.' });
-    }
+    const reqCode = await generateNextApprovalReqCode();
+    const requesterLabel = `${user.full_name || user.email} (${user.role})`;
+    const cleanCategory = (category || '').trim() || 'Start Testing';
+    const cleanDetails = (details || '').trim();
 
     const result = await pool.query(
-      `INSERT INTO approvals (req_code, title, category, requested_by, priority, status, details)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO approvals (
+         req_code, title, category, requested_by, requested_by_id, requested_by_role,
+         priority, status, details, project_name
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
-        req_code,
-        title,
-        category || 'Access Request',
-        requested_by || 'Admin User',
+        reqCode,
+        cleanProjectName,
+        cleanCategory,
+        requesterLabel,
+        user.id,
+        user.role,
         priority || 'Medium',
         status || 'Pending',
-        details || ''
+        cleanDetails,
+        cleanProjectName
       ]
     );
 
@@ -1607,6 +2342,58 @@ app.post('/api/admin/approvals', async (req, res) => {
   } catch (error) {
     console.error('Error creating approval request:', error);
     res.status(500).json({ error: 'Failed to create approval request in database.' });
+  }
+});
+
+// Admin Approvals: Approve or Reject a request (QA Lead & Manager)
+app.put('/api/admin/approvals/:id/status', async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  if (!['QA Lead', 'Manager', 'Super Admin', 'Admin'].includes(user.role)) {
+    return res.status(403).json({ error: 'Access denied. Only QA Lead and Manager can approve or reject requests.' });
+  }
+
+  const { status, review_notes = '' } = req.body || {};
+  if (!['Approved', 'Rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be Approved or Rejected.' });
+  }
+
+  try {
+    const reviewerLabel = `${user.full_name || user.email} (${user.role})`;
+    const updated = await pool.query(
+      `UPDATE approvals
+       SET status = $1,
+           reviewed_by = $2,
+           reviewed_at = CURRENT_TIMESTAMP,
+           review_notes = $3
+       WHERE id = $4
+       RETURNING *`,
+      [status, reviewerLabel, (review_notes || '').trim(), req.params.id]
+    );
+
+    if (updated.rows.length === 0) {
+      return res.status(404).json({ error: 'Approval request not found.' });
+    }
+
+    const row = updated.rows[0];
+    if (row.requested_by_id) {
+      await sendInAppNotification(
+        row.requested_by_id,
+        `Request ${status}: ${row.req_code}`,
+        `${reviewerLabel} ${status.toLowerCase()} "${row.title}".`,
+        status === 'Approved' ? 'approval_approved' : 'approval_rejected',
+        row.project_id ? `/admin/projects/${row.project_id}` : '/admin/approvals'
+      );
+    }
+
+    res.json({
+      message: `Request ${status.toLowerCase()} successfully.`,
+      approval: row
+    });
+  } catch (error) {
+    console.error('Error updating approval status:', error);
+    res.status(500).json({ error: 'Failed to update approval request status.' });
   }
 });
 

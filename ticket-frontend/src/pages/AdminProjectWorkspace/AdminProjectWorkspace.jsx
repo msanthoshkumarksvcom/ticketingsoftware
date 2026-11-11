@@ -24,7 +24,13 @@ import {
   Upload,
   Download,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Lock,
+  Unlock,
+  Globe,
+  GitBranch,
+  Save,
+  Send
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
@@ -37,8 +43,12 @@ const WORKSPACE_FOLDERS = [
   { id: 'lead', label: 'Project Lead', detail: 'Lead allocation & history', icon: ShieldCheck },
   { id: 'developers', label: 'Developers', detail: 'Assigned engineering devs', icon: Users },
   { id: 'documents', label: 'Documents', detail: 'Project document record', icon: FileText },
+  { id: 'testing-request', label: 'Testing Request', detail: 'Start testing approval', icon: Send, restrictedToLeadAndManager: true },
   { id: 'details', label: 'Details', detail: 'Project information', icon: Folder }
 ];
+
+const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx', 'apk'];
+const ALLOWED_DOCUMENT_ACCEPT = ALLOWED_DOCUMENT_EXTENSIONS.map((ext) => `.${ext}`).join(',');
 
 export default function AdminProjectWorkspace() {
   const { projectId } = useParams();
@@ -53,16 +63,24 @@ export default function AdminProjectWorkspace() {
 
   // User info & Role
   const currentUserRole = localStorage.getItem('userRole') || 'Manager';
-  const currentUserId = localStorage.getItem('userId');
-  const currentUserEmail = (localStorage.getItem('userEmail') || '').trim().toLowerCase();
-  const currentUserName = (localStorage.getItem('userName') || '').trim().toLowerCase();
 
   const isDeveloper = currentUserRole === 'Developer';
   const isProjectLead = currentUserRole === 'Project Lead';
+  const isQAMember = currentUserRole === 'QA Member';
   const isManager = currentUserRole === 'Manager' || currentUserRole === 'Super Admin' || currentUserRole === 'Admin';
 
   // Access rules: Only Manager & QA Lead (plus Super Admin, Admin) can assign Project Leads & Developers
   const canAssignLeadAndDevs = ['Manager', 'QA Lead', 'Super Admin', 'Admin'].includes(currentUserRole);
+  // Everyone EXCEPT QA Members can upload documents and edit Application URL / GitHub Link
+  const canEditDocsAndLinks = !isQAMember;
+  // Only Project Lead and Manager can lock/unlock files & link fields and access Testing Request page
+  const canLockContent = isManager || isProjectLead;
+  const canManageTestingRequest = isManager || isProjectLead;
+
+  const visibleWorkspaceFolders = useMemo(
+    () => WORKSPACE_FOLDERS.filter((folder) => !folder.restrictedToLeadAndManager || canManageTestingRequest),
+    [canManageTestingRequest]
+  );
 
   const activeProject = project || {
     id: projectId,
@@ -73,28 +91,6 @@ export default function AdminProjectWorkspace() {
     status: 'In Progress',
     team_members: 0
   };
-
-  const isAssignedProjectLead = useMemo(() => {
-    if (!activeProject) return false;
-    if (currentUserId && activeProject.project_lead_id && String(currentUserId) === String(activeProject.project_lead_id)) {
-      return true;
-    }
-    const leadEmail = (activeProject.lead_email || '').trim().toLowerCase();
-    if (currentUserEmail && leadEmail && leadEmail === currentUserEmail) {
-      return true;
-    }
-    const leadName = (activeProject.lead_name || '').trim().toLowerCase();
-    if (currentUserEmail && leadName && leadName === currentUserEmail) {
-      return true;
-    }
-    if (currentUserName && leadName && leadName === currentUserName) {
-      return true;
-    }
-    return false;
-  }, [activeProject, currentUserId, currentUserEmail, currentUserName]);
-
-  // Access rule: Only Manager and the assigned Project Lead for this project can upload/delete documents
-  const canUploadDocuments = isManager || isAssignedProjectLead;
 
   // Lead Assignment State
   const [leadHistory, setLeadHistory] = useState([]);
@@ -117,48 +113,127 @@ export default function AdminProjectWorkspace() {
   const [devAssignMsg, setDevAssignMsg] = useState({ text: '', type: '' });
   const [showDevHistory, setShowDevHistory] = useState(false);
 
-  // Documents State
+  // Documents & Application Links State
   const [documents, setDocuments] = useState([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [docUploadLoading, setDocUploadLoading] = useState(false);
   const [docError, setDocError] = useState('');
   const [docSuccess, setDocSuccess] = useState('');
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [applicationUrl, setApplicationUrl] = useState('');
+  const [applicationGithubLink, setApplicationGithubLink] = useState('');
+  const [linksMeta, setLinksMeta] = useState({
+    application_url: '',
+    application_github_link: '',
+    links_locked: false,
+    links_locked_by: null,
+    links_locked_at: null,
+    documents_locked: false,
+    documents_locked_by: null,
+    documents_locked_at: null
+  });
+  const [linksSaving, setLinksSaving] = useState(false);
+  const [lockUpdating, setLockUpdating] = useState('');
+  const [docLockUpdatingId, setDocLockUpdatingId] = useState(null);
+
+  // Testing Request State (Project Lead & Manager only)
+  const [testingRequests, setTestingRequests] = useState([]);
+  const [testingRequestsLoading, setTestingRequestsLoading] = useState(false);
+  const [testingPriority, setTestingPriority] = useState('High');
+  const [testingNotes, setTestingNotes] = useState('');
+  const [testingSubmitting, setTestingSubmitting] = useState(false);
+  const [testingMsg, setTestingMsg] = useState({ text: '', type: '' });
+
+  const [docDownloadingId, setDocDownloadingId] = useState(null);
 
   const isImage = (filename = '') => /\.(png|jpe?g|gif|webp|svg)$/i.test(filename);
   const isPdf = (filename = '') => /\.pdf$/i.test(filename);
 
-  const dataUrlToBlobUrl = (dataUrl) => {
-    try {
-      if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
-      const [header, base64] = dataUrl.split(',');
-      const mimeMatch = header.match(/:(.*?);/);
-      const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-      const binary = atob(base64);
-      const array = [];
-      for (let i = 0; i < binary.length; i++) {
-        array.push(binary.charCodeAt(i));
+  const isDocumentEmpty = (doc) => {
+    if (!doc) return true;
+    if (doc.is_empty) return true;
+    if (typeof doc.file_url === 'string' && doc.file_url.startsWith('data:')) {
+      const commaIdx = doc.file_url.indexOf(',');
+      if (commaIdx === -1 || !doc.file_url.slice(commaIdx + 1).trim()) return true;
+    }
+    return !doc.file_url;
+  };
+
+  const closePreviewModal = () => {
+    if (previewDoc?.blobUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewDoc.blobUrl);
+    }
+    setPreviewDoc(null);
+  };
+
+  const fetchDocumentBlobUrl = async (doc, { inline = false } = {}) => {
+    if (isDocumentEmpty(doc)) {
+      throw new Error(`Document "${doc.name}" is empty (0 bytes) because an empty file was uploaded. Please delete it and upload a non-empty file.`);
+    }
+
+    const fileUrl = doc.file_url || '';
+    if ((fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) && !fileUrl.startsWith('http://localhost:5000/uploads/')) {
+      return { url: fileUrl, isBlob: false };
+    }
+
+    const token = localStorage.getItem('token');
+    const endpoint = `http://localhost:5000/api/admin/projects/${projectId}/documents/${doc.id}/download${inline ? '?inline=1' : ''}`;
+    const response = await fetch(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      let errMsg = 'Failed to download document.';
+      try {
+        const errBody = await response.json();
+        if (errBody?.error) errMsg = errBody.error;
+      } catch {
+        // ignore JSON parse failure
       }
-      const blob = new Blob([new Uint8Array(array)], { type: mime });
-      return URL.createObjectURL(blob);
-    } catch (e) {
-      console.warn('Error converting data URL to blob:', e);
-      return dataUrl;
+      throw new Error(errMsg);
+    }
+
+    const blob = await response.blob();
+    if (!blob || blob.size === 0) {
+      throw new Error(`Document "${doc.name}" is empty (0 bytes). Please delete it and re-upload a valid file.`);
+    }
+
+    return { url: URL.createObjectURL(blob), isBlob: true };
+  };
+
+  const handleViewDocument = async (doc) => {
+    setDocError('');
+    try {
+      if (previewDoc?.blobUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(previewDoc.blobUrl);
+      }
+      const { url } = await fetchDocumentBlobUrl(doc, { inline: true });
+      setPreviewDoc({ ...doc, blobUrl: url });
+    } catch (err) {
+      setDocError(err.message || 'Failed to preview document.');
     }
   };
 
-  const handleViewDocument = (doc) => {
-    const blobUrl = doc.file_url?.startsWith('data:') ? dataUrlToBlobUrl(doc.file_url) : doc.file_url;
-    setPreviewDoc({ ...doc, blobUrl });
-  };
-
-  const handleDownloadDocument = (doc) => {
-    const link = document.createElement('a');
-    link.href = doc.file_url;
-    link.setAttribute('download', doc.name);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadDocument = async (doc) => {
+    setDocError('');
+    setDocDownloadingId(doc.id);
+    try {
+      const { url, isBlob } = await fetchDocumentBlobUrl(doc, { inline: false });
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', doc.name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      if (isBlob) {
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+    } catch (err) {
+      setDocError(err.message || 'Failed to download document.');
+    } finally {
+      setDocDownloadingId(null);
+    }
   };
 
   // Ticket Preview Modal
@@ -250,25 +325,219 @@ export default function AdminProjectWorkspace() {
     }
   };
 
+  const fetchProjectLinks = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || !projectId) return;
+    try {
+      const { data } = await axios.get(`http://localhost:5000/api/admin/projects/${projectId}/links`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLinksMeta({
+        application_url: data.application_url || '',
+        application_github_link: data.application_github_link || '',
+        links_locked: Boolean(data.links_locked),
+        links_locked_by: data.links_locked_by || null,
+        links_locked_at: data.links_locked_at || null,
+        documents_locked: Boolean(data.documents_locked),
+        documents_locked_by: data.documents_locked_by || null,
+        documents_locked_at: data.documents_locked_at || null
+      });
+      setApplicationUrl(data.application_url || '');
+      setApplicationGithubLink(data.application_github_link || '');
+    } catch (err) {
+      console.warn('Could not load project links:', err.message);
+    }
+  };
+
+  const fetchTestingRequests = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || !projectId || !canManageTestingRequest) return;
+    setTestingRequestsLoading(true);
+    try {
+      const { data } = await axios.get(`http://localhost:5000/api/admin/projects/${projectId}/testing-requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTestingRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Could not load testing requests:', err.message);
+    } finally {
+      setTestingRequestsLoading(false);
+    }
+  };
+
+  const handleSaveLinks = async (e) => {
+    if (e) e.preventDefault();
+    if (!canEditDocsAndLinks) {
+      setDocError('Access Denied: QA Members have read-only access to project links.');
+      return;
+    }
+    if (linksMeta.links_locked) {
+      setDocError('Application fields are locked (read-only). Unlock them first to make edits.');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    setLinksSaving(true);
+    setDocError('');
+    setDocSuccess('');
+    try {
+      const { data } = await axios.put(
+        `http://localhost:5000/api/admin/projects/${projectId}/links`,
+        {
+          application_url: applicationUrl,
+          application_github_link: applicationGithubLink
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (data?.links) {
+        setLinksMeta((prev) => ({ ...prev, ...data.links }));
+        setApplicationUrl(data.links.application_url || '');
+        setApplicationGithubLink(data.links.application_github_link || '');
+      }
+      setDocSuccess('Application URL and GitHub link saved successfully!');
+      setTimeout(() => setDocSuccess(''), 4000);
+    } catch (err) {
+      setDocError(err.response?.data?.error || 'Failed to save application links.');
+    } finally {
+      setLinksSaving(false);
+    }
+  };
+
+  const handleToggleSectionLock = async (target, nextLocked) => {
+    if (!canLockContent) {
+      setDocError('Access Denied: Only Project Lead and Manager can lock or unlock files and fields.');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    setLockUpdating(target);
+    setDocError('');
+    setDocSuccess('');
+    try {
+      const payload = { target, locked: nextLocked };
+      if ((target === 'links' || target === 'all') && nextLocked && !linksMeta.links_locked) {
+        payload.application_url = applicationUrl;
+        payload.application_github_link = applicationGithubLink;
+      }
+
+      const { data } = await axios.put(
+        `http://localhost:5000/api/admin/projects/${projectId}/locks`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (data?.links) {
+        setLinksMeta((prev) => ({ ...prev, ...data.links }));
+        setApplicationUrl(data.links.application_url || '');
+        setApplicationGithubLink(data.links.application_github_link || '');
+      }
+      if (target === 'documents' || target === 'all') {
+        fetchDocuments();
+      }
+      setDocSuccess(data?.message || (nextLocked ? 'Locked (Read-only).' : 'Unlocked (Editable).'));
+      setTimeout(() => setDocSuccess(''), 3500);
+    } catch (err) {
+      setDocError(err.response?.data?.error || 'Failed to update lock status.');
+    } finally {
+      setLockUpdating('');
+    }
+  };
+
+  const handleToggleDocLock = async (doc) => {
+    if (!canLockContent) {
+      setDocError('Access Denied: Only Project Lead and Manager can lock or unlock files.');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    setDocLockUpdatingId(doc.id);
+    setDocError('');
+    setDocSuccess('');
+    try {
+      const nextLocked = !doc.is_locked;
+      const { data } = await axios.put(
+        `http://localhost:5000/api/admin/projects/${projectId}/documents/${doc.id}/lock`,
+        { locked: nextLocked },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (data?.document) {
+        setDocuments((prev) => prev.map((d) => (d.id === doc.id ? data.document : d)));
+      }
+      setDocSuccess(nextLocked ? `"${doc.name}" locked (read-only).` : `"${doc.name}" unlocked.`);
+      setTimeout(() => setDocSuccess(''), 3000);
+    } catch (err) {
+      setDocError(err.response?.data?.error || 'Failed to toggle file lock.');
+    } finally {
+      setDocLockUpdatingId(null);
+    }
+  };
+
+  const handleRaiseTestingRequest = async (e) => {
+    if (e) e.preventDefault();
+    if (!canManageTestingRequest) {
+      setTestingMsg({ text: 'Access Denied: Only Project Lead and Manager can raise a request for testing.', type: 'error' });
+      return;
+    }
+    const token = localStorage.getItem('token');
+    setTestingSubmitting(true);
+    setTestingMsg({ text: '', type: '' });
+    try {
+      const { data } = await axios.post(
+        `http://localhost:5000/api/admin/projects/${projectId}/testing-request`,
+        {
+          priority: testingPriority,
+          details: testingNotes
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (data?.approval) {
+        setTestingRequests((prev) => [data.approval, ...prev]);
+      }
+      setTestingNotes('');
+      setTestingMsg({
+        text: `Testing request (${data?.approval?.req_code || 'Submitted'}) sent to QA Lead's Approvals & Requests module.`,
+        type: 'success'
+      });
+    } catch (err) {
+      setTestingMsg({
+        text: err.response?.data?.error || 'Failed to send testing request.',
+        type: 'error'
+      });
+    } finally {
+      setTestingSubmitting(false);
+    }
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!canUploadDocuments) {
-      setDocError('Access Denied: Only Manager and the assigned Project Lead are permitted to upload project documents.');
-      return;
-    }
-
-    const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx'];
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
-    if (!fileExt || !ALLOWED_EXTENSIONS.includes(fileExt)) {
-      setDocError('Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX.');
+    if (!canEditDocsAndLinks) {
+      setDocError('Access Denied: QA Members are not permitted to upload project documents.');
       event.target.value = '';
       return;
     }
 
-    if (file.size > 25 * 1024 * 1024) {
-      setDocError('File is too large. Maximum allowed size is 25 MB.');
+    if (linksMeta.documents_locked) {
+      setDocError('Uploaded documents are locked (read-only) by Project Lead or Manager.');
+      event.target.value = '';
+      return;
+    }
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExt || !ALLOWED_DOCUMENT_EXTENSIONS.includes(fileExt)) {
+      setDocError('Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX, APK.');
+      event.target.value = '';
+      return;
+    }
+
+    const maxSizeMb = fileExt === 'apk' ? 100 : 25;
+    if (file.size === 0) {
+      setDocError('Cannot upload an empty (0 B) file. Please select a valid non-empty file.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > maxSizeMb * 1024 * 1024) {
+      setDocError(`File is too large. Maximum allowed size is ${maxSizeMb} MB.`);
       event.target.value = '';
       return;
     }
@@ -277,57 +546,50 @@ export default function AdminProjectWorkspace() {
     setDocSuccess('');
     setDocUploadLoading(true);
 
+    const fileSizeStr = file.size > 1024 * 1024
+      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+      : file.size >= 1024
+      ? `${Math.max(1, Math.round(file.size / 1024))} KB`
+      : `${file.size} B`;
+
+    const token = localStorage.getItem('token');
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result;
-        const fileSizeStr = file.size > 1024 * 1024 
-          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-          : `${Math.max(1, Math.round(file.size / 1024))} KB`;
-
-        const token = localStorage.getItem('token');
-        try {
-          const res = await axios.post(
-            `http://localhost:5000/api/admin/projects/${projectId}/documents`,
-            {
-              name: file.name,
-              file_url: base64Data,
-              file_size: fileSizeStr,
-              file_type: fileExt.toUpperCase()
-            },
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
-          );
-          setDocuments((prev) => [res.data, ...prev]);
-          setDocSuccess(`Document "${file.name}" uploaded successfully!`);
-          fetchProjectData();
-          setTimeout(() => setDocSuccess(''), 4000);
-        } catch (apiErr) {
-          setDocError(apiErr.response?.data?.error || 'Failed to upload document. Please try again.');
-        } finally {
-          setDocUploadLoading(false);
-          event.target.value = '';
+      const res = await axios.post(
+        `http://localhost:5000/api/admin/projects/${projectId}/documents/upload`,
+        file,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/octet-stream',
+            'X-File-Name': encodeURIComponent(file.name),
+            'X-File-Size': fileSizeStr,
+            'X-File-Type': fileExt.toUpperCase()
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+          timeout: 0
         }
-      };
-
-      reader.onerror = () => {
-        setDocError('Failed to read file from local disk.');
-        setDocUploadLoading(false);
-        event.target.value = '';
-      };
-
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setDocError('An error occurred during file upload.');
+      );
+      setDocuments((prev) => [res.data, ...prev]);
+      setDocSuccess(`Document "${file.name}" uploaded successfully!`);
+      fetchProjectData();
+      setTimeout(() => setDocSuccess(''), 4000);
+    } catch (apiErr) {
+      setDocError(apiErr.response?.data?.error || 'Failed to upload document. Please try again.');
+    } finally {
       setDocUploadLoading(false);
       event.target.value = '';
     }
   };
 
   const handleDeleteDocument = async (docId, docName) => {
-    if (!canUploadDocuments) {
-      setDocError('Access Denied: Only Manager and the assigned Project Lead can delete documents.');
+    if (!canEditDocsAndLinks) {
+      setDocError('Access Denied: QA Members cannot delete documents.');
+      return;
+    }
+    const targetDoc = documents.find((d) => d.id === docId);
+    if (linksMeta.documents_locked || targetDoc?.is_locked) {
+      setDocError('This file is locked (read-only). Unlock it first to delete.');
       return;
     }
     if (!window.confirm(`Are you sure you want to delete "${docName}"?`)) return;
@@ -359,7 +621,9 @@ export default function AdminProjectWorkspace() {
       fetchLeadsAndHistory(),
       fetchDevsAndHistory(),
       fetchTickets(),
-      fetchDocuments()
+      fetchDocuments(),
+      fetchProjectLinks(),
+      canManageTestingRequest ? fetchTestingRequests() : Promise.resolve()
     ]).finally(() => setLoading(false));
   }, [projectId]);
 
@@ -374,6 +638,12 @@ export default function AdminProjectWorkspace() {
     }
     if (folderId === 'documents') {
       fetchDocuments();
+      fetchProjectLinks();
+    }
+    if (folderId === 'testing-request') {
+      if (!canManageTestingRequest) return;
+      fetchProjectLinks();
+      fetchTestingRequests();
     }
     setActiveFolder(folderId);
   };
@@ -556,8 +826,11 @@ export default function AdminProjectWorkspace() {
           </header>
 
           {/* Folder tabs */}
-          <section className="project-workspace-folders" aria-label="Project folders">
-            {WORKSPACE_FOLDERS.map(({ id, label, detail, icon: Icon }) => (
+          <section
+            className={`project-workspace-folders${visibleWorkspaceFolders.length === 7 ? ' has-seven' : ''}`}
+            aria-label="Project folders"
+          >
+            {visibleWorkspaceFolders.map(({ id, label, detail, icon: Icon }) => (
               <button
                 className={`project-folder ${activeFolder === id ? 'active' : ''}`}
                 key={id}
@@ -836,30 +1109,45 @@ export default function AdminProjectWorkspace() {
             </section>
           )}
 
-          {/* Tab 5: Documents */}
+          {/* Tab 5: Documents & Application Links */}
           {activeFolder === 'documents' && (
             <section className="project-workspace-content">
               <div className="project-content-heading">
                 <div>
                   <span>PROJECT CONTENTS</span>
-                  <h2>Project Documents</h2>
+                  <h2>Project Documents & Application Links</h2>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <strong>{documents.length} document{documents.length === 1 ? '' : 's'} tracked</strong>
-
-                  {/* Document upload is strictly restricted to Manager and assigned Project Lead */}
-                  {canUploadDocuments && (
-                    <label className="pw-btn-upload-doc">
-                      <Upload size={16} color="#FFFFFF" />
-                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Documents'}</span>
-                      <input
-                        type="file"
-                        onChange={handleFileUpload}
-                        disabled={docUploadLoading}
-                        style={{ display: 'none' }}
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.ppt,.pptx"
-                      />
-                    </label>
+                  {canLockContent && (
+                    <button
+                      type="button"
+                      className={`pw-btn-lock ${linksMeta.links_locked && linksMeta.documents_locked ? 'locked' : ''}`}
+                      onClick={() =>
+                        handleToggleSectionLock(
+                          'all',
+                          !(linksMeta.links_locked && linksMeta.documents_locked)
+                        )
+                      }
+                      disabled={lockUpdating === 'all'}
+                      title={
+                        linksMeta.links_locked && linksMeta.documents_locked
+                          ? 'Unlock all fields and uploaded files'
+                          : 'Lock all fields and uploaded files (Read-only)'
+                      }
+                    >
+                      {linksMeta.links_locked && linksMeta.documents_locked ? (
+                        <>
+                          <Unlock size={14} />
+                          <span>{lockUpdating === 'all' ? 'Unlocking...' : 'Unlock All'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={14} />
+                          <span>{lockUpdating === 'all' ? 'Locking...' : 'Lock All'}</span>
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
               </div>
@@ -901,7 +1189,203 @@ export default function AdminProjectWorkspace() {
                 </div>
               )}
 
-              {/* Content view */}
+              {/* Application URL & Application GitHub Link Card */}
+              <form className="pw-links-card" onSubmit={handleSaveLinks}>
+                <div className="pw-links-card-header">
+                  <div>
+                    <h3>Application Links</h3>
+                    <p>
+                      {linksMeta.links_locked
+                        ? `Locked (Read-Only)${linksMeta.links_locked_by ? ` by ${linksMeta.links_locked_by}` : ''}`
+                        : isQAMember
+                        ? 'Read-only access for QA Members'
+                        : 'Enter the live Application URL and GitHub repository link for this project'}
+                    </p>
+                  </div>
+                  <div className="pw-links-header-actions">
+                    <span className={`pw-lock-pill ${linksMeta.links_locked || isQAMember ? 'locked' : 'unlocked'}`}>
+                      {linksMeta.links_locked ? (
+                        <>
+                          <Lock size={12} />
+                          <span>Locked • Read Only</span>
+                        </>
+                      ) : isQAMember ? (
+                        <>
+                          <Eye size={12} />
+                          <span>Read Only</span>
+                        </>
+                      ) : (
+                        <>
+                          <Unlock size={12} />
+                          <span>Editable</span>
+                        </>
+                      )}
+                    </span>
+                    {canLockContent && (
+                      <button
+                        type="button"
+                        className={`pw-btn-lock ${linksMeta.links_locked ? 'locked' : ''}`}
+                        onClick={() => handleToggleSectionLock('links', !linksMeta.links_locked)}
+                        disabled={lockUpdating === 'links'}
+                      >
+                        {linksMeta.links_locked ? (
+                          <>
+                            <Unlock size={13} />
+                            <span>{lockUpdating === 'links' ? 'Unlocking...' : 'Unlock Fields'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={13} />
+                            <span>{lockUpdating === 'links' ? 'Locking...' : 'Lock Fields'}</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pw-links-grid">
+                  <div className="pw-form-group">
+                    <label htmlFor="pw-app-url">
+                      <Globe size={13} />
+                      <span>Application URL</span>
+                    </label>
+                    <div className="pw-link-input-wrap">
+                      <input
+                        id="pw-app-url"
+                        type="url"
+                        className={`pw-input${!canEditDocsAndLinks || linksMeta.links_locked ? ' pw-input-readonly' : ''}`}
+                        placeholder="https://app.example.com"
+                        value={applicationUrl}
+                        onChange={(e) => setApplicationUrl(e.target.value)}
+                        readOnly={!canEditDocsAndLinks || linksMeta.links_locked}
+                      />
+                      {applicationUrl.trim() && !/^(javascript|vbscript|data):/i.test(applicationUrl.trim()) && (
+                        <a
+                          href={/^https?:\/\//i.test(applicationUrl.trim()) ? applicationUrl.trim() : `https://${applicationUrl.trim()}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="pw-link-open-btn"
+                          title="Open Application URL"
+                        >
+                          <ExternalLink size={14} />
+                          <span>Open</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pw-form-group">
+                    <label htmlFor="pw-github-url">
+                      <GitBranch size={13} />
+                      <span>Application GitHub Link</span>
+                    </label>
+                    <div className="pw-link-input-wrap">
+                      <input
+                        id="pw-github-url"
+                        type="url"
+                        className={`pw-input${!canEditDocsAndLinks || linksMeta.links_locked ? ' pw-input-readonly' : ''}`}
+                        placeholder="https://github.com/organization/repository"
+                        value={applicationGithubLink}
+                        onChange={(e) => setApplicationGithubLink(e.target.value)}
+                        readOnly={!canEditDocsAndLinks || linksMeta.links_locked}
+                      />
+                      {applicationGithubLink.trim() && !/^(javascript|vbscript|data):/i.test(applicationGithubLink.trim()) && (
+                        <a
+                          href={/^https?:\/\//i.test(applicationGithubLink.trim()) ? applicationGithubLink.trim() : `https://${applicationGithubLink.trim()}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="pw-link-open-btn"
+                          title="Open GitHub Repository"
+                        >
+                          <ExternalLink size={14} />
+                          <span>Open</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {canEditDocsAndLinks && !linksMeta.links_locked && (
+                  <div className="pw-links-footer">
+                    <button
+                      type="submit"
+                      className="pw-btn-primary"
+                      disabled={linksSaving}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Save size={14} />
+                      <span>{linksSaving ? 'Saving...' : 'Save Links'}</span>
+                    </button>
+                  </div>
+                )}
+              </form>
+
+              {/* Uploaded Files Section Header */}
+              <div className="pw-docs-section-bar">
+                <div className="pw-docs-section-title">
+                  <h3>Uploaded Files</h3>
+                  <span className={`pw-lock-pill ${linksMeta.documents_locked || isQAMember ? 'locked' : 'unlocked'}`}>
+                    {linksMeta.documents_locked ? (
+                      <>
+                        <Lock size={12} />
+                        <span>
+                          Files Locked • Read Only{linksMeta.documents_locked_by ? ` by ${linksMeta.documents_locked_by}` : ''}
+                        </span>
+                      </>
+                    ) : isQAMember ? (
+                      <>
+                        <Eye size={12} />
+                        <span>View & Download Only</span>
+                      </>
+                    ) : (
+                      <>
+                        <Unlock size={12} />
+                        <span>Editable</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  {canLockContent && (
+                    <button
+                      type="button"
+                      className={`pw-btn-lock ${linksMeta.documents_locked ? 'locked' : ''}`}
+                      onClick={() => handleToggleSectionLock('documents', !linksMeta.documents_locked)}
+                      disabled={lockUpdating === 'documents'}
+                    >
+                      {linksMeta.documents_locked ? (
+                        <>
+                          <Unlock size={13} />
+                          <span>{lockUpdating === 'documents' ? 'Unlocking...' : 'Unlock Files'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={13} />
+                          <span>{lockUpdating === 'documents' ? 'Locking...' : 'Lock Files'}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Document upload allowed for everyone except QA Members, unless locked */}
+                  {canEditDocsAndLinks && !linksMeta.documents_locked && (
+                    <label className="pw-btn-upload-doc">
+                      <Upload size={16} color="#FFFFFF" />
+                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Documents'}</span>
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        disabled={docUploadLoading}
+                        style={{ display: 'none' }}
+                        accept={ALLOWED_DOCUMENT_ACCEPT}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Documents Content view */}
               {documentsLoading ? (
                 <div style={{ padding: '36px', textAlign: 'center', color: '#64748B', fontSize: '14px' }}>
                   Loading project documents...
@@ -920,11 +1404,13 @@ export default function AdminProjectWorkspace() {
                     No Documents Uploaded Yet
                   </h4>
                   <p style={{ margin: '0 auto 16px', fontSize: '13px', color: '#64748B', maxWidth: '440px' }}>
-                    {canUploadDocuments
+                    {linksMeta.documents_locked
+                      ? 'Document uploads are currently locked (read-only) by Project Lead or Manager.'
+                      : canEditDocsAndLinks
                       ? 'Upload product specifications, test plans, architecture diagrams, or contract files for this project.'
                       : 'No documents have been uploaded for this project yet.'}
                   </p>
-                  {canUploadDocuments && (
+                  {canEditDocsAndLinks && !linksMeta.documents_locked && (
                     <label className="pw-btn-upload-doc">
                       <Upload size={16} color="#FFFFFF" />
                       <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Documents'}</span>
@@ -933,7 +1419,7 @@ export default function AdminProjectWorkspace() {
                         onChange={handleFileUpload}
                         disabled={docUploadLoading}
                         style={{ display: 'none' }}
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.ppt,.pptx"
+                        accept={ALLOWED_DOCUMENT_ACCEPT}
                       />
                     </label>
                   )}
@@ -952,65 +1438,91 @@ export default function AdminProjectWorkspace() {
                       </tr>
                     </thead>
                     <tbody>
-                      {documents.map((doc) => (
-                        <tr key={doc.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <FileText size={18} color="#2563EB" />
-                              <span style={{ fontWeight: 600, color: '#0F172A' }}>{doc.name}</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px', color: '#64748B' }}>
-                            <span style={{
-                              background: '#EFF6FF',
-                              color: '#1D4ED8',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11.5px',
-                              fontWeight: 600
-                            }}>
-                              {doc.file_type || 'FILE'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px 16px', color: '#64748B' }}>{doc.file_size || '—'}</td>
-                          <td style={{ padding: '12px 16px', color: '#334155', fontWeight: 500 }}>{doc.uploaded_by || 'Admin'}</td>
-                          <td style={{ padding: '12px 16px', color: '#64748B' }}>
-                            {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : '—'}
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleViewDocument(doc)}
-                                className="pw-btn-doc-view"
-                                title="View document"
-                              >
-                                <Eye size={13} />
-                                <span>View</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadDocument(doc)}
-                                className="pw-btn-doc-download"
-                                title="Download document"
-                              >
-                                <Download size={13} />
-                                <span>Download</span>
-                              </button>
-                              {canUploadDocuments && (
+                      {documents.map((doc) => {
+                        const rowLocked = Boolean(linksMeta.documents_locked || doc.is_locked);
+                        return (
+                          <tr key={doc.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <FileText size={18} color="#2563EB" />
+                                <span style={{ fontWeight: 600, color: '#0F172A' }}>{doc.name}</span>
+                                {isDocumentEmpty(doc) && (
+                                  <span style={{ background: '#FEF3C7', color: '#B45309', padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                                    Empty (0 B)
+                                  </span>
+                                )}
+                                {rowLocked && (
+                                  <span className="pw-file-locked-badge" title={doc.locked_by ? `Locked by ${doc.locked_by}` : 'Locked (Read-Only)'}>
+                                    <Lock size={11} />
+                                    <span>Locked</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#64748B' }}>
+                              <span style={{
+                                background: '#EFF6FF',
+                                color: '#1D4ED8',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11.5px',
+                                fontWeight: 600
+                              }}>
+                                {doc.file_type || 'FILE'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#64748B' }}>{doc.file_size || '—'}</td>
+                            <td style={{ padding: '12px 16px', color: '#334155', fontWeight: 500 }}>{doc.uploaded_by || 'Admin'}</td>
+                            <td style={{ padding: '12px 16px', color: '#64748B' }}>
+                              {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : '—'}
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteDocument(doc.id, doc.name)}
-                                  className="pw-btn-doc-delete"
-                                  title="Delete document"
+                                  onClick={() => handleViewDocument(doc)}
+                                  className="pw-btn-doc-view"
+                                  title="View document"
                                 >
-                                  <Trash2 size={13} />
+                                  <Eye size={13} />
+                                  <span>View</span>
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadDocument(doc)}
+                                  disabled={docDownloadingId === doc.id}
+                                  className="pw-btn-doc-download"
+                                  title="Download document"
+                                >
+                                  <Download size={13} />
+                                  <span>{docDownloadingId === doc.id ? 'Downloading...' : 'Download'}</span>
+                                </button>
+                                {canLockContent && !linksMeta.documents_locked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleDocLock(doc)}
+                                    disabled={docLockUpdatingId === doc.id}
+                                    className={`pw-btn-doc-lock ${doc.is_locked ? 'locked' : ''}`}
+                                    title={doc.is_locked ? 'Unlock file' : 'Lock file (Read-only)'}
+                                  >
+                                    {doc.is_locked ? <Unlock size={13} /> : <Lock size={13} />}
+                                  </button>
+                                )}
+                                {canEditDocsAndLinks && !rowLocked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                                    className="pw-btn-doc-delete"
+                                    title="Delete document"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1018,7 +1530,147 @@ export default function AdminProjectWorkspace() {
             </section>
           )}
 
-          {/* Tab 6: Details */}
+          {/* Tab 6: Testing Request (Project Lead & Manager Only) */}
+          {activeFolder === 'testing-request' && canManageTestingRequest && (
+            <section className="project-workspace-content">
+              <div className="project-content-heading">
+                <div>
+                  <span>QA TESTING WORKFLOW</span>
+                  <h2>Request to Start Testing</h2>
+                </div>
+                {testingRequests.length > 0 && (
+                  <span className={`pw-req-status-badge ${String(testingRequests[0].status || 'Pending').toLowerCase()}`}>
+                    Latest: {testingRequests[0].status} ({testingRequests[0].req_code})
+                  </span>
+                )}
+              </div>
+
+              {testingMsg.text && (
+                <div className={`pw-alert ${testingMsg.type}`} style={{ marginBottom: '16px' }}>
+                  {testingMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                  <span>{testingMsg.text}</span>
+                </div>
+              )}
+
+              <div className="pw-test-req-card">
+                <div className="pw-test-req-summary">
+                  <div>
+                    <small>Project</small>
+                    <strong>{activeProject.name} ({activeProject.project_code})</strong>
+                  </div>
+                  <div>
+                    <small>Application URL</small>
+                    <strong>{applicationUrl.trim() || 'Not set yet'}</strong>
+                  </div>
+                  <div>
+                    <small>GitHub Repository</small>
+                    <strong>{applicationGithubLink.trim() || 'Not set yet'}</strong>
+                  </div>
+                  <div>
+                    <small>Uploaded Documents</small>
+                    <strong>{documents.length} file{documents.length === 1 ? '' : 's'}</strong>
+                  </div>
+                </div>
+
+                <form onSubmit={handleRaiseTestingRequest} className="pw-test-req-form">
+                  <div className="pw-test-req-row">
+                    <div className="pw-form-group" style={{ minWidth: '180px' }}>
+                      <label htmlFor="pw-testing-priority">Request Priority</label>
+                      <select
+                        id="pw-testing-priority"
+                        className="pw-select"
+                        value={testingPriority}
+                        onChange={(e) => setTestingPriority(e.target.value)}
+                      >
+                        <option value="Critical">Critical</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                      </select>
+                    </div>
+
+                    <div className="pw-form-group" style={{ flex: 1 }}>
+                      <label htmlFor="pw-testing-notes">Testing Notes / Build Details for QA Lead</label>
+                      <input
+                        id="pw-testing-notes"
+                        type="text"
+                        className="pw-input"
+                        placeholder="e.g. Build v1.0 deployed on staging, credentials & test scope in Documents..."
+                        value={testingNotes}
+                        onChange={(e) => setTestingNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pw-test-req-actions">
+                    <p className="pw-test-req-hint">
+                      Submitting sends this project testing request directly to the QA Lead&apos;s Approvals &amp; Requests module.
+                    </p>
+                    <button
+                      type="submit"
+                      className="pw-btn-raise-testing"
+                      disabled={testingSubmitting || testingRequests[0]?.status === 'Pending'}
+                    >
+                      <Send size={15} />
+                      <span>
+                        {testingSubmitting
+                          ? 'Sending Request...'
+                          : testingRequests[0]?.status === 'Pending'
+                          ? 'Request Pending QA Lead Approval'
+                          : 'Raise Request for Testing'}
+                      </span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="pw-section-sub" style={{ marginTop: 24 }}>
+                <h3>Testing Request History ({testingRequests.length})</h3>
+                {testingRequestsLoading ? (
+                  <p className="project-workspace-empty">Loading testing requests...</p>
+                ) : testingRequests.length === 0 ? (
+                  <p className="project-workspace-empty">
+                    No request to start testing has been raised for this project yet.
+                  </p>
+                ) : (
+                  <div className="pw-table-wrap">
+                    <table className="pw-table">
+                      <thead>
+                        <tr>
+                          <th>Request Code</th>
+                          <th>Priority</th>
+                          <th>Requested By</th>
+                          <th>Notes</th>
+                          <th>Status</th>
+                          <th>Reviewed By</th>
+                          <th>Submitted On</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {testingRequests.map((reqItem) => (
+                          <tr key={reqItem.id}>
+                            <td><strong>{reqItem.req_code}</strong></td>
+                            <td>{reqItem.priority}</td>
+                            <td>{reqItem.requested_by}</td>
+                            <td>{reqItem.details || '—'}</td>
+                            <td>
+                              <span className={`pw-req-status-badge ${String(reqItem.status || 'Pending').toLowerCase()}`}>
+                                {reqItem.status}
+                              </span>
+                            </td>
+                            <td>{reqItem.reviewed_by || 'Awaiting QA Lead'}</td>
+                            <td>{formatDate(reqItem.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Tab 7: Details */}
           {activeFolder === 'details' && (
             <section className="project-workspace-content">
               <div className="project-content-heading"><div><span>PROJECT CONTENTS</span><h2>Details</h2></div></div>
@@ -1137,7 +1789,7 @@ export default function AdminProjectWorkspace() {
 
       {/* Modal: Document Preview / View */}
       {previewDoc && (
-        <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && setPreviewDoc(null)}>
+        <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closePreviewModal()}>
           <div className="pw-modal-box" style={{ maxWidth: 860, width: '92%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
             <div className="pw-modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
@@ -1194,7 +1846,7 @@ export default function AdminProjectWorkspace() {
                   <Download size={14} />
                   <span>Download</span>
                 </button>
-                <button className="pw-modal-close" onClick={() => setPreviewDoc(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                <button className="pw-modal-close" onClick={closePreviewModal} style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
                   <X size={18} />
                 </button>
               </div>
@@ -1203,7 +1855,7 @@ export default function AdminProjectWorkspace() {
             <div className="pw-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', minHeight: '360px' }}>
               {isImage(previewDoc.name) ? (
                 <img
-                  src={previewDoc.file_url}
+                  src={previewDoc.blobUrl || previewDoc.file_url}
                   alt={previewDoc.name}
                   style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                 />

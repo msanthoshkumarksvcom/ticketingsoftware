@@ -60,6 +60,14 @@ export const initDatabase = async () => {
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_name VARCHAR(150);
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS lead_assigned_at TIMESTAMP;
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS lead_assigned_by VARCHAR(150);
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS application_url TEXT DEFAULT '';
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS application_github_link TEXT DEFAULT '';
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked BOOLEAN DEFAULT FALSE;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked_by VARCHAR(150);
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked_at TIMESTAMP;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS documents_locked BOOLEAN DEFAULT FALSE;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS documents_locked_by VARCHAR(150);
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS documents_locked_at TIMESTAMP;
     `);
 
     // 2.1 Project Lead Assignments History
@@ -205,6 +213,17 @@ export const initDatabase = async () => {
         details TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id) ON DELETE CASCADE;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS project_code VARCHAR(50);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS project_name VARCHAR(150);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS requested_by_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS requested_by_role VARCHAR(50);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS application_url TEXT;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS application_github_link TEXT;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(150);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS review_notes TEXT;
     `);
 
     // 6. Deployments
@@ -253,6 +272,10 @@ export const initDatabase = async () => {
         uploaded_by_id INT REFERENCES users(id) ON DELETE SET NULL,
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE;
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_by VARCHAR(150);
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP;
     `);
 
     // ========================
