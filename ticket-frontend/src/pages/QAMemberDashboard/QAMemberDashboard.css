@@ -27,9 +27,9 @@
 
 .qa-stat-card {
   background: #ffffff;
-  border-radius: 16px;
-  padding: 20px 22px;
-  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-xl, 14px);
+  padding: 18px 20px;
+  border: 1.5px solid var(--color-line, #e2e8f0);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -41,13 +41,13 @@
 .qa-stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.08);
-  border-color: #cbd5e1;
+  border-color: var(--color-line-hover, #cbd5e1);
 }
 
 .qa-stat-icon-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg, 12px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -81,17 +81,17 @@
 }
 
 .qa-stat-value {
-  font-size: 1.65rem;
-  font-weight: 700;
+  font-size: var(--fs-kpi, 1.85rem);
+  font-weight: 800;
   color: #0f172a;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .qa-stat-label {
-  font-size: 0.82rem;
+  font-size: var(--fs-label, 0.78125rem);
   color: #64748b;
-  font-weight: 500;
-  margin-top: 3px;
+  font-weight: 600;
+  margin-top: 2px;
 }
 
 /* Quick Action Hub */
@@ -103,7 +103,7 @@
 }
 
 .qa-section-title {
-  font-size: 1.12rem;
+  font-size: var(--fs-h2, 1.125rem);
   font-weight: 700;
   color: #0f172a;
   display: flex;
@@ -112,10 +112,10 @@
 }
 
 .qa-section-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: var(--fs-badge, 0.71875rem);
+  font-weight: 700;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill, 9999px);
   background: #ecfdf5;
   color: #059669;
   border: 1px solid #a7f3d0;

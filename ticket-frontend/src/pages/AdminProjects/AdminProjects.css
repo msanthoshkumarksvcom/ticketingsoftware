@@ -916,13 +916,14 @@
   width: 36px;
   height: 36px;
   border-radius: 9999px;
-  background-color: #ede9fe;
-  color: #6366f1;
-  font-size: 15px;
+  background-color: #EFF6FF;
+  color: #1E3A8A;
+  font-size: 14px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid #DBEAFE;
 }
 
 .pj-profile-text {
