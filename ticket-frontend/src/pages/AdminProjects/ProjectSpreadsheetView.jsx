@@ -30,12 +30,10 @@ const SHEET_COLUMNS = [
 ];
 
 const DEPARTMENTS = [
-  'Operations',
-  'Engineering',
-  'Quality Assurance',
-  'Human Resources',
-  'Finance',
-  'Product Management'
+  'Website',
+  'Mobile App',
+  'Web and Mobile',
+  'Desktop App'
 ];
 
 const STATUSES = ['Active', 'In Progress', 'Planning', 'Completed', 'On Hold'];
@@ -69,8 +67,8 @@ export default function ProjectSpreadsheetView({
       // 1. Tab filter
       if (activeTab === 'active' && project.status !== 'Active') return false;
       if (activeTab === 'in_progress' && project.status !== 'In Progress') return false;
-      if (activeTab === 'qa' && project.department !== 'Quality Assurance') return false;
-      if (activeTab === 'engineering' && project.department !== 'Engineering') return false;
+      if (activeTab === 'website' && project.department !== 'Website') return false;
+      if (activeTab === 'mobile' && project.department !== 'Mobile App') return false;
       if (activeTab === 'completed' && project.status !== 'Completed') return false;
 
       // 2. Department filter
@@ -577,16 +575,16 @@ export default function ProjectSpreadsheetView({
             Active Projects
           </button>
           <button
-            className={`pj-sheet-tab-btn ${activeTab === 'qa' ? 'active' : ''}`}
-            onClick={() => setActiveTab('qa')}
+            className={`pj-sheet-tab-btn ${activeTab === 'website' ? 'active' : ''}`}
+            onClick={() => setActiveTab('website')}
           >
-            Quality Assurance
+            Website
           </button>
           <button
-            className={`pj-sheet-tab-btn ${activeTab === 'engineering' ? 'active' : ''}`}
-            onClick={() => setActiveTab('engineering')}
+            className={`pj-sheet-tab-btn ${activeTab === 'mobile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('mobile')}
           >
-            Engineering
+            Mobile App
           </button>
           <button
             className={`pj-sheet-tab-btn ${activeTab === 'completed' ? 'active' : ''}`}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
+  AlertTriangle,
   Bell,
   Building2,
   Calendar,
@@ -10,7 +11,6 @@ import {
   Edit2,
   FileSpreadsheet,
   FileText,
-  Filter,
   Folder,
   FolderPlus,
   LayoutGrid,
@@ -27,13 +27,146 @@ import {
   X
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
+import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import FolderEmblem from './FolderEmblem';
 import ProjectSpreadsheetView from './ProjectSpreadsheetView';
 import '../../styles/admin.css';
 import './AdminProjects.css';
 
+const PJ_TYPE_OPTIONS = [
+  { value: 'All Departments', label: 'All Project Types' },
+  { value: 'Website', label: 'Website' },
+  { value: 'Mobile App', label: 'Mobile App' },
+  { value: 'Web and Mobile', label: 'Web and Mobile' },
+  { value: 'Desktop App', label: 'Desktop App' }
+];
+
+const PJ_STATUS_OPTIONS = [
+  { value: 'All Statuses', label: 'All Statuses' },
+  { value: 'Active', label: 'Active' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Planning', label: 'Planning' },
+  { value: 'Completed', label: 'Completed' },
+  { value: 'On Hold', label: 'On Hold' }
+];
+
+const PJ_PRIORITY_OPTIONS = [
+  { value: 'All Priorities', label: 'All Priorities' },
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
+
+const PJ_SORT_OPTIONS = [
+  { value: 'Last Updated', label: 'Sort by: Last Updated' },
+  { value: 'Name', label: 'Sort by: Name' },
+  { value: 'Date', label: 'Sort by: Date' }
+];
+
+const MODAL_PROJECT_TYPE_OPTIONS = [
+  { value: 'Website', label: 'Website' },
+  { value: 'Mobile App', label: 'Mobile App' },
+  { value: 'Web and Mobile', label: 'Web and Mobile' },
+  { value: 'Desktop App', label: 'Desktop App' }
+];
+
+const MODAL_PROJECT_PRIORITY_OPTIONS = [
+  { value: 'Critical', label: 'Critical' },
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' }
+];
+
+const MODAL_PROJECT_STATUS_OPTIONS = [
+  { value: 'Active', label: 'Active' },
+  { value: 'In Progress', label: 'In Progress' },
+  { value: 'Planning', label: 'Planning' },
+  { value: 'Not Started', label: 'Not Started' },
+  { value: 'Completed', label: 'Completed' }
+];
+
 // Default empty projects array
 const EXACT_DEFAULT_PROJECTS = [];
+
+export const generateProjectCode = (nameVal, existingProjects = []) => {
+  if (!nameVal || !nameVal.trim()) return '';
+
+  // Split into words by spaces, hyphens or underscores
+  const words = nameVal
+    .trim()
+    .split(/[\s\-_]+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, ''))
+    .filter(Boolean);
+
+  if (words.length === 0) return '';
+
+  let codeKey = '';
+  if (words.length > 1) {
+    // Multi-word project: take first letters of the words (acronym, e.g. "Customer Support Portal" -> "CSP")
+    codeKey = words.map((w) => w.charAt(0).toUpperCase()).join('');
+  } else {
+    // Single word project: shorten word to 3-4 uppercase characters (e.g. "Hospital" -> "HOSP", "Dee" -> "DEE")
+    const singleWord = words[0].toUpperCase();
+    codeKey = singleWord.length > 4 ? singleWord.slice(0, 4) : singleWord;
+  }
+
+  if (!codeKey) return '';
+
+  const prefix = `PRJ-${codeKey}`;
+  let maxNum = 0;
+  const regex = new RegExp(`^${prefix}-([0-9]+)$`);
+  if (Array.isArray(existingProjects)) {
+    existingProjects.forEach((p) => {
+      if (p && p.project_code) {
+        const match = p.project_code.match(regex);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    });
+  }
+  const nextNum = String(maxNum + 1).padStart(4, '0');
+  return `${prefix}-${nextNum}`;
+};
+
+export const getTodayDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const toLocalDateInputString = (dateVal) => {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
+    return dateVal.trim();
+  }
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const getMinTargetDate = (startDateStr) => {
+  const baseStr = startDateStr || getTodayDateString();
+  const parts = baseStr.split('-');
+  if (parts.length === 3) {
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    d.setDate(d.getDate() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return baseStr;
+};
 
 const initialProjectForm = {
   project_code: '',
@@ -43,15 +176,11 @@ const initialProjectForm = {
   project_lead_id: '',
   lead_name: '',
   priority: 'Medium',
-  department: 'Quality Assurance',
+  department: '',
   status: 'In Progress',
-  start_date: new Date().toISOString().split('T')[0],
-  team_members: 4,
-  test_cases: 0,
-  documents: 0,
-  tickets_count: 0,
-  folder_color: 'blue',
-  folder_icon: 'folder'
+  start_date: '',
+  team_members: '',
+  end_date: ''
 };
 
 function AdminProjects() {
@@ -59,7 +188,6 @@ function AdminProjects() {
   const [projects, setProjects] = useState([]);
   const [, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
-  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [statusFilter, setStatusFilter] = useState('All Statuses');
@@ -72,19 +200,52 @@ function AdminProjects() {
   const [editId, setEditId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [deletingProject, setDeletingProject] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [projectLeads, setProjectLeads] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
+
     axios.get('http://localhost:5000/api/admin/project-leads', {
       headers: { Authorization: `Bearer ${token}` }
     }).then((res) => {
-      setProjectLeads(Array.isArray(res.data) ? res.data : []);
-    }).catch((err) => {
-      console.warn('Could not fetch project leads:', err.message);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        const filteredLeads = res.data.filter((u) => {
+          const r = (u.role || '').toLowerCase();
+          return r !== 'qa member' && r !== 'manager' && !r.includes('admin');
+        });
+        setProjectLeads(filteredLeads);
+      } else {
+        throw new Error('No leads from dedicated route, fallback to users');
+      }
+    }).catch(async () => {
+      try {
+        const usersRes = await axios.get('http://localhost:5000/api/admin/users', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (Array.isArray(usersRes.data)) {
+          const nonAdminUsers = usersRes.data.filter((u) => {
+            const r = (u.role || '').toLowerCase();
+            const e = (u.email || '').toLowerCase();
+            return !r.includes('admin') && r !== 'manager' && r !== 'qa member' && !e.includes('admin') && e !== 'manager@gmail.com';
+          });
+          setProjectLeads(nonAdminUsers);
+        }
+      } catch (err) {
+        console.warn('Could not fetch project leads or users:', err.message);
+      }
     });
   }, []);
+
+  const leadOptions = useMemo(() => {
+    return projectLeads.map((lead) => ({
+      value: String(lead.id),
+      label: `${lead.full_name} (${lead.role || 'Member'}) - ${lead.email}`
+    }));
+  }, [projectLeads]);
 
   // Dropdown context menu state
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -92,11 +253,20 @@ function AdminProjects() {
   // Logout modal
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // User Profile
+  // User Profile & Unread Notifications
   const [userEmail] = useState(() => localStorage.getItem('userEmail') || 'manager@gmail.com');
   const displayName = userEmail ? userEmail.split('@')[0] : 'manager';
   const currentUserRole = localStorage.getItem('userRole') || 'Manager';
   const isQAMember = currentUserRole === 'QA Member';
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  useEffect(() => {
+    const handleUnreadCount = (event) => {
+      setUnreadNotificationsCount(Number(event.detail?.unreadCount || 0));
+    };
+    window.addEventListener('notifications-unread-count', handleUnreadCount);
+    return () => window.removeEventListener('notifications-unread-count', handleUnreadCount);
+  }, []);
 
   // Fetch projects from backend
   const fetchProjects = useCallback(async () => {
@@ -133,15 +303,19 @@ function AdminProjects() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Format date as DD-MM-YYYY
+  // Format date to Indian Standard (DD/MM/YYYY)
   const formatDate = (dateStr) => {
-    if (!dateStr) return '12-10-2026';
+    if (!dateStr) return 'Not set';
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr.trim())) {
+      const [y, m, d] = dateStr.trim().split('-');
+      return `${d}/${m}/${y}`;
+    }
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return String(dateStr);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    return `${day}-${month}-${year}`;
+    return `${day}/${month}/${year}`;
   };
 
   const openProjectWorkspace = (project) => {
@@ -161,7 +335,7 @@ function AdminProjects() {
 
   // Filter & Sort Projects
   const filteredProjects = useMemo(() => {
-    const activeSearch = (searchQuery || headerSearchQuery).trim().toLowerCase();
+    const activeSearch = searchQuery.trim().toLowerCase();
 
     return projects.filter((p) => {
       const matchesSearch =
@@ -188,9 +362,9 @@ function AdminProjects() {
       // 'Last Updated' default order
       return (b.id || 0) - (a.id || 0);
     });
-  }, [projects, searchQuery, headerSearchQuery, departmentFilter, statusFilter, sortBy]);
+  }, [projects, searchQuery, departmentFilter, statusFilter, sortBy]);
 
-  // Compute Stats - Exact reference matches: Total 8, In Progress 5, Not Started 2, Completed 1
+  // Compute Stats from real database records (0 when empty)
   const stats = useMemo(() => {
     const total = projects.length;
     const inProgress = projects.filter(
@@ -202,16 +376,59 @@ function AdminProjects() {
     const completed = projects.filter((p) => p.status === 'Completed').length;
 
     return {
-      total: total || 8,
-      inProgress: inProgress || 5,
-      notStarted: notStarted || 2,
-      completed: completed || 1
+      total,
+      inProgress,
+      notStarted,
+      completed
     };
   }, [projects]);
 
   // Form handlers
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+
+    // Validation: Only allow alphabetic characters and spaces for Project Name & Client Name
+    if (name === 'name' || name === 'client_name') {
+      const cleanAlpha = value.replace(/[^a-zA-Z\s]/g, '');
+      setFormData((prev) => {
+        const updated = { ...prev, [name]: cleanAlpha };
+        if (name === 'name' && !isEditing) {
+          updated.project_code = generateProjectCode(cleanAlpha, projects);
+        }
+        return updated;
+      });
+      if (formError) setFormError('');
+      return;
+    }
+
+    // Validation: Team Members only numbers below 10 (1-9)
+    if (name === 'team_members') {
+      const cleanDigits = value.replace(/[^0-9]/g, '');
+      if (cleanDigits === '') {
+        setFormData((prev) => ({ ...prev, [name]: '' }));
+      } else {
+        const num = parseInt(cleanDigits, 10);
+        if (num < 10) {
+          setFormData((prev) => ({ ...prev, [name]: num }));
+        }
+      }
+      if (formError) setFormError('');
+      return;
+    }
+
+    // Validation: Start Date adjustment updates min target date
+    if (name === 'start_date') {
+      setFormData((prev) => {
+        const updated = { ...prev, start_date: value };
+        if (prev.end_date && prev.end_date <= value) {
+          updated.end_date = '';
+        }
+        return updated;
+      });
+      if (formError) setFormError('');
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formError) setFormError('');
   };
@@ -219,7 +436,11 @@ function AdminProjects() {
   const openCreateModal = () => {
     setIsEditing(false);
     setEditId(null);
-    setFormData(initialProjectForm);
+    setFormData({
+      ...initialProjectForm,
+      start_date: getTodayDateString(),
+      team_members: ''
+    });
     setFormError('');
     setIsModalOpen(true);
   };
@@ -232,18 +453,14 @@ function AdminProjects() {
       name: project.name || '',
       description: project.description || '',
       client_name: project.client_name || '',
-      project_lead_id: project.project_lead_id || '',
+      project_lead_id: project.project_lead_id ? String(project.project_lead_id) : '',
       lead_name: project.lead_name || '',
       priority: project.priority || 'Medium',
-      department: project.department || 'Operations',
-      status: project.status || 'Active',
-      start_date: project.start_date ? project.start_date.split('T')[0] : '2026-10-12',
-      team_members: project.team_members || 4,
-      test_cases: project.test_cases || 0,
-      documents: project.documents || 0,
-      tickets_count: project.tickets_count || 0,
-      folder_color: project.folder_color || 'blue',
-      folder_icon: project.folder_icon || 'folder'
+      department: project.department || 'Website',
+      status: project.status || 'In Progress',
+      start_date: toLocalDateInputString(project.start_date) || getTodayDateString(),
+      team_members: project.team_members !== undefined && project.team_members !== null ? project.team_members : '',
+      end_date: toLocalDateInputString(project.end_date)
     });
     setFormError('');
     setIsModalOpen(true);
@@ -252,12 +469,87 @@ function AdminProjects() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
+    const alphaRegex = /^[a-zA-Z\s]+$/;
+
+    // 1. Project Name validation (alphabets only)
+    if (!formData.name?.trim()) {
       setFormError('Please enter a Project Name.');
       return;
     }
-    if (!formData.project_code.trim()) {
-      setFormError('Please enter a Project Code.');
+    if (!alphaRegex.test(formData.name.trim())) {
+      setFormError('Project Name can only contain alphabetic characters and spaces.');
+      return;
+    }
+
+    // 2. Project Code validation
+    if (!formData.project_code?.trim()) {
+      setFormError('Please enter or generate a Project Code (Format: PRJ-PRJ_NAME-0001).');
+      return;
+    }
+
+    // 3. Project Type (Department) validation
+    if (!formData.department?.trim()) {
+      setFormError('Please select a Project Type.');
+      return;
+    }
+
+    // 4. Client Name validation (alphabets only)
+    if (!formData.client_name?.trim()) {
+      setFormError('Please enter a Client Name.');
+      return;
+    }
+    if (!alphaRegex.test(formData.client_name.trim())) {
+      setFormError('Client Name can only contain alphabetic characters and spaces.');
+      return;
+    }
+
+    // 5. Project Lead validation
+    if (!formData.project_lead_id) {
+      setFormError('Please select a Project Lead.');
+      return;
+    }
+
+    // 6. Priority validation
+    if (!formData.priority) {
+      setFormError('Please select a Priority level.');
+      return;
+    }
+
+    // 7. Status validation
+    if (!formData.status) {
+      setFormError('Please select a Status.');
+      return;
+    }
+
+    // 8. Start Date validation (present or future date for new projects only)
+    const todayStr = getTodayDateString();
+    if (!formData.start_date) {
+      setFormError('Please select a Start Date.');
+      return;
+    }
+    if (!isEditing && formData.start_date < todayStr) {
+      setFormError('Start Date must be today or a future date.');
+      return;
+    }
+
+    // 9. Target End Date validation (optional, but if provided, must be strictly after start date)
+    if (formData.end_date) {
+      if (formData.end_date <= formData.start_date) {
+        setFormError('Target End Date must be after the Start Date.');
+        return;
+      }
+    }
+
+    // 10. Team Members validation (must be number below 10: 1 to 9)
+    const tm = parseInt(formData.team_members, 10);
+    if (formData.team_members === '' || isNaN(tm) || tm < 1 || tm >= 10) {
+      setFormError('Team Members is required and must be a number below 10 (1 - 9).');
+      return;
+    }
+
+    // 11. Project Description validation
+    if (!formData.description?.trim()) {
+      setFormError('Please enter a Project Description.');
       return;
     }
 
@@ -267,18 +559,18 @@ function AdminProjects() {
     try {
       if (isEditing && editId) {
         // Update Project
-        try {
-          if (token) {
-            await axios.put(`http://localhost:5000/api/admin/projects/${editId}`, formData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+        let updatedProject = { ...formData, id: editId };
+        if (token) {
+          const res = await axios.put(`http://localhost:5000/api/admin/projects/${editId}`, formData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data?.project) {
+            updatedProject = res.data.project;
           }
-        } catch (apiErr) {
-          console.warn('API update failed, updating local state:', apiErr.message);
         }
 
         setProjects((prev) =>
-          prev.map((p) => (p.id === editId ? { ...p, ...formData, id: editId } : p))
+          prev.map((p) => (p.id === editId ? { ...p, ...updatedProject } : p))
         );
       } else {
         // Create Project
@@ -287,17 +579,13 @@ function AdminProjects() {
           id: Date.now()
         };
 
-        try {
-          if (token) {
-            const res = await axios.post('http://localhost:5000/api/admin/projects', formData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.data?.project) {
-              newProject = res.data.project;
-            }
+        if (token) {
+          const res = await axios.post('http://localhost:5000/api/admin/projects', formData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data?.project) {
+            newProject = res.data.project;
           }
-        } catch (apiErr) {
-          console.warn('API create failed, adding to local state:', apiErr.message);
         }
 
         setProjects((prev) => [newProject, ...prev]);
@@ -313,20 +601,37 @@ function AdminProjects() {
     }
   };
 
-  const handleDeleteProject = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this project?')) return;
+  const handleDeleteProject = (idOrProject) => {
+    const target =
+      idOrProject && typeof idOrProject === 'object'
+        ? idOrProject
+        : projects.find((p) => p.id === idOrProject) || { id: idOrProject };
+    if (!target?.id) return;
+    setDeleteError('');
+    setProjectToDelete(target);
+    setActiveMenuId(null);
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete?.id) return;
+    setDeletingProject(true);
+    setDeleteError('');
     const token = localStorage.getItem('token');
     try {
       if (token) {
-        await axios.delete(`http://localhost:5000/api/admin/projects/${id}`, {
+        await axios.delete(`http://localhost:5000/api/admin/projects/${projectToDelete.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
       }
+      setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
+      setProjectToDelete(null);
     } catch (err) {
-      console.warn('API delete failed, removing locally:', err.message);
+      setDeleteError(
+        err.response?.data?.error || err.message || 'Failed to delete project. Please try again.'
+      );
+    } finally {
+      setDeletingProject(false);
     }
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    setActiveMenuId(null);
   };
 
   const handleToggleStatus = (project) => {
@@ -371,7 +676,7 @@ function AdminProjects() {
       name: 'New QA Project',
       description: 'Project created via spreadsheet sheet view',
       lead_name: 'Lead Tester',
-      department: 'Quality Assurance',
+      department: 'Website',
       status: 'Planning',
       priority: 'Medium',
       start_date: new Date().toISOString().split('T')[0],
@@ -467,30 +772,22 @@ function AdminProjects() {
 
       {/* Main Content Pane */}
       <main className="main-content">
-        {/* Exact Header Bar */}
-        <header className="header pj-exact-header">
-          {/* Breadcrumb: Workspace > Projects */}
-          <div className="breadcrumb pj-exact-breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">&gt;</span>
-            <strong>Projects</strong>
-          </div>
-
-          {/* Right Header: Search Pill + Notification Bell + Profile */}
+        {/* Top Utility Actions: Notification Bell + Profile */}
+        <div className="pj-top-utility-bar">
           <div className="header-right pj-exact-header-right">
-            <div className="header-search pj-header-search-pill">
-              <Search size={15} />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={headerSearchQuery}
-                onChange={(e) => setHeaderSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <button className="notification-bell pj-header-bell-btn" title="Notifications" aria-label="Notifications">
+            <button
+              type="button"
+              className="notification-bell pj-header-bell-btn"
+              title="Notifications"
+              aria-label="Notifications"
+              onClick={() => window.dispatchEvent(new Event('open-notifications-drawer'))}
+            >
               <Bell size={18} />
-              <span className="notification-count pj-bell-badge">1</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="notification-count pj-bell-badge">
+                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                </span>
+              )}
             </button>
 
             <div className="user-profile pj-header-profile" title="Administrator account">
@@ -502,7 +799,7 @@ function AdminProjects() {
               <ChevronDown size={14} className="profile-chevron pj-profile-chevron" />
             </div>
           </div>
-        </header>
+        </div>
 
         {/* Projects Page Container */}
         <div className="pj-page-container">
@@ -514,7 +811,6 @@ function AdminProjects() {
               </div>
               <div className="pj-title-text">
                 <h1>Projects Directory</h1>
-                <p>Organize, manage, and track all QA projects in one place.</p>
               </div>
             </div>
 
@@ -546,24 +842,6 @@ function AdminProjects() {
                   <FileSpreadsheet size={18} />
                 </button>
               </div>
-
-              {/* Filter Button */}
-              <button
-                className={`pj-btn-filter ${
-                  searchQuery || departmentFilter !== 'All Departments' || statusFilter !== 'All Statuses'
-                    ? 'active-filter'
-                    : ''
-                }`}
-                onClick={() => {
-                  setSearchQuery('');
-                  setHeaderSearchQuery('');
-                  setDepartmentFilter('All Departments');
-                  setStatusFilter('All Statuses');
-                }}
-              >
-                <Filter size={15} />
-                <span>Filter</span>
-              </button>
 
               {/* + Create Project Primary Button */}
               {!isQAMember && (
@@ -603,60 +881,36 @@ function AdminProjects() {
               <Search size={16} />
               <input
                 type="text"
-                placeholder="Search by project name, code, department..."
+                placeholder="Search by project name, code, project type..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
-            <div className="pj-dropdown-group">
-              {/* All Departments */}
-              <div className="pj-custom-select-wrap">
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  aria-label="Filter by department"
-                >
-                  <option value="All Departments">All Departments</option>
-                  <option value="Operations">Operations</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Quality Assurance">Quality Assurance</option>
-                  <option value="Human Resources">Human Resources</option>
-                  <option value="Finance">Finance</option>
-                </select>
-                <ChevronDown size={14} />
-              </div>
+            <div className="pj-dropdown-group" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <CustomSelect
+                value={departmentFilter}
+                onChange={setDepartmentFilter}
+                options={PJ_TYPE_OPTIONS}
+                variant="filter"
+                placeholder="All Project Types"
+              />
 
-              {/* All Statuses */}
-              <div className="pj-custom-select-wrap">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  aria-label="Filter by status"
-                >
-                  <option value="All Statuses">All Statuses</option>
-                  <option value="Active">Active</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Planning">Planning</option>
-                  <option value="Not Started">Not Started</option>
-                  <option value="Completed">Completed</option>
-                </select>
-                <ChevronDown size={14} />
-              </div>
+              <CustomSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={PJ_STATUS_OPTIONS}
+                variant="filter"
+                placeholder="All Statuses"
+              />
 
-              {/* Sort by: Last Updated */}
-              <div className="pj-custom-select-wrap">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  aria-label="Sort projects"
-                >
-                  <option value="Last Updated">Sort by: Last Updated</option>
-                  <option value="Name">Sort by: Name</option>
-                  <option value="Date">Sort by: Date</option>
-                </select>
-                <ChevronDown size={14} />
-              </div>
+              <CustomSelect
+                value={sortBy}
+                onChange={setSortBy}
+                options={PJ_SORT_OPTIONS}
+                variant="filter"
+                placeholder="Sort by"
+              />
             </div>
           </section>
 
@@ -673,10 +927,6 @@ function AdminProjects() {
                   <span className="pj-metric-number">{stats.total}</span>
                 </div>
               </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill up">&uarr; 14%</span>
-                <span className="pj-trend-subtext">vs last month</span>
-              </div>
             </div>
 
             {/* Card 2: In Progress */}
@@ -689,10 +939,6 @@ function AdminProjects() {
                   <span className="pj-metric-label">In Progress</span>
                   <span className="pj-metric-number">{stats.inProgress}</span>
                 </div>
-              </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill up">&uarr; 25%</span>
-                <span className="pj-trend-subtext">vs last month</span>
               </div>
             </div>
 
@@ -707,10 +953,6 @@ function AdminProjects() {
                   <span className="pj-metric-number">{stats.notStarted}</span>
                 </div>
               </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill down">&darr; 0%</span>
-                <span className="pj-trend-subtext">vs last month</span>
-              </div>
             </div>
 
             {/* Card 4: Completed */}
@@ -724,22 +966,37 @@ function AdminProjects() {
                   <span className="pj-metric-number">{stats.completed}</span>
                 </div>
               </div>
-              <div className="pj-metric-trend">
-                <span className="pj-trend-pill up">&uarr; 100%</span>
-                <span className="pj-trend-subtext">vs last month</span>
-              </div>
             </div>
           </section>
 
           {/* 4. Projects Display: Sheet View, Grid View or List View */}
-          {viewMode === 'sheet' ? (
+          {filteredProjects.length === 0 && viewMode !== 'sheet' ? (
+            <div className="pj-empty-state" style={{
+              background: '#FFFFFF',
+              border: '1.5px dashed #CBD5E1',
+              borderRadius: '16px',
+              padding: '48px 24px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px',
+              margin: '20px 0'
+            }}>
+              <Folder size={42} color="#94A3B8" />
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>No Projects Created Yet</h3>
+              <p style={{ margin: 0, fontSize: '14px', color: '#64748B', maxWidth: '440px' }}>
+                Your production workspace is clean and ready. Click the "+ Create Project" button above to initiate your first QA project.
+              </p>
+            </div>
+          ) : viewMode === 'sheet' ? (
             <ProjectSpreadsheetView
               projects={projects}
               onUpdateProject={handleUpdateProjectCell}
               onAddRow={handleAddSheetRow}
               onDeleteRow={handleDeleteProject}
               onOpenProjectSheet={(project) => navigate(`/admin/projects/${project.id}/sheet`)}
-              searchQuery={searchQuery || headerSearchQuery}
+              searchQuery={searchQuery}
               departmentFilter={departmentFilter}
               statusFilter={statusFilter}
             />
@@ -756,74 +1013,52 @@ function AdminProjects() {
                 >
                   {/* Top: Folder Graphic + Status Badge + Actions */}
                   <div className="pj-card-top">
-                    <FolderEmblem
-                      color={project.folder_color || 'blue'}
-                      icon={project.folder_icon || 'folder'}
-                      label={project.name}
-                    />
+                    <FolderEmblem code={project.project_code} label={project.name} />
 
                     <div className="pj-card-top-right">
+                      {project.priority && (
+                        <span className={`pj-priority-badge ${project.priority.toLowerCase()}`}>
+                          {project.priority}
+                        </span>
+                      )}
                       <span className={`pj-status-badge ${getStatusClass(project.status)}`}>
                         {project.status || 'Active'}
                       </span>
 
                       {/* Three-dots menu */}
-                      <div className="pj-card-menu-wrap">
-                        <button
-                          className="pj-btn-more"
-                          onClick={() =>
-                            setActiveMenuId(activeMenuId === project.id ? null : project.id)
-                          }
-                          aria-label="Project actions"
-                          title="More options"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
+                      {!isQAMember && (
+                        <div className="pj-card-menu-wrap">
+                          <button
+                            className="pj-btn-more"
+                            onClick={() =>
+                              setActiveMenuId(activeMenuId === project.id ? null : project.id)
+                            }
+                            aria-label="Project actions"
+                            title="More options"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
 
-                        {activeMenuId === project.id && (
-                          <div className="pj-dropdown-menu">
-                            <button
-                              className="pj-dropdown-item"
-                              onClick={() => openProjectWorkspace(project)}
-                            >
-                              <Folder size={14} />
-                              <span>View Workspace</span>
-                            </button>
-                            <button
-                              className="pj-dropdown-item"
-                              onClick={() => navigate(`/admin/projects/${project.id}/sheet`)}
-                            >
-                              <FileSpreadsheet size={14} />
-                              <span>Open Sheet Module</span>
-                            </button>
-                            {!isQAMember && (
-                              <>
-                                <button
-                                  className="pj-dropdown-item"
-                                  onClick={() => openEditModal(project)}
-                                >
-                                  <Edit2 size={14} />
-                                  <span>Edit Details</span>
-                                </button>
-                                <button
-                                  className="pj-dropdown-item"
-                                  onClick={() => handleToggleStatus(project)}
-                                >
-                                  <PlayCircle size={14} />
-                                  <span>Change Status</span>
-                                </button>
-                                <button
-                                  className="pj-dropdown-item danger"
-                                  onClick={() => handleDeleteProject(project.id)}
-                                >
-                                  <Trash2 size={14} />
-                                  <span>Delete</span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                          {activeMenuId === project.id && (
+                            <div className="pj-dropdown-menu">
+                              <button
+                                className="pj-dropdown-item"
+                                onClick={() => openEditModal(project)}
+                              >
+                                <Edit2 size={14} />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                className="pj-dropdown-item danger"
+                                onClick={() => handleDeleteProject(project.id)}
+                              >
+                                <Trash2 size={14} />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -838,7 +1073,7 @@ function AdminProjects() {
                     {/* Row 1, Col 1: Department */}
                     <div className="pj-meta-item" title={project.department}>
                       <Building2 size={15} />
-                      <span>{project.department || 'Operations'}</span>
+                      <span>{project.department || 'Website'}</span>
                     </div>
 
                     {/* Row 1, Col 2: Project Lead */}
@@ -895,6 +1130,34 @@ function AdminProjects() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Card Quick Actions Bar */}
+                  <div className="pj-card-actions-bar">
+                    <button
+                      type="button"
+                      className="pj-card-action-btn sheet"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/admin/projects/${project.id}/sheet`);
+                      }}
+                      title="Open Test Case Execution Sheet"
+                    >
+                      <FileSpreadsheet size={14} />
+                      <span>Test Sheet</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="pj-card-action-btn workspace"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openProjectWorkspace(project);
+                      }}
+                      title="Open Project Workspace"
+                    >
+                      <Folder size={14} />
+                      <span>Workspace</span>
+                    </button>
+                  </div>
                 </article>
               ))}
             </section>
@@ -907,7 +1170,7 @@ function AdminProjects() {
                     <tr>
                       <th>Project Code</th>
                       <th>Project Name</th>
-                      <th>Department</th>
+                      <th>Project Type</th>
                       <th>Lead</th>
                       <th>Status</th>
                       <th>Start Date</th>
@@ -944,7 +1207,7 @@ function AdminProjects() {
                           </span>
                         </td>
                         <td>{formatDate(project.start_date)}</td>
-                        <td>{project.team_members || 4} Members</td>
+                        <td>{project.team_members ?? 0} Members</td>
                         <td style={{ fontWeight: 700, color: '#16a34a' }}>{project.test_cases ?? 0}</td>
                         <td style={{ fontWeight: 700, color: '#2563eb' }}>{project.documents ?? 0}</td>
                         <td style={{ fontWeight: 700, color: '#ea580c' }}>{project.tickets_count ?? 0}</td>
@@ -988,7 +1251,12 @@ function AdminProjects() {
         >
           <div className="pj-modal-card">
             <div className="pj-modal-header">
-              <h3>{isEditing ? 'Edit Project' : 'Create New Project'}</h3>
+              <div>
+                <h3>{isEditing ? 'Edit Project Specifications' : 'Create New Project'}</h3>
+                <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#64748B' }}>
+                  {isEditing ? 'Update project scope, lead assignment, and timelines.' : 'Fill in project details and configure workspace access.'}
+                </p>
+              </div>
               <button
                 className="pj-modal-close-btn"
                 onClick={() => setIsModalOpen(false)}
@@ -1018,63 +1286,78 @@ function AdminProjects() {
 
                 <div className="pj-form-grid">
                   <div className="pj-form-group">
-                    <label>Project Code *</label>
-                    <input
-                      type="text"
-                      name="project_code"
-                      placeholder="e.g. PRJ-PORTAL-03"
-                      value={formData.project_code}
-                      onChange={handleInputChange}
-                      required
-                      disabled={isEditing}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Project Name *</label>
+                    <label>
+                      Project Name <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="text"
                       name="name"
                       placeholder="e.g. Customer Support Portal"
                       value={formData.name}
                       onChange={handleInputChange}
+                      pattern="[a-zA-Z\s]+"
+                      title="Only alphabetic characters and spaces are allowed"
                       required
                     />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Department</label>
-                    <select
-                      name="department"
-                      value={formData.department}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Operations">Operations</option>
-                      <option value="Engineering">Engineering</option>
-                      <option value="Quality Assurance">Quality Assurance</option>
-                      <option value="Human Resources">Human Resources</option>
-                      <option value="Finance">Finance</option>
-                    </select>
+                    <label>
+                      Project Code <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="project_code"
+                      placeholder="e.g. PRJ-CSP-0001"
+                      value={formData.project_code}
+                      readOnly
+                      required
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        cursor: 'not-allowed',
+                        color: '#0F172A',
+                        fontWeight: 600
+                      }}
+                      title="Auto-generated from Project Name"
+                    />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Client Name</label>
+                    <label>
+                      Project Type <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <CustomSelect
+                      value={formData.department}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, department: val }))}
+                      options={MODAL_PROJECT_TYPE_OPTIONS}
+                      variant="form"
+                      placeholder="-- Select Project Type --"
+                    />
+                  </div>
+
+                  <div className="pj-form-group">
+                    <label>
+                      Client Name <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="text"
                       name="client_name"
                       placeholder="e.g. Acme Health Corp"
                       value={formData.client_name || ''}
                       onChange={handleInputChange}
+                      pattern="[a-zA-Z\s]+"
+                      title="Only alphabetic characters and spaces are allowed"
+                      required
                     />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Project Lead</label>
-                    <select
-                      name="project_lead_id"
-                      value={formData.project_lead_id || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                    <label>
+                      Project Lead <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <CustomSelect
+                      value={String(formData.project_lead_id || '')}
+                      onChange={(val) => {
                         const leadObj = projectLeads.find((l) => String(l.id) === String(val));
                         setFormData((prev) => ({
                           ...prev,
@@ -1082,143 +1365,90 @@ function AdminProjects() {
                           lead_name: leadObj ? leadObj.full_name : ''
                         }));
                       }}
-                    >
-                      <option value="">-- Select Project Lead (Optional) --</option>
-                      {projectLeads.map((lead) => (
-                        <option key={lead.id} value={lead.id}>
-                          {lead.full_name} ({lead.email})
-                        </option>
-                      ))}
-                    </select>
+                      options={leadOptions}
+                      variant="form"
+                      placeholder="-- Select Project Lead --"
+                    />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Priority</label>
-                    <select
-                      name="priority"
+                    <label>
+                      Priority <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <CustomSelect
                       value={formData.priority || 'Medium'}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Critical">Critical</option>
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}
+                      options={MODAL_PROJECT_PRIORITY_OPTIONS}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Status</label>
-                    <select
-                      name="status"
+                    <label>
+                      Status <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <CustomSelect
                       value={formData.status}
-                      onChange={handleInputChange}
-                    >
-                      <option value="Active">Active</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Planning">Planning</option>
-                      <option value="Not Started">Not Started</option>
-                      <option value="Completed">Completed</option>
-                    </select>
+                      onChange={(val) => setFormData((prev) => ({ ...prev, status: val }))}
+                      options={MODAL_PROJECT_STATUS_OPTIONS}
+                      variant="form"
+                    />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Start Date</label>
+                    <label>
+                      Start Date <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="date"
                       name="start_date"
                       value={formData.start_date}
+                      min={isEditing ? undefined : getTodayDateString()}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="pj-form-group">
+                    <label>
+                      Target End Date <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 'normal' }}>(Optional)</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="end_date"
+                      value={formData.end_date || ''}
+                      min={getMinTargetDate(formData.start_date)}
                       onChange={handleInputChange}
                     />
                   </div>
 
                   <div className="pj-form-group">
-                    <label>Folder Color Theme</label>
-                    <select
-                      name="folder_color"
-                      value={formData.folder_color}
-                      onChange={handleInputChange}
-                    >
-                      <option value="blue">Blue (Portal / Gateway)</option>
-                      <option value="purple">Purple (API Services)</option>
-                      <option value="amber">Amber (Automation / Tools)</option>
-                      <option value="pink">Pink (Vendor / Commerce)</option>
-                      <option value="teal">Teal (HR / Academy)</option>
-                      <option value="violet">Violet (Finance / Office)</option>
-                      <option value="emerald">Emerald (Migration / CRM)</option>
-                    </select>
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Folder Emblem Badge</label>
-                    <select
-                      name="folder_icon"
-                      value={formData.folder_icon}
-                      onChange={handleInputChange}
-                    >
-                      <option value="CS">"CS" Text Badge</option>
-                      <option value="API">"API" Text Badge</option>
-                      <option value="settings">Gear / Settings Icon</option>
-                      <option value="cart">Shopping Cart Icon</option>
-                      <option value="graduation">Graduation Cap Icon</option>
-                      <option value="building">Office Building Icon</option>
-                      <option value="shield">Security Shield Icon</option>
-                      <option value="check">Checkmark Icon</option>
-                      <option value="folder">Standard Folder Icon</option>
-                    </select>
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Team Members</label>
+                    <label>
+                      Team Members <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="number"
                       name="team_members"
                       min="1"
+                      max="9"
+                      placeholder="Enter team size (1 - 9)"
                       value={formData.team_members}
                       onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Test Cases Count</label>
-                    <input
-                      type="number"
-                      name="test_cases"
-                      min="0"
-                      value={formData.test_cases}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Documents Count</label>
-                    <input
-                      type="number"
-                      name="documents"
-                      min="0"
-                      value={formData.documents}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>Tickets Count</label>
-                    <input
-                      type="number"
-                      name="tickets_count"
-                      min="0"
-                      value={formData.tickets_count}
-                      onChange={handleInputChange}
+                      required
                     />
                   </div>
 
                   <div className="pj-form-group pj-form-full">
-                    <label>Project Description</label>
+                    <label>
+                      Project Description <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <textarea
                       name="description"
-                      rows="2"
+                      rows="3"
                       placeholder="Brief overview of project scope and objectives..."
                       value={formData.description}
                       onChange={handleInputChange}
+                      required
                     />
                   </div>
                 </div>
@@ -1241,6 +1471,68 @@ function AdminProjects() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE PROJECT CONFIRMATION MODAL */}
+      {projectToDelete && (
+        <div
+          className="pj-del-modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !deletingProject) {
+              setProjectToDelete(null);
+            }
+          }}
+        >
+          <div
+            className="pj-del-modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-project-title"
+          >
+            <div className="pj-del-modal-header">
+              <h3 id="delete-project-title" className="pj-del-modal-title">
+                <AlertTriangle size={20} color="#dc2626" /> Delete Project
+              </h3>
+              <button
+                type="button"
+                className="pj-del-modal-close"
+                onClick={() => setProjectToDelete(null)}
+                disabled={deletingProject}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="pj-del-modal-body">
+              {deleteError && <div className="pj-del-error-banner">{deleteError}</div>}
+              <p style={{ margin: 0, fontSize: '0.94rem', color: '#334155', lineHeight: 1.5 }}>
+                Are you sure you want to permanently delete project{' '}
+                <strong>{projectToDelete.name || 'this project'}</strong>
+                {projectToDelete.project_code ? ` (${projectToDelete.project_code})` : ''}?
+              </p>
+            </div>
+
+            <div className="pj-del-modal-footer">
+              <button
+                type="button"
+                className="pj-del-btn-cancel"
+                disabled={deletingProject}
+                onClick={() => setProjectToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="pj-del-btn-danger"
+                disabled={deletingProject}
+                onClick={confirmDeleteProject}
+              >
+                {deletingProject ? 'Deleting...' : 'Delete Project'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -676,10 +676,10 @@ function AdminUsers() {
     ).size;
 
     return {
-      total: total || 24,
-      active: active || 20,
-      inactive: inactive || 3,
-      departments: departments || 5
+      total,
+      active,
+      inactive,
+      departments
     };
   }, [users]);
 

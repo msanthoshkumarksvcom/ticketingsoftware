@@ -3,6 +3,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import pool from '../db.js';
+import { getWrittenTestCaseRows } from './sheetMetrics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,20 +93,29 @@ export const logTicketHistory = async (ticketId, action, prevStatus, newStatus, 
 };
 
 // Helper: Send in-app notification
-export const sendInAppNotification = async (userId, title, message, type = 'info', link = '') => {
-  if (!userId) return;
+export const sendInAppNotification = async (userId, title, message, type = 'info', link = '', meta = {}) => {
+  if (!userId) return null;
+  const {
+    senderId = null,
+    senderName = null,
+    senderRole = null,
+    audience = 'system'
+  } = meta || {};
   try {
-    await pool.query(
-      `INSERT INTO notifications (user_id, title, message, type, link)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [userId, title, message, type, link]
+    const res = await pool.query(
+      `INSERT INTO notifications (user_id, title, message, type, link, sender_id, sender_name, sender_role, audience)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [userId, title, message, type, link, senderId, senderName, senderRole, audience]
     );
+    return res.rows[0] || null;
   } catch (err) {
     console.error('Error sending in-app notification:', err);
+    return null;
   }
 };
 
-export function registerWorkflowRoutes(app) {
+export function registerWorkflowRoutes(app, io) {
   // ==========================================
   // 1. IMAGE UPLOAD
   // ==========================================
@@ -157,8 +167,8 @@ export function registerWorkflowRoutes(app) {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-    // Permissions: Only Super Admin, Manager, QA Lead can assign Project Lead
-    const allowedRoles = ['Manager', 'QA Lead', 'Super Admin'];
+    // Permissions: Only Manager and QA Lead (plus Super Admin, Admin) can assign Project Lead
+    const allowedRoles = ['Manager', 'QA Lead', 'Super Admin', 'Admin'];
     if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({ error: 'Only Managers and QA Leads can assign or reassign a Project Lead.' });
     }
@@ -203,10 +213,10 @@ export function registerWorkflowRoutes(app) {
         [projectId]
       );
 
-      // Record new assignment in history
+      // Record new assignment in history with both column sets for guaranteed backwards compatibility
       await pool.query(
-        `INSERT INTO project_lead_assignments (project_id, project_lead_id, lead_name, lead_email, assigned_by, status, notes)
-         VALUES ($1, $2, $3, $4, $5, 'Active', $6)`,
+        `INSERT INTO project_lead_assignments (project_id, project_lead_id, lead_name, lead_email, project_lead_name, project_lead_email, assigned_by, status, notes)
+         VALUES ($1, $2, $3, $4, $3, $4, $5, 'Active', $6)`,
         [projectId, leadUser.id, leadUser.full_name, leadUser.email, user.full_name, notes || 'Assigned by management']
       );
 
@@ -245,10 +255,16 @@ export function registerWorkflowRoutes(app) {
 
     try {
       const result = await pool.query(
-        `SELECT id, project_id, project_lead_id, lead_name, lead_email, assigned_by, assigned_at, status, notes
-         FROM project_lead_assignments
-         WHERE project_id = $1
-         ORDER BY assigned_at DESC`,
+        `SELECT pla.id, pla.project_id, pla.project_lead_id,
+                COALESCE(u.full_name, pla.project_lead_name, pla.lead_name) as project_lead_name,
+                COALESCE(u.full_name, pla.project_lead_name, pla.lead_name) as lead_name,
+                COALESCE(u.email, pla.project_lead_email, pla.lead_email) as project_lead_email,
+                COALESCE(u.email, pla.project_lead_email, pla.lead_email) as lead_email,
+                pla.assigned_by, pla.assigned_at, pla.status, pla.notes
+         FROM project_lead_assignments pla
+         LEFT JOIN users u ON u.id = pla.project_lead_id
+         WHERE pla.project_id = $1
+         ORDER BY pla.assigned_at DESC`,
         [req.params.id]
       );
       res.json(result.rows);
@@ -323,13 +339,10 @@ export function registerWorkflowRoutes(app) {
       }
       const project = projRes.rows[0];
 
-      // Permission check: Project Lead must be assigned to this project (or Manager/QA Lead/Admin)
-      if (user.role === 'Project Lead') {
-        if (project.project_lead_id !== user.id && project.lead_name?.toLowerCase() !== user.full_name?.toLowerCase()) {
-          return res.status(403).json({ error: 'You can only assign developers to projects assigned to you.' });
-        }
-      } else if (!['Manager', 'QA Lead', 'Super Admin'].includes(user.role)) {
-        return res.status(403).json({ error: 'Not authorized to assign developers to this project.' });
+      // Permission check: Only Manager and QA Lead (plus Super Admin, Admin) can assign developers
+      const allowedRoles = ['Manager', 'QA Lead', 'Super Admin', 'Admin'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ error: 'Only Managers and QA Leads can assign developers to this project.' });
       }
 
       const assignedDevs = [];
@@ -345,7 +358,7 @@ export function registerWorkflowRoutes(app) {
            ON CONFLICT (project_id, developer_id) 
            DO UPDATE SET status = 'Active', assigned_at = CURRENT_TIMESTAMP, assigned_by = $5, notes = $6
            RETURNING *`,
-          [projectId, devUser.id, devUser.full_name, devUser.email, user.full_name, notes || 'Assigned by Project Lead']
+          [projectId, devUser.id, devUser.full_name, devUser.email, user.full_name, notes || 'Assigned by management']
         );
         assignedDevs.push(insertRes.rows[0]);
 
@@ -358,13 +371,6 @@ export function registerWorkflowRoutes(app) {
           `/developer`
         );
       }
-
-      // Update team_members count on project
-      const countRes = await pool.query(
-        `SELECT COUNT(*) FROM project_developer_assignments WHERE project_id = $1 AND status = 'Active'`,
-        [projectId]
-      );
-      await pool.query('UPDATE projects SET team_members = $1 WHERE id = $2', [parseInt(countRes.rows[0].count, 10), projectId]);
 
       res.status(201).json({
         message: `Successfully assigned ${assignedDevs.length} developer(s) to project.`,
@@ -388,12 +394,10 @@ export function registerWorkflowRoutes(app) {
       if (projRes.rows.length === 0) return res.status(404).json({ error: 'Project not found.' });
       const project = projRes.rows[0];
 
-      if (user.role === 'Project Lead') {
-        if (project.project_lead_id !== user.id && project.lead_name?.toLowerCase() !== user.full_name?.toLowerCase()) {
-          return res.status(403).json({ error: 'You can only manage developers for projects assigned to you.' });
-        }
-      } else if (!['Manager', 'QA Lead', 'Super Admin'].includes(user.role)) {
-        return res.status(403).json({ error: 'Not authorized.' });
+      // Permission check: Only Manager and QA Lead (plus Super Admin, Admin) can remove developers
+      const allowedRoles = ['Manager', 'QA Lead', 'Super Admin', 'Admin'];
+      if (!allowedRoles.includes(user.role)) {
+        return res.status(403).json({ error: 'Only Managers and QA Leads can remove developers from this project.' });
       }
 
       await pool.query(
@@ -402,13 +406,6 @@ export function registerWorkflowRoutes(app) {
          WHERE project_id = $1 AND developer_id = $2`,
         [projectId, developerId]
       );
-
-      // Update team_members count
-      const countRes = await pool.query(
-        `SELECT COUNT(*) FROM project_developer_assignments WHERE project_id = $1 AND status = 'Active'`,
-        [projectId]
-      );
-      await pool.query('UPDATE projects SET team_members = $1 WHERE id = $2', [parseInt(countRes.rows[0].count, 10), projectId]);
 
       res.json({ message: 'Developer removed from project successfully.' });
     } catch (err) {
@@ -520,13 +517,13 @@ export function registerWorkflowRoutes(app) {
           ticket_code, title, description, project_id, project_code,
           test_case_id, module, sub_module, test_scenario, test_steps, test_data,
           expected_result, actual_result, severity, priority, category,
-          type, status, reporter, raised_by, raised_by_id, raised_at, attachments
+          type, status, reporter, raised_by, raised_by_id, raised_at, assigned_to, attachments
         )
         VALUES (
           $1, $2, $3, $4, $5,
           $6, $7, $8, $9, $10, $11,
           $12, $13, $14, $15, $16,
-          'Bug', 'Open', $17, $17, $18, CURRENT_TIMESTAMP, $19
+          'Bug', 'Open', $17, $17, $18, CURRENT_TIMESTAMP, 'Project Team', $19
         )
         RETURNING *`,
         [
@@ -579,16 +576,326 @@ export function registerWorkflowRoutes(app) {
         );
       }
 
+      // 9. Stamp ticket_code onto the test case in project_sheets
+      let updatedSheetRows = null;
+      if (test_case_id) {
+        try {
+          const targetTcKey = test_case_id.trim().toLowerCase();
+          const targetRowId = req.body.row_id ? String(req.body.row_id).trim().toLowerCase() : '';
+          const sheetsRes = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [project.id]);
+          for (const s of sheetsRes.rows) {
+            if (Array.isArray(s.rows)) {
+              let found = false;
+              const updatedRows = s.rows.map(r => {
+                const kCol = String(r.col_id || '').trim().toLowerCase();
+                const kId = String(r.id || '').trim().toLowerCase();
+                if ((targetTcKey && (kCol === targetTcKey || kId === targetTcKey)) || (targetRowId && (kId === targetRowId || kCol === targetRowId))) {
+                  found = true;
+                  return {
+                    ...r,
+                    ticket_code: createdTicket.ticket_code,
+                    ticket_id: createdTicket.id,
+                    ticket_status: 'Open',
+                    ticket_raised_at: new Date().toISOString()
+                  };
+                }
+                return r;
+              });
+              if (found) {
+                await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                if (!updatedSheetRows) updatedSheetRows = updatedRows;
+              }
+            }
+          }
+        } catch (stampErr) {
+          console.warn('Could not stamp ticket_code onto project_sheets:', stampErr.message);
+        }
+      }
+
       res.status(201).json({
         message: 'Bug ticket created successfully under project.',
         ticket: {
           ...createdTicket,
           attachments: processedAttachments
-        }
+        },
+        updatedRows: updatedSheetRows
       });
     } catch (err) {
       console.error('Error creating ticket from test case:', err);
       res.status(500).json({ error: 'Failed to create bug ticket.' });
+    }
+  });
+
+  // ========================================================
+  // 4.1 BULK FAILED & RECOMMENDATION TEST CASES -> PROJECT TICKETS
+  // ========================================================
+  app.post('/api/admin/tickets/bulk-from-sheet', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const {
+      project_id,
+      sheet_id,
+      sheet_name,
+      test_cases
+    } = req.body;
+
+    if (!project_id) {
+      return res.status(400).json({ error: 'Project ID is required.' });
+    }
+
+    try {
+      // 1. Fetch project info
+      const projRes = await pool.query('SELECT * FROM projects WHERE id = $1', [project_id]);
+      if (projRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Project does not exist.' });
+      }
+      const project = projRes.rows[0];
+
+      // 2. Either use provided test_cases array, or read from project_sheets if sheet_id provided
+      let candidateRows = Array.isArray(test_cases) ? test_cases : [];
+      if (candidateRows.length === 0 && sheet_id) {
+        const sheetRes = await pool.query('SELECT rows FROM project_sheets WHERE id = $1 AND project_id = $2', [sheet_id, project_id]);
+        if (sheetRes.rows.length > 0 && Array.isArray(sheetRes.rows[0].rows)) {
+          candidateRows = sheetRes.rows[0].rows;
+        }
+      }
+
+      // Filter candidate rows where status is 'fail', 'failed', or 'recommendation' / 'recommended'
+      // If a row ALREADY has ticket_code set, it is ALREADY RAISED and must be excluded!
+      const eligibleRows = candidateRows.filter(row => {
+        if (row.ticket_code && String(row.ticket_code).trim()) {
+          return false;
+        }
+        let st = '';
+        for (const k of Object.keys(row)) {
+          if (k.toLowerCase().includes('status')) {
+            st = String(row[k] ?? '').toLowerCase().trim();
+            if (st) break;
+          }
+        }
+        if (!st) st = String(row.col_status || row.status || '').toLowerCase().trim();
+        return st === 'fail' || st === 'failed' || st === 'recommendation' || st === 'recommended';
+      });
+
+      if (eligibleRows.length === 0) {
+        return res.json({
+          message: 'No new unraised failed or recommendation test cases found.',
+          createdCount: 0,
+          skippedCount: 0,
+          tickets: []
+        });
+      }
+
+      // Check which test cases already have active tickets in this project
+      const existingTicketsRes = await pool.query(
+        `SELECT id, ticket_code, test_case_id, status FROM tickets 
+         WHERE project_id = $1 AND test_case_id IS NOT NULL AND status IN ('Open', 'In Progress', 'Reopened', 'Resolved')`,
+        [project_id]
+      );
+      const existingTcMap = new Map();
+      existingTicketsRes.rows.forEach(r => {
+        if (r.test_case_id) {
+          existingTcMap.set(String(r.test_case_id).trim().toLowerCase(), r);
+        }
+      });
+
+      const createdTickets = [];
+      const tcToTicketMap = new Map();
+      let skippedCount = 0;
+
+      for (const tc of eligibleRows) {
+        const tcId = (tc.col_id || tc.id || '').trim();
+        const tcKey = tcId.toLowerCase();
+        const altIdKey = tc.id ? String(tc.id).trim().toLowerCase() : '';
+        const altColKey = tc.col_id ? String(tc.col_id).trim().toLowerCase() : '';
+
+        // If an active ticket already exists for this test case, stamp it and skip creating duplicate
+        const existingTicket = (tcKey && existingTcMap.get(tcKey)) || (altColKey && existingTcMap.get(altColKey)) || (altIdKey && existingTcMap.get(altIdKey));
+        if (existingTicket) {
+          skippedCount++;
+          const tInfo = {
+            ticket_code: existingTicket.ticket_code,
+            ticket_id: existingTicket.id,
+            ticket_status: existingTicket.status || 'Open',
+            ticket_raised_at: new Date().toISOString()
+          };
+          if (tcKey) tcToTicketMap.set(tcKey, tInfo);
+          if (altColKey) tcToTicketMap.set(altColKey, tInfo);
+          if (altIdKey) tcToTicketMap.set(altIdKey, tInfo);
+          if (tc._rowIndex !== undefined) tcToTicketMap.set(`row_idx_${tc._rowIndex}`, tInfo);
+          continue;
+        }
+
+        let st = '';
+        for (const k of Object.keys(tc)) {
+          if (k.toLowerCase().includes('status')) {
+            st = String(tc[k] ?? '').toLowerCase().trim();
+            if (st) break;
+          }
+        }
+        if (!st) st = String(tc.col_status || tc.status || '').toLowerCase().trim();
+        const isRecommendation = st === 'recommendation' || st === 'recommended';
+
+        const ticket_code = await generateBugTicketCode(project.project_code);
+        const tcTitle = tc.col_title || tc.title || tc.scenario || 'Test Scenario Execution';
+        const title = `[${tcId || 'TC'}] ${tcTitle} - ${isRecommendation ? 'Recommendation' : 'Test Failure'}`;
+        const steps = tc.col_steps || tc.steps || tc.test_steps || '1. Navigate to target screen\n2. Execute test case steps\n3. Observe outcome';
+        const expected = tc.col_expected || tc.expected || tc.expected_result || 'Expected behavior per specification';
+        const actual = tc.col_actual || tc.actual || tc.actual_result || (isRecommendation ? 'QA recommends workflow or UI enhancement.' : 'Test execution resulted in defect or unexpected failure.');
+        const moduleName = tc.col_module || tc.module || 'General';
+
+        const fullDesc = `Test Case ID: ${tcId || 'N/A'}\nModule: ${moduleName}\nType: ${isRecommendation ? 'Recommendation' : 'Defect / Failure'}\n\nSteps to Reproduce / Details:\n${steps}\n\nExpected Result:\n${expected}\n\nActual Result:\n${actual}`;
+
+        let processedAttachments = [];
+        if (tc.col_screenshot && typeof tc.col_screenshot === 'string' && tc.col_screenshot.trim() !== '') {
+          const savedUrl = saveBase64Image(tc.col_screenshot.trim(), `${tcId || 'proof'}.png`);
+          if (savedUrl) processedAttachments.push(savedUrl);
+        }
+        if (Array.isArray(tc.attachments)) {
+          for (const a of tc.attachments) {
+            const url = typeof a === 'string' ? a : a?.url;
+            if (url) {
+              const savedUrl = saveBase64Image(url);
+              if (savedUrl) processedAttachments.push(savedUrl);
+            }
+          }
+        }
+
+        const insertRes = await pool.query(
+          `INSERT INTO tickets (
+            ticket_code, title, description, project_id, project_code,
+            test_case_id, module, sub_module, test_scenario, test_steps, test_data,
+            expected_result, actual_result, severity, priority, category,
+            type, status, reporter, raised_by, raised_by_id, raised_at, 
+            assigned_to, attachments
+          )
+          VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10, $11,
+            $12, $13, $14, $15, $16,
+            $17, 'Open', $18, $18, $19, CURRENT_TIMESTAMP,
+            $20, $21
+          )
+          RETURNING *`,
+          [
+            ticket_code,
+            title,
+            fullDesc,
+            project.id,
+            project.project_code,
+            tcId || 'TC-GEN',
+            moduleName,
+            tc.col_submodule || '',
+            tcTitle,
+            steps,
+            tc.col_data || '',
+            expected,
+            actual,
+            tc.col_priority === 'Critical' ? 'Critical' : (tc.col_priority || 'High'),
+            tc.col_priority === 'Critical' ? 'Urgent' : (tc.col_priority || 'High'),
+            isRecommendation ? 'Quality Recommendation' : 'Functional Bug',
+            isRecommendation ? 'Recommendation' : 'Bug',
+            user.full_name || user.email,
+            user.id,
+            'Project Team', // Assigned to the Project Team pool!
+            JSON.stringify(processedAttachments)
+          ]
+        );
+
+        const created = insertRes.rows[0];
+        createdTickets.push(created);
+        const tInfo = {
+          ticket_code: created.ticket_code,
+          ticket_id: created.id,
+          ticket_status: 'Open',
+          ticket_raised_at: new Date().toISOString()
+        };
+        if (tcKey) tcToTicketMap.set(tcKey, tInfo);
+        if (altColKey) tcToTicketMap.set(altColKey, tInfo);
+        if (altIdKey) tcToTicketMap.set(altIdKey, tInfo);
+        if (tc._rowIndex !== undefined) tcToTicketMap.set(`row_idx_${tc._rowIndex}`, tInfo);
+
+        // Audit Log in ticket_history
+        await logTicketHistory(
+          created.id,
+          'Created',
+          null,
+          'Open',
+          user.full_name,
+          user.id,
+          `${isRecommendation ? 'Recommendation' : 'Bug'} ticket created via bulk run from sheet "${sheet_name || 'Test Execution Sheet'}".`
+        );
+      }
+
+      // Update project tickets count
+      if (createdTickets.length > 0) {
+        await pool.query('UPDATE projects SET tickets_count = COALESCE(tickets_count, 0) + $1 WHERE id = $2', [createdTickets.length, project.id]);
+
+        // In-app notification to Project Lead
+        if (project.project_lead_id) {
+          await sendInAppNotification(
+            project.project_lead_id,
+            'Bulk Tickets Generated from Test Sheet',
+            `${createdTickets.length} new defect/recommendation tickets generated by ${user.full_name} for "${project.name}". Assigned to Project Team.`,
+            'ticket_bulk_created',
+            `/admin/tickets`
+          );
+        }
+      }
+
+      // 6. Stamp generated ticket_code directly onto the sheet rows in project_sheets!
+      let updatedSheetRows = null;
+      if (tcToTicketMap.size > 0) {
+        try {
+          const currentSheetRes = await pool.query(
+            'SELECT id, rows FROM project_sheets WHERE project_id = $1',
+            [project.id]
+          );
+          for (const s of currentSheetRes.rows) {
+            if (Array.isArray(s.rows)) {
+              let sheetModified = false;
+              const stamped = s.rows.map((row, rIdx) => {
+                const kCol = String(row.col_id || '').trim().toLowerCase();
+                const kId = String(row.id || '').trim().toLowerCase();
+                const tInfo = (kCol && tcToTicketMap.get(kCol)) || 
+                              (kId && tcToTicketMap.get(kId)) || 
+                              tcToTicketMap.get(`row_idx_${rIdx}`);
+                if (tInfo) {
+                  sheetModified = true;
+                  return {
+                    ...row,
+                    ticket_code: tInfo.ticket_code,
+                    ticket_id: tInfo.ticket_id,
+                    ticket_status: tInfo.ticket_status,
+                    ticket_raised_at: tInfo.ticket_raised_at || new Date().toISOString()
+                  };
+                }
+                return row;
+              });
+              if (sheetModified) {
+                await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(stamped), s.id]);
+                if (String(s.id) === String(sheet_id) || !updatedSheetRows) {
+                  updatedSheetRows = stamped;
+                }
+              }
+            }
+          }
+        } catch (stampErr) {
+          console.warn('Error stamping ticket_code onto project_sheets:', stampErr.message);
+        }
+      }
+
+      res.status(201).json({
+        message: `Successfully created ${createdTickets.length} tickets assigned to the Project Team.${skippedCount > 0 ? ` (${skippedCount} already had active tickets and were skipped).` : ''}`,
+        createdCount: createdTickets.length,
+        skippedCount,
+        tickets: createdTickets,
+        updatedRows: updatedSheetRows
+      });
+    } catch (err) {
+      console.error('Error in bulk tickets from sheet:', err);
+      res.status(500).json({ error: 'Failed to bulk-generate tickets from sheet.' });
     }
   });
 
@@ -613,13 +920,24 @@ export function registerWorkflowRoutes(app) {
 
       const ticket = ticketRes.rows[0];
 
-      // Developer permission check: Developer can only view tickets assigned to them
+      // Developer permission check: Developer can only view tickets assigned to them or their assigned projects
       if (user.role === 'Developer') {
         const isAssigned = ticket.assigned_developer_id === user.id ||
                            ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
                            ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
-        if (!isAssigned) {
-          return res.status(403).json({ error: 'You are only authorized to view tickets assigned to you.' });
+        let isProjectDev = false;
+        if (!isAssigned && ticket.project_id) {
+          const devProjCheck = await pool.query(
+            `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
+            [ticket.project_id, user.id]
+          );
+          if (devProjCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
+            isProjectDev = true;
+          }
+        }
+
+        if (!isAssigned && !isProjectDev) {
+          return res.status(403).json({ error: 'You are only authorized to view tickets in your assigned projects.' });
         }
       }
 
@@ -752,6 +1070,11 @@ export function registerWorkflowRoutes(app) {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
+    // Strict RBAC: Only the Development team can start work on bug tickets
+    if (user.role !== 'Developer') {
+      return res.status(403).json({ error: 'Access denied: Only members of the Development team can mark tickets In Progress.' });
+    }
+
     const ticketId = req.params.id;
 
     try {
@@ -761,8 +1084,17 @@ export function registerWorkflowRoutes(app) {
 
       const prevStatus = ticket.status;
       const updateRes = await pool.query(
-        `UPDATE tickets SET status = 'In Progress' WHERE id = $1 RETURNING *`,
-        [ticketId]
+        `UPDATE tickets 
+         SET status = 'In Progress',
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $2::varchar),
+             assigned_developer_id = COALESCE(assigned_developer_id, $3),
+             assigned_developer_name = COALESCE(assigned_developer_name, $2::varchar),
+             assigned_developer_email = COALESCE(assigned_developer_email, $4::varchar),
+             assigned_by = COALESCE(assigned_by, $2::varchar),
+             assigned_at = COALESCE(assigned_at, CURRENT_TIMESTAMP)
+         WHERE id = $1 
+         RETURNING *`,
+        [ticketId, user.full_name, user.id, user.email]
       );
 
       await logTicketHistory(
@@ -782,10 +1114,134 @@ export function registerWorkflowRoutes(app) {
     }
   });
 
+  // Developer claims real-time exclusive lock to resolve ticket (Intimates & locks out other developers)
+  app.post('/api/admin/tickets/:id/lock', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const ticketId = req.params.id;
+    try {
+      const ticketRes = await pool.query('SELECT * FROM tickets WHERE id = $1', [ticketId]);
+      if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found.' });
+      const ticket = ticketRes.rows[0];
+
+      // Strict RBAC: Only members of the Development team can claim locks to resolve bugs
+      if (user.role !== 'Developer') {
+        return res.status(403).json({ error: 'Access denied: Only members of the Development team can lock and resolve defect tickets.' });
+      }
+
+      const isDirect = ticket.assigned_developer_id === user.id ||
+                       ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
+                       ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
+      let isProjDev = false;
+      if (!isDirect && ticket.project_id) {
+        const projCheck = await pool.query(
+          `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
+          [ticket.project_id, user.id]
+        );
+        if (projCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
+          isProjDev = true;
+        }
+      }
+      if (!isDirect && !isProjDev) {
+        return res.status(403).json({ error: 'You are only authorized to lock tickets in your assigned projects.' });
+      }
+
+      // If already locked by ANOTHER developer within the last 15 minutes, prevent collision
+      const isLockedByOther = ticket.locked_by_id && 
+                              Number(ticket.locked_by_id) !== Number(user.id) && 
+                              ticket.locked_at && 
+                              (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000);
+
+      if (isLockedByOther) {
+        return res.status(423).json({
+          error: `Ticket is currently being resolved by ${ticket.locked_by}. Please wait or coordinate with them.`,
+          locked_by: ticket.locked_by,
+          locked_by_id: ticket.locked_by_id,
+          locked_at: ticket.locked_at
+        });
+      }
+
+      // Lock ticket for this developer and move to In Progress if currently Open
+      const updateRes = await pool.query(
+        `UPDATE tickets 
+         SET locked_by = $1::varchar, 
+             locked_by_id = $2, 
+             locked_at = CURRENT_TIMESTAMP,
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Project Team'), $1::varchar),
+             assigned_developer_id = COALESCE(assigned_developer_id, $2),
+             assigned_developer_name = COALESCE(assigned_developer_name, $1::varchar),
+             assigned_developer_email = COALESCE(assigned_developer_email, $3::varchar),
+             status = CASE WHEN status = 'Open' THEN 'In Progress' ELSE status END
+         WHERE id = $4
+         RETURNING *`,
+        [user.full_name, user.id, user.email, ticketId]
+      );
+
+      const lockedTicket = updateRes.rows[0];
+
+      // Broadcast real-time lock across WebSocket
+      if (io) {
+        io.emit('ticket_lock_changed', {
+          ticketId,
+          locked_by: user.full_name,
+          locked_by_id: user.id,
+          locked_at: lockedTicket.locked_at,
+          status: lockedTicket.status
+        });
+        io.emit('ticket_updated', lockedTicket);
+      }
+
+      res.json({
+        message: `Ticket locked by ${user.full_name}.`,
+        ticket: lockedTicket
+      });
+    } catch (err) {
+      console.error('Error locking ticket:', err);
+      res.status(500).json({ error: 'Failed to claim ticket lock.' });
+    }
+  });
+
+  // Release lock on ticket (e.g. developer cancelled or closed resolution form)
+  app.post('/api/admin/tickets/:id/unlock', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const ticketId = req.params.id;
+    try {
+      const updateRes = await pool.query(
+        `UPDATE tickets 
+         SET locked_by = NULL, locked_by_id = NULL, locked_at = NULL 
+         WHERE id = $1
+         RETURNING *`,
+        [ticketId]
+      );
+
+      if (io) {
+        io.emit('ticket_lock_changed', {
+          ticketId,
+          locked_by: null,
+          locked_by_id: null,
+          locked_at: null
+        });
+      }
+
+      res.json({ message: 'Ticket lock released.', ticket: updateRes.rows[0] });
+    } catch (err) {
+      console.error('Error unlocking ticket:', err);
+      res.status(500).json({ error: 'Failed to release ticket lock.' });
+    }
+  });
+
   // Developer resolves bug ticket (Mandatory resolution form)
   app.put('/api/admin/tickets/:id/resolve', async (req, res) => {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    // Strict RBAC: Only members of the Development team can resolve bug tickets
+    if (user.role !== 'Developer') {
+      return res.status(403).json({ error: 'Access denied: Only members of the Development team can resolve bug tickets.' });
+    }
 
     const ticketId = req.params.id;
     const {
@@ -815,6 +1271,35 @@ export function registerWorkflowRoutes(app) {
       if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
       const ticket = ticketRes.rows[0];
 
+      // Verify that this developer belongs to this project or ticket
+      const isDirect = ticket.assigned_developer_id === user.id ||
+                       ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
+                       ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
+      let isProjDev = false;
+      if (!isDirect && ticket.project_id) {
+        const projCheck = await pool.query(
+          `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
+          [ticket.project_id, user.id]
+        );
+        if (projCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
+          isProjDev = true;
+        }
+      }
+      if (!isDirect && !isProjDev) {
+        return res.status(403).json({ error: 'You are only authorized to resolve tickets in your assigned projects.' });
+      }
+
+      // If locked by another developer, prevent collision
+      const isLockedByOther = ticket.locked_by_id && 
+                              Number(ticket.locked_by_id) !== Number(user.id) && 
+                              ticket.locked_at && 
+                              (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000);
+      if (isLockedByOther) {
+        return res.status(423).json({
+          error: `Ticket is currently being resolved by ${ticket.locked_by}. You cannot submit resolution while locked by another developer.`
+        });
+      }
+
       // Save resolution attachments if any
       let processedResAttachments = [];
       if (Array.isArray(resolution_attachments)) {
@@ -838,9 +1323,16 @@ export function registerWorkflowRoutes(app) {
              files_changed = $4,
              resolution_remarks = $5,
              resolution_attachments = $6,
-             resolved_by = $7,
+             resolved_by = $7::varchar,
              resolved_by_id = $8,
-             resolved_at = CURRENT_TIMESTAMP
+             resolved_at = CURRENT_TIMESTAMP,
+             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $7::varchar),
+             assigned_developer_id = COALESCE(assigned_developer_id, $8),
+             assigned_developer_name = COALESCE(assigned_developer_name, $7::varchar),
+             assigned_developer_email = COALESCE(assigned_developer_email, $10::varchar),
+             locked_by = NULL,
+             locked_by_id = NULL,
+             locked_at = NULL
          WHERE id = $9
          RETURNING *`,
         [
@@ -852,9 +1344,73 @@ export function registerWorkflowRoutes(app) {
           JSON.stringify(processedResAttachments),
           user.full_name,
           user.id,
-          ticketId
+          ticketId,
+          user.email
         ]
       );
+
+      const resolvedTicket = updateRes.rows[0];
+
+      // Automatically update corresponding test case row in project_sheets!
+      let updatedSheets = [];
+      if (ticket.project_id) {
+        try {
+          const sheetQuery = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [ticket.project_id]);
+          for (const s of sheetQuery.rows) {
+            if (Array.isArray(s.rows)) {
+              let changed = false;
+              const updatedRows = s.rows.map(r => {
+                const kCol = String(r.col_id || '').trim().toLowerCase();
+                const kId = String(r.id || '').trim().toLowerCase();
+                const kTicket = String(r.ticket_code || '').trim().toLowerCase();
+                const targetTc = String(ticket.test_case_id || '').trim().toLowerCase();
+                const targetCode = String(ticket.ticket_code || '').trim().toLowerCase();
+                const targetId = String(ticket.id).trim().toLowerCase();
+
+                const matchesTicket =
+                  (targetCode && kTicket === targetCode) ||
+                  (r.ticket_id && String(r.ticket_id) === targetId) ||
+                  (!kTicket && !r.ticket_id && targetTc && targetTc !== 'tc-gen' && (kCol === targetTc || kId === targetTc));
+
+                if (matchesTicket) {
+                  changed = true;
+                  return {
+                    ...r,
+                    ticket_status: 'Resolved',
+                    resolved_by: user.full_name,
+                    resolved_at: new Date().toISOString()
+                  };
+                }
+                return r;
+              });
+
+              if (changed) {
+                await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                updatedSheets.push({ id: s.id, rows: updatedRows });
+              }
+            }
+          }
+        } catch (sheetErr) {
+          console.warn('Failed to update project sheet on ticket resolution:', sheetErr.message);
+        }
+      }
+
+      if (io) {
+        io.emit('ticket_lock_changed', {
+          ticketId,
+          locked_by: null,
+          locked_by_id: null,
+          locked_at: null,
+          status: 'Resolved'
+        });
+        io.emit('ticket_updated', resolvedTicket);
+        io.emit('sheet_data_synced', {
+          projectId: ticket.project_id,
+          message: `Ticket ${resolvedTicket.ticket_code} resolved by ${user.full_name}. Sheet updated.`,
+          updatedBy: user.full_name,
+          updatedSheets
+        });
+      }
 
       // Log in history
       await logTicketHistory(
@@ -890,7 +1446,7 @@ export function registerWorkflowRoutes(app) {
       res.json({
         message: 'Resolution submitted successfully. Ticket is now pending QA verification.',
         ticket: {
-          ...updateRes.rows[0],
+          ...resolvedTicket,
           resolution_attachments: processedResAttachments
         }
       });
@@ -938,6 +1494,62 @@ export function registerWorkflowRoutes(app) {
           [user.full_name, user.id, ticketId]
         );
 
+        const closedTicket = updateRes.rows[0];
+
+        // Update corresponding test case row in project_sheets to Closed
+        let updatedSheets = [];
+        if (ticket.project_id) {
+          try {
+            const sheetQuery = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [ticket.project_id]);
+            for (const s of sheetQuery.rows) {
+              if (Array.isArray(s.rows)) {
+                let changed = false;
+                const updatedRows = s.rows.map(r => {
+                  const kCol = String(r.col_id || '').trim().toLowerCase();
+                  const kId = String(r.id || '').trim().toLowerCase();
+                  const kTicket = String(r.ticket_code || '').trim().toLowerCase();
+                  const targetTc = String(ticket.test_case_id || '').trim().toLowerCase();
+                  const targetCode = String(ticket.ticket_code || '').trim().toLowerCase();
+                  const targetId = String(ticket.id).trim().toLowerCase();
+
+                  const matchesTicket =
+                    (targetCode && kTicket === targetCode) ||
+                    (r.ticket_id && String(r.ticket_id) === targetId) ||
+                    (!kTicket && !r.ticket_id && targetTc && targetTc !== 'tc-gen' && (kCol === targetTc || kId === targetTc));
+
+                  if (matchesTicket) {
+                    changed = true;
+                    return {
+                      ...r,
+                      ticket_status: 'Closed',
+                      closed_by: user.full_name,
+                      closed_at: new Date().toISOString()
+                    };
+                  }
+                  return r;
+                });
+
+                if (changed) {
+                  await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                  updatedSheets.push({ id: s.id, rows: updatedRows });
+                }
+              }
+            }
+          } catch (sheetErr) {
+            console.warn('Failed to update project sheet on ticket close:', sheetErr.message);
+          }
+        }
+
+        if (io) {
+          io.emit('ticket_updated', closedTicket);
+          io.emit('sheet_data_synced', {
+            projectId: ticket.project_id,
+            message: `Ticket ${closedTicket.ticket_code} verified and closed by QA ${user.full_name}.`,
+            updatedBy: user.full_name,
+            updatedSheets
+          });
+        }
+
         await logTicketHistory(
           ticketId,
           'Closed',
@@ -959,7 +1571,7 @@ export function registerWorkflowRoutes(app) {
           );
         }
 
-        res.json({ message: 'Ticket successfully verified and closed.', ticket: updateRes.rows[0] });
+        res.json({ message: 'Ticket successfully verified and closed.', ticket: closedTicket });
       } else {
         // Reopen
         const updateRes = await pool.query(
@@ -972,6 +1584,60 @@ export function registerWorkflowRoutes(app) {
            RETURNING *`,
           [user.full_name, reopen_comments.trim(), ticketId]
         );
+
+        const reopenedTicket = updateRes.rows[0];
+
+        // Update corresponding test case row in project_sheets to Reopened
+        let updatedSheets = [];
+        if (ticket.project_id) {
+          try {
+            const sheetQuery = await pool.query('SELECT id, rows FROM project_sheets WHERE project_id = $1', [ticket.project_id]);
+            for (const s of sheetQuery.rows) {
+              if (Array.isArray(s.rows)) {
+                let changed = false;
+                const updatedRows = s.rows.map(r => {
+                  const kCol = String(r.col_id || '').trim().toLowerCase();
+                  const kId = String(r.id || '').trim().toLowerCase();
+                  const kTicket = String(r.ticket_code || '').trim().toLowerCase();
+                  const targetTc = String(ticket.test_case_id || '').trim().toLowerCase();
+                  const targetCode = String(ticket.ticket_code || '').trim().toLowerCase();
+                  const targetId = String(ticket.id).trim().toLowerCase();
+
+                  const matchesTicket =
+                    (targetCode && kTicket === targetCode) ||
+                    (r.ticket_id && String(r.ticket_id) === targetId) ||
+                    (!kTicket && !r.ticket_id && targetTc && targetTc !== 'tc-gen' && (kCol === targetTc || kId === targetTc));
+
+                  if (matchesTicket) {
+                    changed = true;
+                    return {
+                      ...r,
+                      ticket_status: 'Reopened'
+                    };
+                  }
+                  return r;
+                });
+
+                if (changed) {
+                  await pool.query('UPDATE project_sheets SET rows = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedRows), s.id]);
+                  updatedSheets.push({ id: s.id, rows: updatedRows });
+                }
+              }
+            }
+          } catch (sheetErr) {
+            console.warn('Failed to update project sheet on ticket reopen:', sheetErr.message);
+          }
+        }
+
+        if (io) {
+          io.emit('ticket_updated', reopenedTicket);
+          io.emit('sheet_data_synced', {
+            projectId: ticket.project_id,
+            message: `Ticket ${reopenedTicket.ticket_code} reopened by QA ${user.full_name}.`,
+            updatedBy: user.full_name,
+            updatedSheets
+          });
+        }
 
         await logTicketHistory(
           ticketId,
@@ -994,7 +1660,7 @@ export function registerWorkflowRoutes(app) {
           );
         }
 
-        res.json({ message: 'Ticket has been reopened and returned to developer.', ticket: updateRes.rows[0] });
+        res.json({ message: 'Ticket has been reopened and returned to developer.', ticket: reopenedTicket });
       }
     } catch (err) {
       console.error('Error during QA verification:', err);
@@ -1042,12 +1708,12 @@ export function registerWorkflowRoutes(app) {
 
       if (projectIds.length > 0) {
         const sheetsRes = await pool.query(
-          `SELECT rows FROM project_sheets WHERE project_id = ANY($1::int[])`,
+          `SELECT columns, rows FROM project_sheets WHERE project_id = ANY($1::int[])`,
           [projectIds]
         );
 
         for (const sheet of sheetsRes.rows) {
-          const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
+          const rows = getWrittenTestCaseRows(sheet);
           for (const row of rows) {
             totalTestCases++;
             const st = String(row.col_status || row.status || '').toLowerCase().trim();
@@ -1102,7 +1768,7 @@ export function registerWorkflowRoutes(app) {
     try {
       // 1. Projects assigned to developer
       const projectsRes = await pool.query(
-        `SELECT p.id, p.project_code, p.name, p.status, p.progress, p.lead_name,
+        `SELECT p.id, p.project_code, p.name, p.status, p.progress, p.lead_name, p.lead_name as project_lead_name,
                 pda.assigned_at
          FROM projects p
          JOIN project_developer_assignments pda ON pda.project_id = p.id
@@ -1111,20 +1777,23 @@ export function registerWorkflowRoutes(app) {
         [user.id]
       );
 
-      // 2. Tickets assigned to developer
+      // 2. Tickets assigned to developer OR for projects developer is allocated to
       const ticketsRes = await pool.query(
-        `SELECT t.*, p.name as project_name
+        `SELECT t.*, p.id as matched_project_id, p.name as project_name, p.project_code as matched_project_code
          FROM tickets t
-         LEFT JOIN projects p ON p.id = t.project_id OR p.project_code = t.project_code
+         LEFT JOIN projects p ON p.id = t.project_id OR (t.project_id IS NULL AND LOWER(p.project_code) = LOWER(t.project_code))
          WHERE (t.assigned_developer_id = $1 
             OR LOWER(t.assigned_to) = LOWER($2) 
-            OR LOWER(t.assigned_to) = LOWER($3))
+            OR LOWER(t.assigned_to) = LOWER($3)
+            OR COALESCE(t.project_id, p.id) IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $1 AND status = 'Active'))
          ORDER BY t.id DESC`,
-        [user.id, user.full_name, user.email]
+        [user.id, user.full_name || '', user.email || '']
       );
 
-      const tickets = ticketsRes.rows.map(row => ({
+      const tickets = ticketsRes.rows.map(({ matched_project_id, matched_project_code, ...row }) => ({
         ...row,
+        project_id: row.project_id || matched_project_id || null,
+        project_code: row.project_code || matched_project_code || 'General',
         attachments: typeof row.attachments === 'string' ? JSON.parse(row.attachments || '[]') : (row.attachments || [])
       }));
 
@@ -1165,13 +1834,189 @@ export function registerWorkflowRoutes(app) {
         `SELECT * FROM notifications 
          WHERE user_id = $1 
          ORDER BY created_at DESC 
-         LIMIT 30`,
+         LIMIT 50`,
         [user.id]
       );
       res.json(result.rows);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.get('/api/notifications/recipients', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      const result = await pool.query(
+        `SELECT id, emp_id, full_name, email, department, role, avatar, status
+         FROM users
+         WHERE COALESCE(status, 'Active') = 'Active' AND id != $1
+         ORDER BY full_name ASC NULLS LAST, id ASC`,
+        [user.id]
+      );
+      res.json(result.rows);
+    } catch (err) {
+      console.error('Error fetching notification recipients:', err);
+      res.status(500).json({ error: 'Failed to fetch recipients' });
+    }
+  });
+
+  app.get('/api/notifications/sent', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      const result = await pool.query(
+        `SELECT
+           MAX(n.id) AS id,
+           n.title,
+           n.message,
+           COALESCE(n.type, 'info') AS type,
+           COALESCE(n.audience, 'selected') AS audience,
+           COUNT(*)::int AS recipient_count,
+           STRING_AGG(COALESCE(u.full_name, u.email, 'User'), ', ' ORDER BY u.full_name) AS recipients_summary,
+           MAX(n.created_at) AS created_at
+         FROM notifications n
+         LEFT JOIN users u ON u.id = n.user_id
+         WHERE n.sender_id = $1
+         GROUP BY n.title, n.message, n.type, n.audience, DATE_TRUNC('second', n.created_at)
+         ORDER BY MAX(n.created_at) DESC
+         LIMIT 30`,
+        [user.id]
+      );
+      res.json(result.rows);
+    } catch (err) {
+      console.error('Error fetching sent notifications:', err);
+      res.status(500).json({ error: 'Failed to fetch sent notifications' });
+    }
+  });
+
+  app.post('/api/notifications/send', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const {
+      targetType = 'selected',
+      userIds = [],
+      title,
+      message,
+      type = 'info',
+      link = ''
+    } = req.body || {};
+
+    const cleanTitle = String(title || '').trim();
+    const cleanMessage = String(message || '').trim();
+    if (!cleanTitle || !cleanMessage) {
+      return res.status(400).json({ error: 'Notification title and message are required.' });
+    }
+    if (cleanTitle.length > 200) {
+      return res.status(400).json({ error: 'Title must be 200 characters or fewer.' });
+    }
+
+    const normalizedAudience = targetType === 'all' ? 'all' : 'selected';
+    const allowedTypes = ['info', 'success', 'warning', 'urgent'];
+    const normalizedType = allowedTypes.includes(String(type || '').toLowerCase())
+      ? String(type).toLowerCase()
+      : 'info';
+
+    const client = await pool.connect();
+    try {
+      let recipientRows = [];
+      if (normalizedAudience === 'all') {
+        const usersRes = await client.query(
+          `SELECT id, full_name, email FROM users WHERE COALESCE(status, 'Active') = 'Active' AND id != $1 ORDER BY id ASC`,
+          [user.id]
+        );
+        recipientRows = usersRes.rows;
+      } else {
+        const parsedIds = Array.from(
+          new Set(
+            (Array.isArray(userIds) ? userIds : [])
+              .map((v) => Number(v))
+              .filter((n) => Number.isInteger(n) && n > 0 && n !== Number(user.id))
+          )
+        );
+        if (parsedIds.length === 0) {
+          return res.status(400).json({ error: 'Please select at least one recipient user.' });
+        }
+        const usersRes = await client.query(
+          `SELECT id, full_name, email FROM users WHERE id = ANY($1::int[]) AND id != $2 ORDER BY id ASC`,
+          [parsedIds, user.id]
+        );
+        recipientRows = usersRes.rows;
+      }
+
+      if (recipientRows.length === 0) {
+        return res.status(400).json({ error: 'No matching recipients found.' });
+      }
+
+      const recipientIds = recipientRows.map((r) => r.id);
+      const senderName = user.full_name || user.email || 'Workspace User';
+      const senderRole = user.role || 'Member';
+
+      await client.query('BEGIN');
+      const insertRes = await client.query(
+        `INSERT INTO notifications (user_id, title, message, type, link, sender_id, sender_name, sender_role, audience)
+         SELECT uid, $2, $3, $4, $5, $6, $7, $8, $9
+         FROM UNNEST($1::int[]) AS uid
+         RETURNING *`,
+        [
+          recipientIds,
+          cleanTitle,
+          cleanMessage,
+          normalizedType,
+          String(link || ''),
+          user.id,
+          senderName,
+          senderRole,
+          normalizedAudience
+        ]
+      );
+      await client.query('COMMIT');
+
+      const createdNotifications = insertRes.rows;
+      if (io) {
+        createdNotifications.forEach((notif) => {
+          io.to(`user_${notif.user_id}`).emit('new_notification', notif);
+        });
+      }
+
+      res.status(201).json({
+        message:
+          normalizedAudience === 'all'
+            ? `Notification broadcasted to all ${createdNotifications.length} active users.`
+            : `Notification sent to ${createdNotifications.length} selected user${createdNotifications.length === 1 ? '' : 's'}.`,
+        deliveredCount: createdNotifications.length,
+        audience: normalizedAudience,
+        recipients: recipientRows,
+        createdAt: createdNotifications[0]?.created_at || new Date().toISOString()
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {}
+      console.error('Error sending notifications:', err);
+      res.status(500).json({ error: 'Failed to send notification.' });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.put('/api/notifications/read-all', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      await pool.query(
+        'UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE',
+        [user.id]
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+      res.status(500).json({ error: 'Failed to mark notifications as read' });
     }
   });
 
@@ -1187,6 +2032,569 @@ export function registerWorkflowRoutes(app) {
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+  });
+
+  // ==========================================
+  // 8. QUALITY & DEFECT REPORTS (PROJECT OVERVIEW & QA PERFORMANCE)
+  // ==========================================
+
+  // 8A. Project-Wise Quality & Defect Overview Report
+  // Accessible to: Manager, QA Lead, QA Member, Project Lead, Developer (Role-scoped)
+  app.get('/api/admin/reports/project-overview', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    try {
+      // Role-based project filtering:
+      // Developers: only their assigned projects
+      // Project Leads: only their assigned projects
+      // Manager, QA Lead, QA Member, Admin: all projects
+      let projectsQuery = `SELECT * FROM projects WHERE 1=1`;
+      const queryParams = [];
+
+      if (user.role === 'Developer') {
+        queryParams.push(user.id);
+        projectsQuery += ` AND id IN (SELECT project_id FROM project_developer_assignments WHERE developer_id = $${queryParams.length} AND status != 'Removed')`;
+      } else if (user.role === 'Project Lead') {
+        queryParams.push(user.id);
+        queryParams.push(user.full_name);
+        projectsQuery += ` AND (project_lead_id = $1 OR LOWER(lead_name) = LOWER($2) OR id IN (SELECT project_id FROM project_lead_assignments WHERE project_lead_id = $1))`;
+      }
+
+      projectsQuery += ` ORDER BY id ASC`;
+      const projectsRes = await pool.query(projectsQuery, queryParams);
+      const projects = projectsRes.rows;
+
+      // Fetch all sheets & tickets for these projects
+      const projectIds = projects.map(p => p.id);
+      let sheets = [];
+      let tickets = [];
+
+      if (projectIds.length > 0) {
+        const sheetsRes = await pool.query(
+          `SELECT id, project_id, sheet_name, columns, rows FROM project_sheets WHERE project_id = ANY($1::int[])`,
+          [projectIds]
+        );
+        sheets = sheetsRes.rows;
+
+        const ticketsRes = await pool.query(
+          `SELECT id, ticket_code, project_id, project_code, title, status, severity, priority, 
+                  resolved_by, resolved_by_id, resolved_at, closed_by, closed_by_id, closed_at, 
+                  raised_by, raised_by_id, created_at 
+           FROM tickets 
+           WHERE project_id = ANY($1::int[])`,
+          [projectIds]
+        );
+        tickets = ticketsRes.rows;
+      }
+
+      // Aggregate report for each project
+      const projectReports = projects.map((proj) => {
+        const projSheets = sheets.filter(s => s.project_id === proj.id);
+        const projTickets = tickets.filter(t => t.project_id === proj.id || t.project_code === proj.project_code);
+
+        // Aggregate test case metrics across all sheets
+        let totalTestCases = 0;
+        let passCount = 0;
+        let failCount = 0;
+        let recommendationCount = 0;
+        let inProgressCount = 0;
+        let untestedCount = 0;
+        let blockedCount = 0;
+
+        projSheets.forEach((s) => {
+          if (Array.isArray(s.rows)) {
+            // Find status column in this sheet
+            const statusCol = Array.isArray(s.columns)
+              ? s.columns.find(c => c.type === 'status' || c.id?.toLowerCase().includes('status') || c.id?.toLowerCase().includes('signoff') || c.id?.toLowerCase().includes('coverage'))
+              : null;
+            const statusColId = statusCol ? statusCol.id : 'col_status';
+
+            s.rows.forEach((row) => {
+              totalTestCases++;
+              const rawStatus = String(row[statusColId] || row.status || row.col_status || '').trim().toLowerCase();
+              if (rawStatus === 'pass' || rawStatus === 'passed') {
+                passCount++;
+              } else if (rawStatus === 'fail' || rawStatus === 'failed') {
+                failCount++;
+              } else if (rawStatus === 'recommendation' || rawStatus === 'rec') {
+                recommendationCount++;
+              } else if (rawStatus === 'in progress' || rawStatus === 'progress' || rawStatus === 'working') {
+                inProgressCount++;
+              } else if (rawStatus === 'blocked' || rawStatus === 'skipped') {
+                blockedCount++;
+              } else {
+                untestedCount++;
+              }
+            });
+          }
+        });
+
+        // Aggregate ticket metrics
+        const totalTickets = projTickets.length;
+        const openTickets = projTickets.filter(t => t.status === 'Open' || t.status === 'Reopened').length;
+        const inProgressTickets = projTickets.filter(t => t.status === 'In Progress').length;
+        const resolvedTickets = projTickets.filter(t => t.status === 'Resolved').length;
+        const closedTickets = projTickets.filter(t => t.status === 'Closed').length;
+
+        // Group resolved_by breakdown (who resolved what)
+        const resolvedByMap = {};
+        projTickets.forEach((t) => {
+          if (t.resolved_by && (t.status === 'Resolved' || t.status === 'Closed')) {
+            const devName = t.resolved_by.trim();
+            resolvedByMap[devName] = (resolvedByMap[devName] || 0) + 1;
+          }
+        });
+        const resolvedByBreakdown = Object.entries(resolvedByMap).map(([developer_name, count]) => ({
+          developer_name,
+          count
+        })).sort((a, b) => b.count - a.count);
+
+        // Group closed_by breakdown (who verified and closed)
+        const closedByMap = {};
+        projTickets.forEach((t) => {
+          if (t.closed_by && t.status === 'Closed') {
+            const qaName = t.closed_by.trim();
+            closedByMap[qaName] = (closedByMap[qaName] || 0) + 1;
+          }
+        });
+        const closedByBreakdown = Object.entries(closedByMap).map(([qa_name, count]) => ({
+          qa_name,
+          count
+        })).sort((a, b) => b.count - a.count);
+
+        const evaluatedTC = passCount + failCount + recommendationCount;
+        const passRate = evaluatedTC > 0 ? Math.round((passCount / evaluatedTC) * 100) : 0;
+        const executionRate = totalTestCases > 0 ? Math.round(((totalTestCases - untestedCount) / totalTestCases) * 100) : 0;
+        const resolutionRate = totalTickets > 0 ? Math.round(((resolvedTickets + closedTickets) / totalTickets) * 100) : 100;
+
+        return {
+          id: proj.id,
+          project_code: proj.project_code,
+          name: proj.name,
+          status: proj.status,
+          priority: proj.priority,
+          lead_name: proj.lead_name,
+          sheets_count: projSheets.length,
+          test_cases: {
+            total: totalTestCases,
+            pass: passCount,
+            fail: failCount,
+            recommendation: recommendationCount,
+            in_progress: inProgressCount,
+            untested: untestedCount,
+            blocked: blockedCount,
+            pass_rate: passRate,
+            execution_rate: executionRate
+          },
+          tickets: {
+            total: totalTickets,
+            open: openTickets,
+            in_progress: inProgressTickets,
+            resolved: resolvedTickets,
+            closed: closedTickets,
+            resolution_rate: resolutionRate,
+            resolved_by_breakdown: resolvedByBreakdown,
+            closed_by_breakdown: closedByBreakdown
+          }
+        };
+      });
+
+      // Overall workspace stats across these projects
+      const overall = {
+        total_projects: projectReports.length,
+        total_test_cases: projectReports.reduce((acc, p) => acc + p.test_cases.total, 0),
+        total_passed: projectReports.reduce((acc, p) => acc + p.test_cases.pass, 0),
+        total_failed: projectReports.reduce((acc, p) => acc + p.test_cases.fail, 0),
+        total_recommendations: projectReports.reduce((acc, p) => acc + p.test_cases.recommendation, 0),
+        total_tickets: projectReports.reduce((acc, p) => acc + p.tickets.total, 0),
+        total_resolved: projectReports.reduce((acc, p) => acc + p.tickets.resolved, 0),
+        total_closed: projectReports.reduce((acc, p) => acc + p.tickets.closed, 0)
+      };
+      const totalEval = overall.total_passed + overall.total_failed + overall.total_recommendations;
+      overall.global_pass_rate = totalEval > 0 ? Math.round((overall.total_passed / totalEval) * 100) : 0;
+      overall.global_resolution_rate = overall.total_tickets > 0 ? Math.round(((overall.total_resolved + overall.total_closed) / overall.total_tickets) * 100) : 100;
+
+      res.json({
+        userRole: user.role,
+        projects: projectReports,
+        overall
+      });
+    } catch (err) {
+      console.error('Error generating project overview report:', err);
+      res.status(500).json({ error: 'Failed to generate project overview report.' });
+    }
+  });
+
+  // 8B. QA Member Test Execution Performance Report
+  // Accessible to ONLY: Manager, QA Lead, QA Member, Super Admin, Admin
+  // Strictly Forbidden for: Developer, Project Lead
+  app.get('/api/admin/reports/qa-execution', async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    // Strict RBAC: Developers and Project Leads are forbidden from viewing internal QA Member individual reports
+    const allowedRoles = ['Manager', 'QA Lead', 'QA Member', 'Super Admin', 'Admin'];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({
+        error: 'Access denied: Developers and Project Leads are only authorized to view Project-level quality reports.'
+      });
+    }
+
+    try {
+      const { period = 'all', date: customDate } = req.query;
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const yesterdayDate = new Date(now.getTime() - 86400000);
+      const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+      const sevenDaysAgoStr = new Date(now.getTime() - 7 * 86400000).toISOString().split('T')[0];
+      const thirtyDaysAgoStr = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0];
+
+      // Helper function to extract normalized YYYY-MM-DD from any date field
+      const parseDateKey = (val, fallbackTimestamp) => {
+        if (val) {
+          const s = String(val).trim();
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+          const d = new Date(s);
+          if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+        }
+        if (fallbackTimestamp) {
+          try {
+            const fb = new Date(fallbackTimestamp);
+            if (!isNaN(fb.getTime())) return fb.toISOString().split('T')[0];
+          } catch (e) {}
+        }
+        return todayStr;
+      };
+
+      // Helper to test if a date falls in selected filter period
+      const isDateInPeriod = (dStr) => {
+        if (period === 'today') return dStr === todayStr;
+        if (period === 'yesterday') return dStr === yesterdayStr;
+        if (period === '7days') return dStr >= sevenDaysAgoStr && dStr <= todayStr;
+        if (period === '30days') return dStr >= thirtyDaysAgoStr && dStr <= todayStr;
+        if (period === 'custom' && customDate) return dStr === customDate;
+        return true; // 'all'
+      };
+
+      // 1. Fetch strictly QA Member users (Excludes QA Lead and Managers as requested)
+      const qaUsersRes = await pool.query(
+        `SELECT id, full_name, email, role, department, avatar, status 
+         FROM users 
+         WHERE role = 'QA Member' AND status != 'Inactive'
+         ORDER BY id ASC`
+      );
+      const qaUsers = qaUsersRes.rows;
+
+      // 2. Fetch all project sheets
+      const sheetsRes = await pool.query(
+        `SELECT ps.id, ps.project_id, ps.sheet_name, ps.columns, ps.rows, ps.updated_at, p.project_code, p.name as project_name 
+         FROM project_sheets ps
+         LEFT JOIN projects p ON p.id = ps.project_id`
+      );
+      const allSheets = sheetsRes.rows;
+
+      // 3. Fetch all bug tickets to see tickets raised by each QA member
+      const ticketsRes = await pool.query(
+        `SELECT id, ticket_code, project_id, raised_by, raised_by_id, status, severity, created_at 
+         FROM tickets`
+      );
+      const allTickets = ticketsRes.rows;
+
+      // Build daily and lifetime performance map for each QA member
+      const qaPerformance = qaUsers.map((qa) => {
+        const qaNameClean = (qa.full_name || '').trim().toLowerCase();
+        const qaEmailClean = (qa.email || '').trim().toLowerCase();
+
+        // Lifetime counters
+        let totalAssignedOrTested = 0;
+        let passCount = 0;
+        let failCount = 0;
+        let recommendationCount = 0;
+        let inProgressCount = 0;
+        let untestedCount = 0;
+        let blockedCount = 0;
+
+        // Filtered period counters
+        let periodAssignedOrTested = 0;
+        let periodPassCount = 0;
+        let periodFailCount = 0;
+        let periodRecCount = 0;
+        let periodInProgressCount = 0;
+        let periodUntestedCount = 0;
+
+        // Daily activity tracking map (date -> daily stats)
+        const dailyWorkMap = {};
+        const projectContributions = {};
+
+        allSheets.forEach((s) => {
+          if (!Array.isArray(s.rows)) return;
+
+          // Identify candidate assignee/tester columns in this sheet
+          const assignCols = Array.isArray(s.columns)
+            ? s.columns.filter(c => {
+                const lbl = (c.label || '').toLowerCase();
+                const cid = (c.id || '').toLowerCase();
+                return c.type === 'user' || lbl.includes('qa') || lbl.includes('assign') || lbl.includes('tester') || cid.includes('assigned') || cid.includes('qa');
+              })
+            : [];
+
+          const statusCol = Array.isArray(s.columns)
+            ? s.columns.find(c => c.type === 'status' || c.id?.toLowerCase().includes('status') || c.id?.toLowerCase().includes('signoff') || c.id?.toLowerCase().includes('coverage'))
+            : null;
+          const statusColId = statusCol ? statusCol.id : 'col_status';
+
+          // Candidate date columns in this sheet
+          const dateCol = Array.isArray(s.columns)
+            ? s.columns.find(c => c.type === 'date' || c.id?.toLowerCase().includes('date') || c.label?.toLowerCase().includes('date'))
+            : null;
+
+          s.rows.forEach((row) => {
+            // Check if this row is assigned to or tested by this QA member
+            let isRowMatch = false;
+
+            const rowAssignee = String(row.col_assigned || row.assigned_to || row.tested_by || row.executed_by || row.col_qa_lead || '').trim().toLowerCase();
+            if (rowAssignee && (rowAssignee === qaNameClean || rowAssignee === qaEmailClean || qaNameClean.includes(rowAssignee) || rowAssignee.includes(qaNameClean))) {
+              isRowMatch = true;
+            }
+
+            if (!isRowMatch && assignCols.length > 0) {
+              for (const ac of assignCols) {
+                const val = String(row[ac.id] || '').trim().toLowerCase();
+                if (val && (val === qaNameClean || val === qaEmailClean || qaNameClean.includes(val) || val.includes(qaNameClean))) {
+                  isRowMatch = true;
+                  break;
+                }
+              }
+            }
+
+            if (isRowMatch) {
+              totalAssignedOrTested++;
+              const rawStatus = String(row[statusColId] || row.status || row.col_status || '').trim().toLowerCase();
+              const isPass = rawStatus === 'pass' || rawStatus === 'passed';
+              const isFail = rawStatus === 'fail' || rawStatus === 'failed';
+              const isRec = rawStatus === 'recommendation' || rawStatus === 'rec';
+              const isProg = rawStatus === 'in progress' || rawStatus === 'progress' || rawStatus === 'working';
+              const isBlocked = rawStatus === 'blocked' || rawStatus === 'skipped';
+
+              if (isPass) passCount++;
+              else if (isFail) failCount++;
+              else if (isRec) recommendationCount++;
+              else if (isProg) inProgressCount++;
+              else if (isBlocked) blockedCount++;
+              else untestedCount++;
+
+              // Determine row execution date
+              const rawRowDate = row.col_date || row.date || (dateCol ? row[dateCol.id] : null) || row.execution_date || row.tested_at;
+              const rowDate = parseDateKey(rawRowDate, s.updated_at);
+
+              // Add to daily work map
+              if (!dailyWorkMap[rowDate]) {
+                dailyWorkMap[rowDate] = {
+                  date: rowDate,
+                  cases_tested: 0,
+                  pass_count: 0,
+                  fail_count: 0,
+                  recommendation_count: 0,
+                  in_progress_count: 0,
+                  untested_count: 0,
+                  bugs_raised_count: 0,
+                  critical_bugs_count: 0,
+                  projects: new Set()
+                };
+              }
+
+              dailyWorkMap[rowDate].cases_tested++;
+              if (isPass) dailyWorkMap[rowDate].pass_count++;
+              else if (isFail) dailyWorkMap[rowDate].fail_count++;
+              else if (isRec) dailyWorkMap[rowDate].recommendation_count++;
+              else if (isProg) dailyWorkMap[rowDate].in_progress_count++;
+              else dailyWorkMap[rowDate].untested_count++;
+
+              const pCode = s.project_code || `PRJ-${s.project_id}`;
+              dailyWorkMap[rowDate].projects.add(pCode);
+
+              // Period counters
+              if (isDateInPeriod(rowDate)) {
+                periodAssignedOrTested++;
+                if (isPass) periodPassCount++;
+                else if (isFail) periodFailCount++;
+                else if (isRec) periodRecCount++;
+                else if (isProg) periodInProgressCount++;
+                else periodUntestedCount++;
+              }
+
+              // Track project distribution
+              if (!projectContributions[pCode]) {
+                projectContributions[pCode] = {
+                  project_code: pCode,
+                  project_name: s.project_name || pCode,
+                  total: 0,
+                  pass: 0,
+                  fail: 0
+                };
+              }
+              projectContributions[pCode].total++;
+              if (isPass) projectContributions[pCode].pass++;
+              if (isFail) projectContributions[pCode].fail++;
+            }
+          });
+        });
+
+        // Count bug tickets raised by this QA member
+        const userRaisedTickets = allTickets.filter(t => {
+          if (t.raised_by_id && Number(t.raised_by_id) === Number(qa.id)) return true;
+          const rName = (t.raised_by || '').trim().toLowerCase();
+          return rName && (rName === qaNameClean || rName === qaEmailClean);
+        });
+
+        let periodBugsRaisedCount = 0;
+        let periodCriticalBugs = 0;
+
+        userRaisedTickets.forEach((t) => {
+          const tDate = parseDateKey(t.created_at, null);
+          if (!dailyWorkMap[tDate]) {
+            dailyWorkMap[tDate] = {
+              date: tDate,
+              cases_tested: 0,
+              pass_count: 0,
+              fail_count: 0,
+              recommendation_count: 0,
+              in_progress_count: 0,
+              untested_count: 0,
+              bugs_raised_count: 0,
+              critical_bugs_count: 0,
+              projects: new Set()
+            };
+          }
+          dailyWorkMap[tDate].bugs_raised_count++;
+          if (t.severity === 'Critical' || t.severity === 'Urgent') {
+            dailyWorkMap[tDate].critical_bugs_count++;
+          }
+          if (t.project_id) {
+            dailyWorkMap[tDate].projects.add(`PRJ-${t.project_id}`);
+          }
+
+          if (isDateInPeriod(tDate)) {
+            periodBugsRaisedCount++;
+            if (t.severity === 'Critical' || t.severity === 'Urgent') {
+              periodCriticalBugs++;
+            }
+          }
+        });
+
+        // Convert dailyWorkMap into ordered array (newest to oldest)
+        const dailyWorkList = Object.values(dailyWorkMap)
+          .map((d) => {
+            const evalTC = d.pass_count + d.fail_count + d.recommendation_count;
+            const passRate = evalTC > 0 ? Math.round((d.pass_count / evalTC) * 100) : (d.cases_tested > 0 && d.pass_count > 0 ? 100 : 0);
+            return {
+              date: d.date,
+              cases_tested: d.cases_tested,
+              pass_count: d.pass_count,
+              fail_count: d.fail_count,
+              recommendation_count: d.recommendation_count,
+              in_progress_count: d.in_progress_count,
+              untested_count: d.untested_count,
+              pass_rate: passRate,
+              bugs_raised_count: d.bugs_raised_count,
+              critical_bugs_count: d.critical_bugs_count,
+              projects: Array.from(d.projects)
+            };
+          })
+          .sort((a, b) => b.date.localeCompare(a.date));
+
+        // Today's work snapshot
+        const todayRecord = dailyWorkMap[todayStr] || {
+          date: todayStr,
+          cases_tested: 0,
+          pass_count: 0,
+          fail_count: 0,
+          recommendation_count: 0,
+          in_progress_count: 0,
+          pass_rate: 0,
+          bugs_raised_count: 0,
+          projects: []
+        };
+
+        const lifetimeEvalTC = passCount + failCount + recommendationCount;
+        const lifetimePassRate = lifetimeEvalTC > 0 ? Math.round((passCount / lifetimeEvalTC) * 100) : (totalAssignedOrTested > 0 && passCount > 0 ? 100 : 0);
+
+        const periodEvalTC = periodPassCount + periodFailCount + periodRecCount;
+        const periodPassRate = periodEvalTC > 0 ? Math.round((periodPassCount / periodEvalTC) * 100) : (periodAssignedOrTested > 0 && periodPassCount > 0 ? 100 : 0);
+
+        return {
+          id: qa.id,
+          full_name: qa.full_name,
+          email: qa.email,
+          role: qa.role,
+          department: qa.department,
+          avatar: qa.avatar,
+          // Lifetime metrics
+          total_tested: totalAssignedOrTested,
+          pass_count: passCount,
+          fail_count: failCount,
+          recommendation_count: recommendationCount,
+          in_progress_count: inProgressCount,
+          untested_count: untestedCount,
+          blocked_count: blockedCount,
+          pass_rate: lifetimePassRate,
+          bugs_raised_count: userRaisedTickets.length,
+          critical_bugs_raised: userRaisedTickets.filter(t => t.severity === 'Critical' || t.severity === 'Urgent').length,
+          project_contributions: Object.values(projectContributions),
+          // Daily & Period metrics requested by user
+          period: period,
+          period_tested: periodAssignedOrTested,
+          period_pass: periodPassCount,
+          period_fail: periodFailCount,
+          period_rec: periodRecCount,
+          period_in_progress: periodInProgressCount,
+          period_untested: periodUntestedCount,
+          period_pass_rate: periodPassRate,
+          period_bugs_raised: periodBugsRaisedCount,
+          period_critical_bugs: periodCriticalBugs,
+          // Today snapshot
+          today_tested: todayRecord.cases_tested || 0,
+          today_pass: todayRecord.pass_count || 0,
+          today_fail: todayRecord.fail_count || 0,
+          today_bugs: todayRecord.bugs_raised_count || 0,
+          // Full chronological daily work history
+          last_active_date: dailyWorkList.length > 0 ? dailyWorkList[0].date : null,
+          daily_work: dailyWorkList
+        };
+      });
+
+      // Sort QA members by period activity first, then total tested
+      qaPerformance.sort((a, b) => b.period_tested - a.period_tested || b.total_tested - a.total_tested || b.period_bugs_raised - a.period_bugs_raised);
+
+      const summary = {
+        total_qa_members: qaPerformance.length,
+        period: period,
+        // Overall lifetime totals
+        total_tests_executed: qaPerformance.reduce((acc, q) => acc + q.total_tested, 0),
+        total_passed: qaPerformance.reduce((acc, q) => acc + q.pass_count, 0),
+        total_failed: qaPerformance.reduce((acc, q) => acc + q.fail_count, 0),
+        total_bugs_raised: qaPerformance.reduce((acc, q) => acc + q.bugs_raised_count, 0),
+        // Filtered period totals
+        period_tests_executed: qaPerformance.reduce((acc, q) => acc + q.period_tested, 0),
+        period_passed: qaPerformance.reduce((acc, q) => acc + q.period_pass, 0),
+        period_failed: qaPerformance.reduce((acc, q) => acc + q.period_fail, 0),
+        period_bugs_raised: qaPerformance.reduce((acc, q) => acc + q.period_bugs_raised, 0),
+        // Today's total work executed across all QA members
+        today_tests_executed: qaPerformance.reduce((acc, q) => acc + q.today_tested, 0),
+        today_passed: qaPerformance.reduce((acc, q) => acc + q.today_pass, 0),
+        today_failed: qaPerformance.reduce((acc, q) => acc + q.today_fail, 0),
+        today_bugs_raised: qaPerformance.reduce((acc, q) => acc + q.today_bugs, 0)
+      };
+
+      res.json({
+        qaMembers: qaPerformance,
+        summary
+      });
+    } catch (err) {
+      console.error('Error generating QA execution report:', err);
+      res.status(500).json({ error: 'Failed to generate QA execution report.' });
     }
   });
 }

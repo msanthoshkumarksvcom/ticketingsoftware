@@ -355,13 +355,20 @@
   height: 100%;
   border: none;
   outline: none;
-  background: #ffffff;
-  padding: 4px 6px;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 11px 11px;
+  padding: 4px 20px 4px 6px;
   font-size: 12px;
   color: #0f172a;
   box-sizing: border-box;
   font-family: inherit;
   font-weight: 600;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
   cursor: pointer;
 }
 

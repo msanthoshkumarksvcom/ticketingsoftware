@@ -41,41 +41,42 @@
 }
 
 .um-header-titles h1 {
-  font-size: 1.5rem;
+  font-size: var(--fs-h1, 1.375rem);
   font-weight: 800;
   color: #0f172a;
   margin: 0 0 3px 0;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.025em;
 }
 
 .um-header-titles p {
-  font-size: 0.88rem;
+  font-size: var(--fs-body, 0.84375rem);
   color: #64748b;
   margin: 0;
   max-width: 720px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .um-btn-create {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #2563eb;
+  background: var(--color-primary, #2563eb);
   color: #ffffff;
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 0.92rem;
-  font-weight: 600;
+  height: var(--btn-height-md, 38px);
+  padding: 0 16px;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--fs-label, 0.78125rem);
+  font-weight: 700;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .um-btn-create:hover {
-  background: #1d4ed8;
+  background: var(--color-primary-hover, #1d4ed8);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
 }
 
 /* 4 Summary Stat Cards */

@@ -9,7 +9,6 @@ import AdminUsers from './pages/AdminUsers/AdminUsers';
 import AdminProjects from './pages/AdminProjects/AdminProjects';
 import AdminProjectSheet from './pages/AdminProjectSheet/AdminProjectSheet';
 import AdminProjectWorkspace from './pages/AdminProjectWorkspace/AdminProjectWorkspace';
-import AdminRoles from './pages/AdminRoles/AdminRoles';
 import AdminTickets from './pages/AdminTickets/AdminTickets';
 import AdminReports from './pages/AdminReports/AdminReports';
 import AdminApprovals from './pages/AdminApprovals/AdminApprovals';
@@ -70,11 +69,7 @@ function App() {
 
         <Route
           path="/admin/roles-permissions"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
-              <AdminRoles />
-            </RoleRoute>
-          }
+          element={<Navigate to="/admin" replace />}
         />
         <Route path="/admin/tickets" element={<AdminTickets />} />
         <Route path="/admin/reports" element={<AdminReports />} />

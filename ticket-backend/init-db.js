@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import pool from './db.js';
+import { backfillAllProjectTestCasesCounts } from './services/sheetMetrics.js';
 
 export const initDatabase = async () => {
   try {
@@ -13,15 +14,22 @@ export const initDatabase = async () => {
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
         emp_id VARCHAR(50) UNIQUE,
         full_name VARCHAR(150),
         department VARCHAR(100),
         role VARCHAR(50) DEFAULT 'QA Member',
         phone VARCHAR(30),
         status VARCHAR(20) DEFAULT 'Active',
-        avatar TEXT
+        avatar TEXT,
+        bio TEXT DEFAULT '',
+        theme VARCHAR(20) DEFAULT 'light'
       );
+    `);
+
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(20) DEFAULT 'light';
     `);
 
     // 2. Projects
@@ -60,6 +68,14 @@ export const initDatabase = async () => {
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_name VARCHAR(150);
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS lead_assigned_at TIMESTAMP;
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS lead_assigned_by VARCHAR(150);
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS application_url TEXT DEFAULT '';
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS application_github_link TEXT DEFAULT '';
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked BOOLEAN DEFAULT FALSE;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked_by VARCHAR(150);
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked_at TIMESTAMP;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS documents_locked BOOLEAN DEFAULT FALSE;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS documents_locked_by VARCHAR(150);
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS documents_locked_at TIMESTAMP;
     `);
 
     // 2.1 Project Lead Assignments History
@@ -158,6 +174,9 @@ export const initDatabase = async () => {
       ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopened_by VARCHAR(150);
       ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP;
       ALTER TABLE tickets ADD COLUMN IF NOT EXISTS reopen_comments TEXT;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS locked_by VARCHAR(150);
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS locked_by_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE tickets ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP;
     `);
 
     // 4.1 Ticket History (Audit Log)
@@ -184,9 +203,18 @@ export const initDatabase = async () => {
         message TEXT,
         type VARCHAR(50),
         link VARCHAR(255),
+        sender_id INT REFERENCES users(id) ON DELETE SET NULL,
+        sender_name VARCHAR(150),
+        sender_role VARCHAR(50),
+        audience VARCHAR(30) DEFAULT 'selected',
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_name VARCHAR(150);
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_role VARCHAR(50);
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS audience VARCHAR(30) DEFAULT 'selected';
     `);
 
     // 5. Approvals
@@ -202,6 +230,17 @@ export const initDatabase = async () => {
         details TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id) ON DELETE CASCADE;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS project_code VARCHAR(50);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS project_name VARCHAR(150);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS requested_by_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS requested_by_role VARCHAR(50);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS application_url TEXT;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS application_github_link TEXT;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(150);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS review_notes TEXT;
     `);
 
     // 6. Deployments
@@ -225,11 +264,35 @@ export const initDatabase = async () => {
         id SERIAL PRIMARY KEY,
         project_id INT REFERENCES projects(id) ON DELETE CASCADE,
         sheet_name VARCHAR(150) NOT NULL,
+        tab_color VARCHAR(50) DEFAULT '#0F9D58',
         columns JSONB NOT NULL DEFAULT '[]',
         rows JSONB NOT NULL DEFAULT '[]',
+        formatting JSONB NOT NULL DEFAULT '{}',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE project_sheets ADD COLUMN IF NOT EXISTS formatting JSONB NOT NULL DEFAULT '{}';
+      ALTER TABLE project_sheets ADD COLUMN IF NOT EXISTS tab_color VARCHAR(50) DEFAULT '#0F9D58';
+    `);
+
+    // 8. Project Documents
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS project_documents (
+        id SERIAL PRIMARY KEY,
+        project_id INT REFERENCES projects(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        file_url TEXT NOT NULL,
+        file_size VARCHAR(50),
+        file_type VARCHAR(100),
+        uploaded_by VARCHAR(150),
+        uploaded_by_id INT REFERENCES users(id) ON DELETE SET NULL,
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE;
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_by VARCHAR(150);
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP;
     `);
 
     // ========================
@@ -243,9 +306,7 @@ export const initDatabase = async () => {
       INSERT INTO users (emp_id, full_name, email, password, department, role, status)
       VALUES 
         ('EMP-001', 'Manager', 'manager@gmail.com', $1, 'Quality Assurance', 'Manager', 'Active'),
-        ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active'),
-        ('EMP-005', 'Project Lead', 'projectlead@gmail.com', $1, 'Engineering', 'Project Lead', 'Active'),
-        ('EMP-006', 'Developer', 'developer@gmail.com', $1, 'Development', 'Developer', 'Active')
+        ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active')
       ON CONFLICT (email) DO NOTHING;
     `, [defaultHash]);
 
@@ -287,6 +348,8 @@ export const initDatabase = async () => {
       `);
       console.log('Default roles created: Manager, QA Lead, QA Member, Developer, Project Lead');
     }
+
+    await backfillAllProjectTestCasesCounts(pool);
 
     console.log('Database initialized successfully.');
   } catch (error) {

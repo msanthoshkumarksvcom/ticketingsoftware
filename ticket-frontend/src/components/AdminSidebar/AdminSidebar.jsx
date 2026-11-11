@@ -12,24 +12,25 @@ import {
   Menu,
   Rocket,
   Settings,
-  ShieldCheck,
   Ticket,
   Users,
   X
 } from 'lucide-react';
+import NotificationCenter from '../NotificationCenter/NotificationCenter';
 import './AdminSidebar.css';
 
-const mainMenuNav = [
+export const MAIN_ADMIN_NAV = [
   { label: 'Dashboard', to: '/admin', icon: LayoutDashboard, end: true },
   { label: 'Projects', to: '/admin/projects', icon: FolderKanban },
   { label: 'Users', to: '/admin/users', icon: Users, end: true },
-  { label: 'Roles & Permissions', to: '/admin/roles-permissions', icon: ShieldCheck },
   { label: 'Tickets', to: '/admin/tickets', icon: Ticket },
   { label: 'Reports', to: '/admin/reports', icon: BarChart3 },
   { label: 'Approvals & Requests', to: '/admin/approvals', icon: CheckSquare },
   { label: 'Deployment Approval', to: '/admin/deployment-approval', icon: Rocket },
-  { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
+  { label: 'Application Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
+
+const mainMenuNav = MAIN_ADMIN_NAV;
 
 export const QA_MEMBER_NAV = [
   { label: 'Dashboard', to: '/qa-member', icon: LayoutDashboard, end: true },
@@ -37,7 +38,7 @@ export const QA_MEMBER_NAV = [
   { label: 'Users', to: '/admin/users', icon: Users, end: true },
   { label: 'Tickets', to: '/admin/tickets', icon: Ticket },
   { label: 'Reports', to: '/admin/reports', icon: BarChart3 },
-  { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
+  { label: 'Application Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
 
 export const PROJECT_LEAD_NAV = [
@@ -45,14 +46,15 @@ export const PROJECT_LEAD_NAV = [
   { label: 'Projects', to: '/admin/projects', icon: FolderKanban },
   { label: 'Bug Tickets', to: '/admin/tickets', icon: Ticket },
   { label: 'Reports', to: '/admin/reports', icon: BarChart3 },
-  { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
+  { label: 'Application Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
 
 export const DEVELOPER_NAV = [
   { label: 'Dashboard', to: '/developer', icon: LayoutDashboard, end: true },
   { label: 'Assigned Tickets', to: '/admin/tickets', icon: Ticket },
   { label: 'My Projects', to: '/admin/projects', icon: FolderKanban },
-  { label: 'Workspace Settings', to: '/admin/settings', icon: Settings, end: true }
+  { label: 'Project Reports', to: '/admin/reports', icon: BarChart3 },
+  { label: 'Application Settings', to: '/admin/settings', icon: Settings, end: true }
 ];
 
 export const SmallCubeLogo = () => (
@@ -76,12 +78,32 @@ function AdminSidebar({
 }) {
   const currentRole = typeof window !== 'undefined' ? (window.localStorage.getItem('userRole') || '') : '';
   const isQAMember = currentRole === 'QA Member';
+  const isProjectLead = currentRole === 'Project Lead';
+  const isDeveloper = currentRole === 'Developer';
 
-  const effectiveHomeRoute = homeRoute || (isQAMember ? '/qa-member' : '/admin');
-  const effectiveWorkspaceRole = workspaceRole || (isQAMember ? 'QA Member console' : 'Admin console');
+  let roleHomeRoute = '/admin';
+  let roleWorkspaceRole = 'Admin console';
+  let roleNavItems = mainMenuNav;
+
+  if (isProjectLead) {
+    roleHomeRoute = '/project-lead';
+    roleWorkspaceRole = 'Project Lead console';
+    roleNavItems = PROJECT_LEAD_NAV;
+  } else if (isDeveloper) {
+    roleHomeRoute = '/developer';
+    roleWorkspaceRole = 'Developer console';
+    roleNavItems = DEVELOPER_NAV;
+  } else if (isQAMember) {
+    roleHomeRoute = '/qa-member';
+    roleWorkspaceRole = 'QA Member console';
+    roleNavItems = QA_MEMBER_NAV;
+  }
+
+  const effectiveHomeRoute = homeRoute || roleHomeRoute;
+  const effectiveWorkspaceRole = workspaceRole || roleWorkspaceRole;
   const effectiveNavItems = (navItems && navItems !== mainMenuNav)
     ? navItems
-    : (isQAMember ? QA_MEMBER_NAV : mainMenuNav);
+    : roleNavItems;
   const [collapsed, setCollapsed] = useState(() => {
     const savedState = window.localStorage.getItem('workspaceSidebarCollapsed');
     return defaultCollapsed || (savedState !== null
@@ -181,6 +203,7 @@ function AdminSidebar({
         </nav>
 
         <div className="sidebar-footer">
+          <NotificationCenter collapsed={collapsed} />
           <div className="workspace-card">
             <div className="workspace-card-icon"><Activity size={17} /></div>
             <div>
