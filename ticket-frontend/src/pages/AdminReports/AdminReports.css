@@ -6,7 +6,7 @@
 .reports-layout {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
 }
 
 /* ==========================================================================
@@ -17,11 +17,11 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 14px;
   background: #FFFFFF;
   border: 1.5px solid #E2E8F0;
-  border-radius: 16px;
-  padding: 20px 26px;
+  border-radius: 14px;
+  padding: 16px 20px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
@@ -79,19 +79,19 @@
    ========================================================================== */
 .reports-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
 }
 
 .report-kpi-card {
   background: #FFFFFF;
   border: 1.5px solid #E2E8F0;
-  border-radius: 14px;
-  padding: 18px 20px;
+  border-radius: 12px;
+  padding: 14px 16px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   position: relative;
   overflow: hidden;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -411,8 +411,8 @@
   gap: 8px;
   background: #FFFFFF;
   border: 1.5px solid #CBD5E1;
-  border-radius: 16px;
-  padding: 7px 14px;
+  border-radius: 9999px;
+  padding: 7px 16px;
   min-width: 280px;
   transition: all 0.15s ease;
 }

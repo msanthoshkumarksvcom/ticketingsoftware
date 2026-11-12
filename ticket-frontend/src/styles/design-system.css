@@ -75,21 +75,21 @@
   /* ==========================================================================
      3. COMPONENT HEIGHTS & SIZING SCALE
      ========================================================================== */
-  --btn-height-sm: 32px;
-  --btn-height-md: 38px;
-  --btn-height-lg: 44px;
+  --btn-height-sm: 28px;
+  --btn-height-md: 34px;
+  --btn-height-lg: 40px;
 
-  --input-height-sm: 32px;
-  --input-height-md: 38px;
-  --input-height-lg: 44px;
+  --input-height-sm: 28px;
+  --input-height-md: 34px;
+  --input-height-lg: 40px;
 
   /* Radius Scale */
   --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 11px;
+  --radius-xl: 13px;
+  --radius-2xl: 16px;
   --radius-pill: 9999px;
 
   /* Border & Elevation Scale */
@@ -365,7 +365,7 @@ table th,
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  padding: 12px 16px !important;
+  padding: 9px 14px !important;
   border-bottom: 1.5px solid var(--color-line, #E2E8F0) !important;
   white-space: nowrap !important;
 }
@@ -378,7 +378,7 @@ table td,
 .reports-modern-table td,
 .tickets-page .users-table td,
 .daily-log-table td {
-  padding: 13px 16px !important;
+  padding: 10px 14px !important;
   font-size: var(--fs-body, 0.84375rem) !important;
   color: var(--color-ink, #0F172A) !important;
   border-bottom: 1px solid var(--color-line-subtle, #F1F5F9) !important;
@@ -401,18 +401,18 @@ table tbody tr:hover td,
 .pj-btn-primary,
 .btn-submit,
 .modal-btn-confirm {
-  height: var(--btn-height-md, 38px) !important;
-  padding: 0 16px !important;
+  height: var(--btn-height-md, 34px) !important;
+  padding: 0 14px !important;
   font-size: var(--fs-label, 0.78125rem) !important;
   font-weight: 700 !important;
-  border-radius: var(--radius-md, 8px) !important;
+  border-radius: var(--radius-md, 7px) !important;
   background: var(--color-primary, #2563EB) !important;
   color: #FFFFFF !important;
   border: 1px solid var(--color-primary, #2563EB) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 7px !important;
+  gap: 6px !important;
   box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
   transition: all 0.15s ease !important;
 }
@@ -431,11 +431,11 @@ table tbody tr:hover td,
 .pj-btn-secondary,
 .report-btn-export,
 .modal-btn-cancel {
-  height: var(--btn-height-md, 38px) !important;
-  padding: 0 14px !important;
+  height: var(--btn-height-md, 34px) !important;
+  padding: 0 12px !important;
   font-size: var(--fs-label, 0.78125rem) !important;
   font-weight: 600 !important;
-  border-radius: var(--radius-md, 8px) !important;
+  border-radius: var(--radius-md, 7px) !important;
   background: #FFFFFF !important;
   color: var(--color-ink, #0F172A) !important;
   border: 1.5px solid var(--color-line-hover, #CBD5E1) !important;
@@ -470,7 +470,7 @@ table tbody tr:hover td,
 .tickets-search-input {
   height: var(--input-height-md, 38px) !important;
   border: 1.5px solid var(--color-line-hover, #CBD5E1) !important;
-  border-radius: 16px !important;
+  border-radius: 9999px !important;
   background: #FFFFFF !important;
   transition: all 0.15s ease !important;
 }
@@ -561,14 +561,14 @@ table tbody tr:hover td,
   min-width: 0;
   height: 100vh;
   height: 100dvh;
-  margin-left: 256px;
+  margin-left: 236px;
   overflow-x: hidden;
   overflow-y: auto;
   transition: margin-left .22s ease;
 }
 
 .admin-layout .sidebar-collapsed ~ .main-content {
-  margin-left: 76px;
+  margin-left: 68px;
 }
 
 .admin-layout .header,
@@ -577,12 +577,12 @@ table tbody tr:hover td,
   top: 0;
   z-index: 10;
   display: flex;
-  min-height: 68px;
-  height: 68px;
+  min-height: 58px;
+  height: 58px;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 0 clamp(20px, 3vw, 40px);
+  gap: 16px;
+  padding: 0 clamp(18px, 2.5vw, 32px);
   border-bottom: 1px solid var(--color-line, #E2E8F0);
   background: rgba(255, 255, 255, .96);
   backdrop-filter: blur(14px);
@@ -593,9 +593,9 @@ table tbody tr:hover td,
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 8px;
+  gap: 7px;
   color: #64748B;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -769,25 +769,25 @@ table tbody tr:hover td,
 .dashboard-container,
 .role-dashboard-container {
   width: min(100%, 1500px);
-  padding: 28px clamp(18px, 3vw, 40px) 32px;
+  padding: 22px clamp(16px, 2.5vw, 32px) 26px;
 }
 
 .welcome-banner {
-  min-height: 176px;
-  padding: 28px 32px;
+  min-height: 156px;
+  padding: 22px 26px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 14px;
   background: linear-gradient(118deg, #1E3A8A 0%, #2563EB 100%);
   box-shadow: 0 12px 28px rgba(30, 58, 138, .14);
 }
 
 .welcome-banner h1 {
-  font-size: clamp(24px, 2.4vw, 31px);
+  font-size: clamp(21px, 2.2vw, 27px);
   letter-spacing: -.7px;
 }
 
 .welcome-banner p {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .eyebrow {
@@ -1120,16 +1120,16 @@ table tbody tr:hover td,
 
 .btn-primary-action {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 36px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0 14px;
+  gap: 7px;
+  padding: 0 13px;
   border: 1px solid var(--color-primary);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--color-primary);
   color: #fff;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 650;
   cursor: pointer;
   transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
@@ -1161,9 +1161,9 @@ table tbody tr:hover td,
   flex: 1 1 220px;
   align-items: center;
   gap: 9px;
-  padding: 0 14px;
+  padding: 0 18px;
   border: 1.5px solid #CBD5E1;
-  border-radius: 16px;
+  border-radius: 9999px;
   background: #FFFFFF;
 }
 
@@ -1337,6 +1337,44 @@ table tbody tr:hover td,
   box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
 }
 
+/* Search inputs must stay deeply curved without inner focus rings or 8px overrides */
+.admin-layout .pj-search-input-wrap,
+.admin-layout .pj-page-container .pj-search-input-wrap,
+.admin-layout .pj-search-input-wrap input,
+.admin-layout .pj-page-container .pj-search-input-wrap input,
+.admin-layout .users-search-box,
+.admin-layout .um-search-container,
+.admin-layout .report-search-box,
+.admin-layout .dev-search-box,
+.admin-layout .pld-search-box,
+.admin-layout .qa-table-search,
+.admin-layout .ws-recipient-search,
+.pjs-layout .pjs-tb-search {
+  border-radius: 9999px !important;
+}
+
+.admin-layout .users-search-box input,
+.admin-layout .users-search-box input:focus,
+.admin-layout .um-search-container input,
+.admin-layout .um-search-container input:focus,
+.admin-layout .report-search-box input,
+.admin-layout .report-search-box input:focus,
+.admin-layout .dev-search-box input,
+.admin-layout .dev-search-box input:focus,
+.admin-layout .pld-search-box input,
+.admin-layout .pld-search-box input:focus,
+.admin-layout .qa-table-search input,
+.admin-layout .qa-table-search input:focus,
+.admin-layout .ws-recipient-search input,
+.admin-layout .ws-recipient-search input:focus,
+.pjs-layout .pjs-tb-search input,
+.pjs-layout .pjs-tb-search input:focus {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .admin-layout input[type="checkbox"],
 .admin-layout input[type="radio"],
 .login-container input[type="checkbox"] {
@@ -1396,12 +1434,12 @@ table tbody tr:hover td,
 
 .pjs-layout .pjs-main {
   min-width: 0;
-  margin-left: 256px;
+  margin-left: 236px;
   transition: margin-left .22s ease;
 }
 
 .pjs-layout .sidebar-collapsed ~ .pjs-main {
-  margin-left: 76px;
+  margin-left: 68px;
 }
 
 .pjs-header,
@@ -1953,18 +1991,18 @@ body:has(.login-container) #root {
 .dashboard-container {
   width: min(100%, 1440px);
   margin-inline: auto;
-  padding-top: clamp(24px, 3vw, 42px);
-  padding-bottom: 36px;
+  padding-top: clamp(18px, 2.4vw, 32px);
+  padding-bottom: 28px;
 }
 
 .dashboard-container .welcome-banner {
   position: relative;
-  min-height: 220px;
+  min-height: 184px;
   overflow: hidden;
   align-items: center;
   border: 0;
-  border-radius: 22px;
-  padding: clamp(28px, 4vw, 48px);
+  border-radius: 18px;
+  padding: clamp(22px, 3vw, 36px);
   background:
     radial-gradient(ellipse at 83% 18%, rgba(147, 197, 253, .28), transparent 34%),
     linear-gradient(112deg, #1E3A8A 0%, #2563EB 72%, #3B82F6 100%);
@@ -1979,22 +2017,22 @@ body:has(.login-container) #root {
 
 .dashboard-container .welcome-banner h1 {
   max-width: 660px;
-  font-size: clamp(26px, 3vw, 38px);
+  font-size: clamp(22px, 2.5vw, 32px);
   letter-spacing: -.045em;
   line-height: 1.15;
 }
 
 .dashboard-container .welcome-banner p {
   max-width: 460px;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 
 .dashboard-container .welcome-banner .refresh-button {
   z-index: 2;
-  min-height: 42px;
+  min-height: 36px;
   border: 1px solid rgba(255, 255, 255, .32);
-  border-radius: 11px;
+  border-radius: 9px;
   background: rgba(255, 255, 255, .12);
   backdrop-filter: blur(10px);
 }
@@ -2878,22 +2916,24 @@ body:has(.login-container) #root {
 
 /* Tighter page content cards, preserving the sidebar and global header sizing. */
 .dashboard-container .stat-card {
-  min-height: 144px;
-  padding: 16px 17px 14px;
+  min-height: 124px;
+  padding: 13px 15px 12px;
+  border-radius: 14px;
 }
 
 .dashboard-container .stat-value {
-  margin: 10px 0 5px;
-  font-size: 29px;
+  margin: 8px 0 4px;
+  font-size: 24px;
 }
 
 .dashboard-container .dashboard-panels {
-  gap: 14px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .dashboard-container .panel {
-  padding: 18px;
+  padding: 15px;
+  border-radius: 14px;
 }
 
 .dashboard-container .chart-panel {
@@ -2901,26 +2941,26 @@ body:has(.login-container) #root {
 }
 
 .dashboard-container .chart-wrap {
-  gap: 15px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .admin-layout .um-stats-grid {
-  gap: 11px;
+  gap: 10px;
 }
 
 .admin-layout .um-stat-card {
   min-width: 0;
-  gap: 11px;
-  padding: 13px 15px;
-  border-radius: 13px;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 11px;
 }
 
 .admin-layout .um-stat-icon-wrap {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 10px;
 }
 
 .admin-layout .um-stat-top {
@@ -2930,32 +2970,32 @@ body:has(.login-container) #root {
 }
 
 .admin-layout .um-stat-number {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
 }
 
 .admin-layout .um-stat-trend {
   max-width: 100%;
-  font-size: .67rem;
+  font-size: .64rem;
 }
 
 .admin-layout .um-stat-label {
-  font-size: .78rem;
+  font-size: .74rem;
 }
 
 .admin-layout .pj-cards-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .admin-layout .pj-card {
   min-width: 0;
-  padding: 14px;
-  border-radius: 14px;
+  padding: 12px;
+  border-radius: 12px;
 }
 
 .admin-layout .pj-card-top {
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 
 .admin-layout .pj-card-top-right {
@@ -2966,22 +3006,22 @@ body:has(.login-container) #root {
 .admin-layout .pj-status-badge {
   max-width: 130px;
   overflow: hidden;
-  padding: 3px 8px;
-  font-size: 10px;
+  padding: 2px 7px;
+  font-size: 9.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .admin-layout .pj-card-titles {
   min-width: 0;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .admin-layout .pj-card-name {
   display: -webkit-box;
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: 15px;
+  font-size: 13.5px;
   line-height: 1.3;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -2989,19 +3029,19 @@ body:has(.login-container) #root {
 
 .admin-layout .pj-card-code {
   overflow-wrap: anywhere;
-  font-size: 10.5px;
+  font-size: 10px;
 }
 
 .admin-layout .pj-card-meta-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 10px;
-  margin-bottom: 12px;
+  gap: 6px 8px;
+  margin-bottom: 10px;
 }
 
 .admin-layout .pj-meta-item {
   min-width: 0;
-  gap: 6px;
-  font-size: 10.5px;
+  gap: 5px;
+  font-size: 10px;
   white-space: normal;
 }
 
@@ -3021,15 +3061,15 @@ body:has(.login-container) #root {
 
 .admin-layout .pj-sub-metric {
   min-width: 0;
-  min-height: 38px;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 8px;
+  min-height: 34px;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 7px;
 }
 
 .admin-layout .pj-sub-metric-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .admin-layout .pj-sub-metric-content {
@@ -3038,13 +3078,13 @@ body:has(.login-container) #root {
 
 .admin-layout .pj-sub-metric-label {
   overflow: hidden;
-  font-size: 8.5px;
+  font-size: 8px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .admin-layout .pj-sub-metric-val {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .admin-layout .users-table-card th,
@@ -3282,10 +3322,10 @@ body:has(.login-container) #root {
   width: 100%;
   max-width: 1560px;
   margin: 0 auto;
-  padding: clamp(28px, 3vw, 42px) clamp(20px, 3vw, 40px) 48px;
+  padding: clamp(20px, 2.4vw, 32px) clamp(16px, 2.4vw, 32px) 38px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
   box-sizing: border-box;
 }
 
@@ -3338,7 +3378,7 @@ body:has(.login-container) #root {
 .admin-layout.tickets-page .projects-header-info h2,
 .admin-layout .ws-settings-page .ws-header-row h1 {
   font-family: 'Outfit', 'Plus Jakarta Sans', 'Inter', sans-serif !important;
-  font-size: 32px !important;
+  font-size: 26px !important;
   font-weight: 700 !important;
   letter-spacing: -0.02em !important;
   line-height: 1.15 !important;
@@ -3398,10 +3438,10 @@ body:has(.login-container) #root {
 }
 
 .admin-layout.users-page .um-stat-icon-wrap {
-  width: 48px !important;
-  height: 48px !important;
-  flex: 0 0 48px !important;
-  border-radius: 13px !important;
+  width: 42px !important;
+  height: 42px !important;
+  flex: 0 0 42px !important;
+  border-radius: 11px !important;
   border: none !important;
 }
 
@@ -3438,7 +3478,7 @@ body:has(.login-container) #root {
 }
 
 .admin-layout.users-page .um-stat-label {
-  font-size: 14px !important;
+  font-size: 12.5px !important;
   font-weight: 500 !important;
   color: #64748b !important;
   text-transform: none !important;
@@ -3448,7 +3488,7 @@ body:has(.login-container) #root {
 }
 
 .admin-layout.users-page .um-stat-number {
-  font-size: 28px !important;
+  font-size: 24px !important;
   font-weight: 800 !important;
   color: #0f172a !important;
   line-height: 1.1 !important;
@@ -3474,10 +3514,10 @@ body:has(.login-container) #root {
 .admin-layout.tickets-page .users-search-box {
   width: 100%;
   min-width: 0;
-  height: 46px;
-  min-height: 46px;
+  height: 40px;
+  min-height: 40px;
   flex: 0 0 auto;
-  border-radius: 20px;
+  border-radius: 9999px;
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
   padding: 0 16px;
@@ -3498,7 +3538,7 @@ body:has(.login-container) #root {
   border: none;
   outline: none;
   background: transparent;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .admin-layout.users-page .um-filter-selects {
@@ -3584,15 +3624,15 @@ body:has(.login-container) #root {
 
 .admin-layout.users-page .um-filter-selects .c-select-filter .c-select-trigger,
 .admin-layout.tickets-page .tickets-filter-dropdowns .c-select-filter .c-select-trigger {
-  height: 46px;
-  border-radius: 10px;
+  height: 38px;
+  border-radius: 9px;
 }
 
 .admin-layout.tickets-page .ticket-folders-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-  padding-top: 8px;
+  gap: 14px;
+  padding-top: 6px;
 }
 
 @media (max-width: 1360px) {
@@ -3684,9 +3724,9 @@ body:has(.login-container) #root {
 }
 
 .admin-layout.approvals-page .users-search-box {
-  height: 44px;
-  min-height: 44px;
-  border-radius: 20px;
+  height: 38px;
+  min-height: 38px;
+  border-radius: 9999px;
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
   padding: 0 16px;
@@ -3700,8 +3740,8 @@ body:has(.login-container) #root {
 }
 
 .admin-layout.approvals-page .users-filter-bar .c-select-filter .c-select-trigger {
-  height: 44px;
-  border-radius: 10px;
+  height: 38px;
+  border-radius: 9px;
 }
 
 @media (max-width: 768px) {

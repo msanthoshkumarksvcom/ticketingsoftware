@@ -422,12 +422,13 @@ html[data-theme='dark'] .users-search-box,
 html[data-theme='dark'] .um-search-box,
 html[data-theme='dark'] .um-search-container,
 html[data-theme='dark'] .pj-search-box,
-html[data-theme='dark'] .pj-search-input-wrap,
 html[data-theme='dark'] .report-search-box,
 html[data-theme='dark'] .tickets-search-input,
 html[data-theme='dark'] .dev-search-box,
 html[data-theme='dark'] .pld-search-box,
 html[data-theme='dark'] .qa-table-search,
+html[data-theme='dark'] .ws-recipient-search,
+html[data-theme='dark'] .pjs-tb-search,
 html[data-theme='dark'] .header-search,
 html[data-theme='dark'] .um-input-box,
 html[data-theme='dark'] .um-status-readonly-box {
@@ -458,19 +459,40 @@ html[data-theme='dark'] .pjs-layout textarea::placeholder {
   color: #64748b;
 }
 
+html[data-theme='dark'] .pj-search-input-wrap,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-search-input-wrap {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 9999px !important;
+}
+
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-search-input-wrap input {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  border-radius: 9999px !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-search-input-wrap input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18) !important;
+}
+
 html[data-theme='dark'] .users-search-box input,
 html[data-theme='dark'] .um-search-container input,
 html[data-theme='dark'] .pj-search-box input,
-html[data-theme='dark'] .pj-search-input-wrap input,
 html[data-theme='dark'] .report-search-box input,
 html[data-theme='dark'] .dev-search-box input,
 html[data-theme='dark'] .pld-search-box input,
 html[data-theme='dark'] .qa-table-search input,
+html[data-theme='dark'] .ws-recipient-search input,
+html[data-theme='dark'] .pjs-tb-search input,
 html[data-theme='dark'] .header-search input,
 html[data-theme='dark'] .um-input-box input,
 html[data-theme='dark'] .um-input-box select {
   background: transparent !important;
-  border-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   color: #f1f5f9 !important;
 }
 

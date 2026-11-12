@@ -35,14 +35,14 @@
   flex: 1;
   height: 100vh;
   height: 100dvh;
-  margin-left: 256px;
+  margin-left: 236px;
   overflow-x: hidden;
   overflow-y: auto;
   transition: margin-left 0.22s ease;
 }
 
 .sidebar-collapsed ~ .main-content {
-  margin-left: 76px;
+  margin-left: 68px;
 }
 
 /* Header & Top Navigation Bar */
@@ -51,8 +51,8 @@
   top: 0;
   z-index: 20;
   display: flex;
-  min-height: 68px;
-  height: 68px;
+  min-height: 58px;
+  height: 58px;
   align-items: center;
   justify-content: space-between;
   gap: 18px;

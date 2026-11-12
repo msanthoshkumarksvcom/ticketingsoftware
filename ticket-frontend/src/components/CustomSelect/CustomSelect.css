@@ -24,16 +24,16 @@
 .c-select-filter .c-select-trigger {
   width: 100%;
   min-width: 0;
-  height: 38px;
+  height: 34px;
   background: transparent;
   border: none;
-  border-radius: 8px;
-  padding: 0 10px;
+  border-radius: 7px;
+  padding: 0 9px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
+  gap: 7px;
+  font-size: 12px;
   font-weight: 500;
   color: #1e293b;
   cursor: pointer;
@@ -66,16 +66,16 @@
 .c-select-form .c-select-trigger {
   width: 100%;
   min-width: 0;
-  height: 40px;
+  height: 36px;
   background: #ffffff;
   border: 1.5px solid #cbd5e1;
-  border-radius: 9px;
-  padding: 0 12px;
+  border-radius: 8px;
+  padding: 0 11px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 13.5px;
+  gap: 8px;
+  font-size: 12.5px;
   font-weight: 500;
   color: #0f172a;
   cursor: pointer;
@@ -222,9 +222,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 0.86rem;
+  padding: 7px 9px;
+  border-radius: 7px;
+  font-size: 0.82rem;
   font-weight: 500;
   color: #334155;
   cursor: pointer;

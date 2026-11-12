@@ -200,8 +200,8 @@
   align-items: center;
   background: #ffffff;
   border: 1px solid #cbd5e1;
-  border-radius: 16px;
-  padding: 0 16px;
+  border-radius: 9999px;
+  padding: 0 18px;
   height: 42px;
   gap: 10px;
   transition: all 0.2s ease;
@@ -1420,10 +1420,10 @@
 }
 
 .admin-layout.users-page .um-stat-icon-wrap {
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  border-radius: 13px;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 11px;
   border: none;
 }
 
@@ -1460,7 +1460,7 @@
 }
 
 .admin-layout.users-page .um-stat-label {
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 500;
   color: #64748b;
   text-transform: none;
@@ -1470,7 +1470,7 @@
 }
 
 .admin-layout.users-page .um-stat-number {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1.1;
@@ -1494,9 +1494,9 @@
 .admin-layout.users-page .um-search-container {
   width: 100%;
   min-width: 0;
-  height: 46px;
-  min-height: 46px;
-  border-radius: 20px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: 9999px;
   border: 1.5px solid #cbd5e1;
   background: #ffffff;
   padding: 0 16px;
@@ -1524,10 +1524,10 @@
 }
 
 .admin-layout.users-page .um-fix-filter-chip {
-  height: 46px;
-  width: 34px;
-  flex: 0 0 34px;
-  padding: 0 6px;
+  height: 38px;
+  width: 32px;
+  flex: 0 0 32px;
+  padding: 0 5px;
   background: transparent;
   border: none;
   border-radius: 8px;

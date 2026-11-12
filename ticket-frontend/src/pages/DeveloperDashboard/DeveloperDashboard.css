@@ -1,12 +1,12 @@
 /* DeveloperDashboard.css - Frontend UI Design System Compliant */
 
 .dev-container {
-  padding: 24px 32px 48px;
+  padding: 20px 26px 36px;
   max-width: 1600px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
 }
 
 .dev-spin {
@@ -21,8 +21,8 @@
 /* Welcome Banner */
 .dev-welcome-banner {
   background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%);
-  border-radius: 16px;
-  padding: 28px 32px;
+  border-radius: 14px;
+  padding: 22px 26px;
   color: #FFFFFF;
   position: relative;
   overflow: hidden;
@@ -470,8 +470,8 @@
   gap: 8px;
   background: #FFFFFF;
   border: 1.5px solid #CBD5E1;
-  border-radius: 16px;
-  padding: 7px 14px;
+  border-radius: 9999px;
+  padding: 7px 16px;
   flex: 1;
   min-width: 260px;
   max-width: 440px;
