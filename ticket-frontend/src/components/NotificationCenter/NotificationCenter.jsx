@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import { Bell, Check, CheckCheck, Globe, UserCheck, X, Clock } from 'lucide-react';
 import { formatIndianDateTime } from '../../utils/dateFormat';
 import './NotificationCenter.css';
+import { SOCKET_URL } from '../../utils/apiConfig';
 
 function NotificationDrawerPortal({ isOpen, onClose, children }) {
   const onCloseRef = useRef(onClose);
@@ -36,8 +37,6 @@ function NotificationDrawerPortal({ isOpen, onClose, children }) {
     document.body
   );
 }
-
-const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
 const TYPE_META = {
   info: { label: 'Info', className: 'notif-type-info' },

@@ -306,9 +306,7 @@ export const initDatabase = async () => {
       INSERT INTO users (emp_id, full_name, email, password, department, role, status)
       VALUES 
         ('EMP-001', 'Manager', 'manager@gmail.com', $1, 'Quality Assurance', 'Manager', 'Active'),
-        ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active'),
-        ('EMP-005', 'Project Lead', 'projectlead@gmail.com', $1, 'Engineering', 'Project Lead', 'Active'),
-        ('EMP-006', 'Developer', 'developer@gmail.com', $1, 'Development', 'Developer', 'Active')
+        ('EMP-002', 'QA Lead', 'qalead@gmail.com', $1, 'Quality Assurance', 'QA Lead', 'Active')
       ON CONFLICT (email) DO NOTHING;
     `, [defaultHash]);
 

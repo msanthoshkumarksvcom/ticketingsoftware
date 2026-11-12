@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { SOCKET_URL } from '../../utils/apiConfig';
 import {
   Code2,
   Folder,
@@ -122,7 +123,7 @@ export default function DeveloperDashboard() {
     fetchTickets();
 
     // Real-time synchronization for ticket locks and resolutions
-    const socket = io('http://localhost:5000', {
+    const socket = io(SOCKET_URL, {
       transports: ['polling', 'websocket'],
       reconnection: true,
       timeout: 5000
