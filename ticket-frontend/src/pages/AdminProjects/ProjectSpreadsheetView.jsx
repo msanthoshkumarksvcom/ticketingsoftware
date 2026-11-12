@@ -12,6 +12,7 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react';
+import { formatIndianDate } from '../../utils/dateFormat';
 import './ProjectSpreadsheetView.css';
 
 // Column configurations matching Google Sheets / Excel coordinates
@@ -265,7 +266,8 @@ export default function ProjectSpreadsheetView({
 
     filteredProjects.forEach((proj) => {
       const row = SHEET_COLUMNS.filter((c) => c.type !== 'action').map((c) => {
-        const val = proj[c.key] ?? '';
+        const raw = proj[c.key] ?? '';
+        const val = c.type === 'date' && raw ? formatIndianDate(raw, '') : raw;
         return `"${String(val).replace(/"/g, '""')}"`;
       });
       csvRows.push(row.join(','));
@@ -349,7 +351,7 @@ export default function ProjectSpreadsheetView({
 
         <div className="pj-sheet-ribbon-actions">
           {/* Add Row Button */}
-          <button className="pj-sheet-action-btn success" onClick={onAddRow} title="Add new project row into sheet">
+          <button className="pj-sheet-action-btn success" onClick={onAddRow}>
             <Plus size={15} strokeWidth={2.5} />
             <span>Add Row</span>
           </button>
@@ -359,14 +361,13 @@ export default function ProjectSpreadsheetView({
             className="pj-sheet-action-btn"
             onClick={handleDeleteSelected}
             disabled={!filteredProjects.length}
-            title="Delete selected row"
           >
             <Trash2 size={14} />
             <span>Delete Row</span>
           </button>
 
           {/* Export to CSV */}
-          <button className="pj-sheet-action-btn" onClick={handleExportCSV} title="Download sheet as CSV file">
+          <button className="pj-sheet-action-btn" onClick={handleExportCSV}>
             <Download size={14} />
             <span>Export CSV</span>
           </button>
@@ -376,7 +377,6 @@ export default function ProjectSpreadsheetView({
             <button
               className="pj-sheet-action-btn primary"
               onClick={() => onOpenProjectSheet && onOpenProjectSheet(filteredProjects[activeCell.rowIndex])}
-              title="Open full dedicated test cases & project sheet workspace"
             >
               <ExternalLink size={14} />
               <span>Open Project Sheet</span>
@@ -387,7 +387,7 @@ export default function ProjectSpreadsheetView({
 
       {/* 2. Formula Bar (fx) */}
       <div className="pj-sheet-formulabar">
-        <div className="pj-sheet-coord-box" title="Active Cell Coordinate">
+        <div className="pj-sheet-coord-box">
           {activeCellCoord}
         </div>
         <div className="pj-sheet-fx-symbol">fx</div>
@@ -513,7 +513,7 @@ export default function ProjectSpreadsheetView({
                                 e.stopPropagation();
                                 if (onOpenProjectSheet) onOpenProjectSheet(project);
                               }}
-                              title="Open dedicated project sheet"
+                              aria-label="Open dedicated project sheet"
                             >
                               <FileSpreadsheet size={13} />
                               <span>Open Sheet</span>
@@ -536,7 +536,7 @@ export default function ProjectSpreadsheetView({
                             {col.type === 'number'
                               ? rawVal
                               : col.type === 'date' && rawVal
-                              ? String(rawVal).slice(0, 10)
+                              ? formatIndianDate(rawVal, '—')
                               : String(rawVal)}
                           </div>
                         )}
@@ -595,7 +595,7 @@ export default function ProjectSpreadsheetView({
         </div>
 
         {/* Live Formulas Status Summary Bar */}
-        <div className="pj-sheet-calc-bar" title="Calculated summary of currently visible sheet rows">
+        <div className="pj-sheet-calc-bar">
           <div className="pj-sheet-calc-item">
             <span className="pj-sheet-calc-label">COUNT:</span>
             <span className="pj-sheet-calc-val">{stats.total}</span>

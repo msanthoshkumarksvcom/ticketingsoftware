@@ -53,6 +53,7 @@ import { io } from 'socket.io-client';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import RaiseBugTicketModal from '../../components/RaiseBugTicketModal/RaiseBugTicketModal';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
+import { formatIndianDate } from '../../utils/dateFormat';
 import { Bug } from 'lucide-react';
 import './AdminProjectSheet.css';
 
@@ -3064,7 +3065,7 @@ export default function AdminProjectSheet() {
                                 wordBreak: cellStyle.wrap === 'wrap' ? 'break-word' : 'normal'
                               }}
                             >
-                              {rawVal}
+                              {col.type === 'date' && rawVal ? formatIndianDate(rawVal, rawVal) : rawVal}
                             </div>
                           )}
 

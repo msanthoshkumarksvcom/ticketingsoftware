@@ -85,6 +85,7 @@
 }
 
 .tdm-sev-pill.critical { background: #FEE2E2; color: #991B1B; }
+.tdm-sev-pill.block { background: #F5F3FF; color: #6D28D9; }
 .tdm-sev-pill.high { background: #FFEDD5; color: #C2410C; }
 .tdm-sev-pill.medium { background: #FEF3C7; color: #B45309; }
 .tdm-sev-pill.low { background: #F1F5F9; color: #475569; }

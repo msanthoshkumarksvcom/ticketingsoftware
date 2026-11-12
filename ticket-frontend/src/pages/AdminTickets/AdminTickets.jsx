@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
+  AlertCircle,
   ArrowLeft,
-  ChevronDown,
+  CheckCircle2,
   ChevronRight,
+  Clock,
   Eye,
   FileText,
   Folder,
@@ -14,7 +16,6 @@ import {
   List,
   LogOut,
   Plus,
-  RefreshCw,
   Search,
   Ticket,
   Upload,
@@ -40,8 +41,9 @@ const TICKET_STATUS_OPTIONS = [
 ];
 
 const TICKET_PRIORITY_OPTIONS = [
-  { value: 'All', label: 'All Priorities' },
+  { value: 'All', label: 'All Severities' },
   { value: 'Critical', label: 'Critical' },
+  { value: 'Block', label: 'Block' },
   { value: 'High', label: 'High' },
   { value: 'Medium', label: 'Medium' },
   { value: 'Low', label: 'Low' }
@@ -64,6 +66,7 @@ const MODAL_TYPE_OPTIONS = [
 
 const MODAL_PRIORITY_OPTIONS = [
   { value: 'Critical', label: 'Critical' },
+  { value: 'Block', label: 'Block' },
   { value: 'High', label: 'High' },
   { value: 'Medium', label: 'Medium' },
   { value: 'Low', label: 'Low' }
@@ -80,14 +83,6 @@ const initialTicketForm = {
   attachments: []
 };
 
-const TICKET_STATUS_CLASS_MAP = {
-  Open: 'ticket-status-open',
-  'In Progress': 'ticket-status-in-progress',
-  Resolved: 'ticket-status-resolved',
-  Reopened: 'ticket-status-reopened',
-  Closed: 'ticket-status-closed'
-};
-
 const TICKET_TYPE_CLASS_MAP = {
   Bug: 'type-bug',
   Incident: 'type-incident',
@@ -96,16 +91,67 @@ const TICKET_TYPE_CLASS_MAP = {
   Task: 'type-task'
 };
 
-const TICKET_PRIORITY_CLASS_MAP = {
-  Critical: 'priority-critical',
-  High: 'priority-high',
-  Medium: 'priority-medium',
-  Low: 'priority-low'
+const FOLDER_PRIORITY_LEVELS = [
+  { key: 'critical', label: 'Critical' },
+  { key: 'block', label: 'Block' },
+  { key: 'high', label: 'High' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'low', label: 'Low' }
+];
+
+const SEVERITY_LABEL_MAP = {
+  critical: 'Critical',
+  block: 'Block',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low'
 };
+
+function resolveTicketLevel(ticket) {
+  const priority = String(ticket?.priority || '').trim().toLowerCase();
+  const severity = String(ticket?.severity || '').trim().toLowerCase();
+  const status = String(ticket?.status || '').trim().toLowerCase();
+
+  if (
+    ['block', 'blocker', 'blocked'].includes(priority) ||
+    ['block', 'blocker', 'blocked'].includes(severity) ||
+    ['block', 'blocker', 'blocked'].includes(status)
+  ) {
+    return 'block';
+  }
+  if (priority === 'critical' || priority === 'urgent' || severity === 'critical') {
+    return 'critical';
+  }
+  if (priority === 'high' || priority === 'medium' || priority === 'low') {
+    return priority;
+  }
+  if (severity === 'high' || severity === 'medium' || severity === 'low') {
+    return severity;
+  }
+  return 'medium';
+}
+
+function getFolderPriorityCounts(folderTickets) {
+  const counts = {
+    critical: 0,
+    block: 0,
+    high: 0,
+    medium: 0,
+    low: 0
+  };
+  (folderTickets || []).forEach((ticket) => {
+    const level = resolveTicketLevel(ticket);
+    if (Object.prototype.hasOwnProperty.call(counts, level)) {
+      counts[level] += 1;
+    }
+  });
+  return counts;
+}
 
 function matchesTicketAttributes(ticket, { statusFilter, priorityFilter, typeFilter }) {
   const matchesStatus = statusFilter === 'All' || ticket.status === statusFilter;
-  const matchesPriority = priorityFilter === 'All' || ticket.priority === priorityFilter;
+  const matchesPriority =
+    priorityFilter === 'All' || resolveTicketLevel(ticket) === priorityFilter.toLowerCase();
   const matchesType = typeFilter === 'All' || ticket.type === typeFilter;
   return matchesStatus && matchesPriority && matchesType;
 }
@@ -146,7 +192,6 @@ function AdminTickets() {
   const currentUserRole = localStorage.getItem('userRole') || 'Administrator';
   const isDeveloper = currentUserRole === 'Developer';
   const isProjectLead = currentUserRole === 'Project Lead';
-  const [userEmail] = useState(() => localStorage.getItem('userEmail') || '');
 
   const fetchData = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -293,6 +338,7 @@ function AdminTickets() {
         'http://localhost:5000/api/admin/tickets',
         {
           ...formData,
+          severity: formData.priority,
           project_id: matchedProject?.id || activeFolder?.projectId || undefined,
           title: formData.title.trim(),
           description: formData.description.trim(),
@@ -506,12 +552,17 @@ function AdminTickets() {
   const statsSource = activeFolder ? activeFolder.tickets : tickets;
   const overviewStats = isShowingFoldersGrid
     ? folderSummaryStats
-    : [
-        { label: activeFolder ? 'Folder Tickets' : 'Total Tickets', value: statsSource.length, tone: 'total' },
-        { label: 'Open', value: statsSource.filter((ticket) => ticket.status === 'Open').length, tone: 'open' },
-        { label: 'In Progress', value: statsSource.filter((ticket) => ticket.status === 'In Progress').length, tone: 'progress' },
-        { label: 'Resolved', value: statsSource.filter((ticket) => ticket.status === 'Resolved').length, tone: 'resolved' }
-      ];
+    : activeFolder
+      ? [
+          { label: 'Tickets', value: statsSource.length, tone: 'total' },
+          { label: 'Resolved', value: statsSource.filter((ticket) => ticket.status === 'Resolved').length, tone: 'resolved' }
+        ]
+      : [
+          { label: 'Total Tickets', value: statsSource.length, tone: 'total' },
+          { label: 'Open', value: statsSource.filter((ticket) => ticket.status === 'Open').length, tone: 'open' },
+          { label: 'In Progress', value: statsSource.filter((ticket) => ticket.status === 'In Progress').length, tone: 'progress' },
+          { label: 'Resolved', value: statsSource.filter((ticket) => ticket.status === 'Resolved').length, tone: 'resolved' }
+        ];
 
   const folderNameByKey = useMemo(() => {
     const map = new Map();
@@ -530,9 +581,6 @@ function AdminTickets() {
     }
     return activeFolder?.projectName || 'General';
   };
-
-  const displayName = userEmail ? userEmail.split('@')[0] : 'Administrator';
-  const avatarLabel = displayName.charAt(0).toUpperCase();
 
   return (
     <div className="admin-layout tickets-page">
@@ -579,28 +627,6 @@ function AdminTickets() {
       <AdminSidebar onLogout={() => setShowLogoutModal(true)} />
 
       <main className="main-content">
-        <div className="tickets-top-utility-bar">
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={fetchData}
-              title="Refresh tickets"
-              aria-label="Refresh tickets list"
-            >
-              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar">{avatarLabel}</div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">{localStorage.getItem('userRole') || 'Administrator'}</span>
-              </div>
-              <ChevronDown size={15} className="profile-chevron" />
-            </div>
-          </div>
-        </div>
-
         <div className="dashboard-container">
           <div className="projects-layout">
             {!activeFolder && (
@@ -700,15 +726,43 @@ function AdminTickets() {
             )}
 
             <div className={`tickets-overview ${isShowingFoldersGrid ? 'folders-overview' : ''}`}>
-              {overviewStats.map((card) => (
-                <div key={card.label} className={`overview-card ${card.tone}`}>
-                  <span>{card.label}</span>
-                  <strong>{card.value}</strong>
-                </div>
-              ))}
+              {overviewStats.map((card) => {
+                const iconTone =
+                  card.tone === 'total'
+                    ? 'blue'
+                    : card.tone === 'open'
+                      ? 'orange'
+                      : card.tone === 'progress'
+                        ? 'purple'
+                        : 'green';
+                const MetricIcon =
+                  card.tone === 'total'
+                    ? isShowingFoldersGrid
+                      ? Folder
+                      : Ticket
+                    : card.tone === 'open'
+                      ? AlertCircle
+                      : card.tone === 'progress'
+                        ? Clock
+                        : CheckCircle2;
+
+                return (
+                  <div key={card.label} className={`overview-card ${card.tone}`}>
+                    <div className="pj-metric-left">
+                      <div className={`pj-metric-icon-box ${iconTone}`}>
+                        <MetricIcon size={24} />
+                      </div>
+                      <div className="pj-metric-info">
+                        <span className="pj-metric-label">{card.label}</span>
+                        <strong className="pj-metric-number">{card.value}</strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="users-filter-bar">
+            <div className={`users-filter-bar ${isShowingFoldersGrid ? 'is-folders-search' : ''}`}>
               <div className="users-search-box">
                 <Search size={16} color="#64748b" />
                 <input
@@ -724,7 +778,7 @@ function AdminTickets() {
               </div>
 
               {!isShowingFoldersGrid && (
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div className="tickets-filter-dropdowns">
                   <CustomSelect
                     value={statusFilter}
                     onChange={setStatusFilter}
@@ -738,7 +792,7 @@ function AdminTickets() {
                     onChange={setPriorityFilter}
                     options={TICKET_PRIORITY_OPTIONS}
                     variant="filter"
-                    placeholder="All Priorities"
+                    placeholder="All Severities"
                   />
 
                   <CustomSelect
@@ -783,6 +837,7 @@ function AdminTickets() {
                   <div className="ticket-folders-grid">
                     {visibleFolders.map((folder) => {
                       const folderTickets = folder.tickets;
+                      const priorityCounts = getFolderPriorityCounts(folderTickets);
 
                       return (
                         <div
@@ -824,6 +879,22 @@ function AdminTickets() {
                               {folder.leadName ? ` • Lead: ${folder.leadName}` : ''}
                             </p>
 
+                            <div className="ticket-folder-status-strip" aria-label="Ticket status counts by priority">
+                              {FOLDER_PRIORITY_LEVELS.map((level) => {
+                                const count = priorityCounts[level.key];
+                                return (
+                                  <span
+                                    key={level.key}
+                                    className={`folder-stat-chip ${level.key}${count === 0 ? ' is-zero' : ''}`}
+                                  >
+                                    <span className="folder-stat-dot" aria-hidden="true" />
+                                    <span className="folder-stat-label">{level.label}</span>
+                                    <strong className="folder-stat-value">{count}</strong>
+                                  </span>
+                                );
+                              })}
+                            </div>
+
                             <div className="ticket-folder-footer">
                               <span className="ticket-folder-open-cta">
                                 <span>Open Folder</span>
@@ -846,8 +917,7 @@ function AdminTickets() {
                       <th>Title & Description</th>
                       <th>Project</th>
                       <th>Type</th>
-                      <th>Priority</th>
-                      <th>Status</th>
+                      <th>Severity</th>
                       <th>Assigned To</th>
                       <th>Actions</th>
                     </tr>
@@ -855,13 +925,13 @@ function AdminTickets() {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
                           Loading tickets...
                         </td>
                       </tr>
                     ) : filteredTickets.length === 0 ? (
                       <tr>
-                        <td colSpan="8">
+                        <td colSpan="7">
                           <div className="user-empty-state">
                             <Ticket size={40} style={{ opacity: 0.35, marginBottom: '10px' }} />
                             <p>
@@ -921,18 +991,16 @@ function AdminTickets() {
                             </span>
                           </td>
                           <td>
-                            <span
-                              className={`priority-badge ${TICKET_PRIORITY_CLASS_MAP[t.priority] || 'priority-medium'}`}
-                            >
-                              {t.priority}
-                            </span>
-                          </td>
-                          <td>
-                            <span
-                              className={`status-tag ${TICKET_STATUS_CLASS_MAP[t.status] || 'ticket-status-closed'}`}
-                            >
-                              {t.status}
-                            </span>
+                            {(() => {
+                              const severityLevel = resolveTicketLevel(t);
+                              const severityLabel =
+                                SEVERITY_LABEL_MAP[severityLevel] || t.severity || t.priority || 'Medium';
+                              return (
+                                <span className={`priority-badge priority-${severityLevel}`}>
+                                  {severityLabel}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td style={{ fontWeight: 500, color: '#334155' }}>
                             {t.assigned_to || 'Unassigned'}
@@ -1010,7 +1078,7 @@ function AdminTickets() {
                   </div>
 
                   <div className="form-group-user">
-                    <label>Priority</label>
+                    <label>Severity</label>
                     <CustomSelect
                       value={formData.priority}
                       onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}

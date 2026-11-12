@@ -3,12 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Check,
-  ChevronDown,
   Key,
   Lock,
   LogOut,
   Plus,
-  RefreshCw,
   Search,
   Shield,
   ShieldAlert,
@@ -46,7 +44,6 @@ function AdminRoles() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [userEmail] = useState(() => localStorage.getItem('userEmail') || '');
 
   const fetchRoles = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -139,9 +136,6 @@ function AdminRoles() {
     );
   });
 
-  const displayName = userEmail ? userEmail.split('@')[0] : 'Administrator';
-  const avatarLabel = displayName.charAt(0).toUpperCase();
-
   return (
     <div className="admin-layout">
       {/* Logout Modal */}
@@ -176,33 +170,6 @@ function AdminRoles() {
 
       {/* Main Content */}
       <main className="main-content">
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">/</span>
-            <strong>Roles & Permissions</strong>
-          </div>
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={fetchRoles}
-              title="Refresh roles"
-              aria-label="Refresh roles list"
-            >
-              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar">{avatarLabel}</div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">{localStorage.getItem('userRole') || 'Administrator'}</span>
-              </div>
-              <ChevronDown size={15} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         <div className="dashboard-container">
           <div className="users-layout">
             {/* Header Card */}

@@ -28,6 +28,7 @@ import {
   CalendarDays
 } from 'lucide-react';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import './AdminReports.css';
 
@@ -36,8 +37,6 @@ export default function AdminReports() {
 
   // Role and Identity
   const [userRole] = useState(() => localStorage.getItem('userRole') || 'Administrator');
-  const [userEmail] = useState(() => localStorage.getItem('userEmail') || '');
-  const [userName] = useState(() => localStorage.getItem('userName') || '');
 
   // Strict RBAC: Only Manager, QA Lead, and QA Member can view QA Member execution report
   const canViewQAReport = useMemo(() => {
@@ -136,9 +135,6 @@ export default function AdminReports() {
     localStorage.clear();
     navigate('/', { replace: true });
   };
-
-  const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'Member');
-  const avatarLabel = displayName.charAt(0).toUpperCase();
 
   // Exclusive Toggle Handler: Opening one report closes the other
   const handleToggleReport = (reportKey) => {
@@ -269,7 +265,7 @@ export default function AdminReports() {
       m.today_pass,
       m.today_bugs,
       m.total_tested,
-      `"${m.last_active_date || 'N/A'}"`
+      `"${m.last_active_date ? formatIndianDate(m.last_active_date) : 'N/A'}"`
     ]);
 
     const csvContent =
@@ -303,7 +299,7 @@ export default function AdminReports() {
     ];
 
     const rows = (qaMember.daily_work || []).map((d) => [
-      `"${d.date}"`,
+      `"${formatIndianDate(d.date, d.date)}"`,
       `"${qaMember.full_name}"`,
       `"${qaMember.email}"`,
       d.cases_tested,
@@ -432,7 +428,7 @@ export default function AdminReports() {
                             <td>
                               <span className="daily-date-cell">
                                 <Calendar size={13} color={isToday ? '#16A34A' : '#64748B'} />
-                                <span>{dw.date}</span>
+                                <span>{formatIndianDate(dw.date, dw.date)}</span>
                                 {isToday && (
                                   <span style={{ fontSize: '0.68rem', background: '#DCFCE7', color: '#15803D', padding: '1px 5px', borderRadius: '4px', fontWeight: '800' }}>
                                     Today
@@ -512,36 +508,6 @@ export default function AdminReports() {
 
       {/* Main Content Viewport */}
       <main className="main-content">
-        {/* Top Header Navbar */}
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">&gt;</span>
-            <strong>Quality &amp; Defect Analytics</strong>
-          </div>
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={fetchReportsData}
-              title="Refresh reports data"
-              aria-label="Refresh data"
-            >
-              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar" style={{ background: '#EFF6FF', color: '#1E3A8A' }}>
-                {avatarLabel}
-              </div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">{userRole}</span>
-              </div>
-              <ChevronDown size={14} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         {/* Dashboard Body */}
         <div className="dashboard-container">
           <div className="reports-layout">
@@ -1024,8 +990,7 @@ export default function AdminReports() {
                         {selectedPeriod !== 'all' && (
                           <button
                             type="button"
-                            className="qa-period-btn"
-                            style={{ background: '#F1F5F9' }}
+                            className="qa-period-btn qa-period-reset-btn"
                             onClick={() => {
                               setSelectedPeriod('all');
                               setCustomDate('');
@@ -1047,7 +1012,7 @@ export default function AdminReports() {
                           </div>
                           <div className="today-banner-text">
                             <strong>Today&apos;s QA Team Work Output:</strong>
-                            <span>Live execution metrics for {new Date().toISOString().split('T')[0]}</span>
+                            <span>Live execution metrics for {formatIndianDate(new Date())}</span>
                           </div>
                         </div>
 
@@ -1162,7 +1127,7 @@ export default function AdminReports() {
                                         {qa.last_active_date && (
                                           <span className={`qa-last-active-tag ${isTodayActive ? 'today' : ''}`}>
                                             <Calendar size={10} />
-                                            {isTodayActive ? 'Active Today' : `Last active: ${qa.last_active_date}`}
+                                            {isTodayActive ? 'Active Today' : `Last active: ${formatIndianDate(qa.last_active_date, qa.last_active_date)}`}
                                           </span>
                                         )}
                                       </div>

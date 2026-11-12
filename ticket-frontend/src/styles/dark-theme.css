@@ -157,12 +157,21 @@ html[data-theme='dark'] .workspace-card {
   border-color: #1e293b;
 }
 
+html[data-theme='dark'] .workspace-profile-card:hover {
+  background: #162033;
+  border-color: #334155;
+}
+
 html[data-theme='dark'] .workspace-card strong {
   color: #f8fafc;
 }
 
-html[data-theme='dark'] .workspace-card span {
+html[data-theme='dark'] .workspace-profile-email {
   color: #94a3b8;
+}
+
+html[data-theme='dark'] .workspace-profile-initial {
+  color: #ffffff;
 }
 
 html[data-theme='dark'] .admin-layout .header,
@@ -244,6 +253,7 @@ html[data-theme='dark'] h3,
 html[data-theme='dark'] h4,
 html[data-theme='dark'] .projects-header-info h2,
 html[data-theme='dark'] .pj-title-text h1,
+html[data-theme='dark'] .pj-dashboard-panel-title,
 html[data-theme='dark'] .pj-card-title,
 html[data-theme='dark'] .pj-card-name,
 html[data-theme='dark'] .stat-value,
@@ -274,30 +284,21 @@ html[data-theme='dark'] .dashboard-container .panel,
 html[data-theme='dark'] .admin-layout .approvals-panel,
 html[data-theme='dark'] .dashboard-container .approvals-panel,
 html[data-theme='dark'] .admin-layout .users-table-card,
-html[data-theme='dark'] .admin-layout .users-filter-bar,
 html[data-theme='dark'] .admin-layout .users-placeholder,
 html[data-theme='dark'] .users-page-heading,
 html[data-theme='dark'] .admin-layout .users-page-heading,
 html[data-theme='dark'] .projects-header-row,
 html[data-theme='dark'] .admin-layout .projects-header-row,
-html[data-theme='dark'] .pj-subheader,
-html[data-theme='dark'] .admin-layout .pj-subheader,
 html[data-theme='dark'] .project-workspace-header,
 html[data-theme='dark'] .overview-card,
 html[data-theme='dark'] .ticket-folder-body,
 html[data-theme='dark'] .ticket-active-folder-banner,
-html[data-theme='dark'] .pj-metric-card,
 html[data-theme='dark'] .pj-card,
 html[data-theme='dark'] .admin-layout .pj-card,
-html[data-theme='dark'] .pj-controls-bar,
-html[data-theme='dark'] .pj-filter-controls-row,
-html[data-theme='dark'] .admin-layout .pj-filter-controls-row,
 html[data-theme='dark'] .pj-table-card,
 html[data-theme='dark'] .um-header-container,
 html[data-theme='dark'] .admin-layout .um-header-container,
 html[data-theme='dark'] .um-stat-card,
-html[data-theme='dark'] .um-controls-bar,
-html[data-theme='dark'] .admin-layout .um-controls-bar,
 html[data-theme='dark'] .um-table-card,
 html[data-theme='dark'] .reports-header-card,
 html[data-theme='dark'] .report-kpi-card,
@@ -307,7 +308,6 @@ html[data-theme='dark'] .report-table-container,
 html[data-theme='dark'] .report-empty-state,
 html[data-theme='dark'] .reports-table-card,
 html[data-theme='dark'] .report-accordion-card,
-html[data-theme='dark'] .qa-daily-filter-card,
 html[data-theme='dark'] .dev-section-card,
 html[data-theme='dark'] .dev-proj-card,
 html[data-theme='dark'] .dev-metric-card,
@@ -331,6 +331,7 @@ html[data-theme='dark'] .pw-dev-card,
 html[data-theme='dark'] .pw-empty-box,
 html[data-theme='dark'] .pw-table-wrap,
 html[data-theme='dark'] .pw-testing-request-card,
+html[data-theme='dark'] .ws-header-row,
 html[data-theme='dark'] .ws-card {
   background: #111827 !important;
   border-color: #1e293b !important;
@@ -357,6 +358,26 @@ html[data-theme='dark'] .project-folder:hover {
 html[data-theme='dark'] .ticket-folder-card {
   background: transparent !important;
   border: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .pj-subheader,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-subheader,
+html[data-theme='dark'] .pj-dashboard-panel,
+html[data-theme='dark'] .pj-metric-card,
+html[data-theme='dark'] .pj-metric-card:hover,
+html[data-theme='dark'] .pj-filter-controls-row,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-filter-controls-row,
+html[data-theme='dark'] .users-filter-bar,
+html[data-theme='dark'] .admin-layout .users-filter-bar,
+html[data-theme='dark'] .um-controls-bar,
+html[data-theme='dark'] .admin-layout .um-controls-bar,
+html[data-theme='dark'] .pj-controls-bar,
+html[data-theme='dark'] .qa-daily-filter-card,
+html[data-theme='dark'] .reports-view-selector-bar {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
 }
 
@@ -463,19 +484,76 @@ html[data-theme='dark'] .rbt-label {
 }
 
 /* CustomSelect Dropdowns */
-html[data-theme='dark'] .c-select-filter .c-select-trigger,
+html[data-theme='dark'] .c-select-filter .c-select-trigger {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .c-select-filter .c-select-trigger:hover {
+  background: rgba(148, 163, 184, 0.1) !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .c-select-filter.is-open .c-select-trigger {
+  background: rgba(59, 130, 246, 0.14) !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #93c5fd;
+}
+
 html[data-theme='dark'] .c-select-form .c-select-trigger {
   background: #0f172a;
   border-color: #334155;
   color: #f1f5f9;
 }
 
-html[data-theme='dark'] .c-select-filter .c-select-trigger:hover,
 html[data-theme='dark'] .c-select-form .c-select-trigger:hover,
-html[data-theme='dark'] .c-select-filter.is-open .c-select-trigger,
 html[data-theme='dark'] .c-select-form.is-open .c-select-trigger {
   background: #162033;
   border-color: #3b82f6;
+}
+
+html[data-theme='dark'] .pj-fix-filter-chip,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-fix-filter-chip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .pj-fix-filter-chip svg {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .pj-fix-filter-chip:hover,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-fix-filter-chip:hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .pj-fix-filter-chip:hover svg,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-fix-filter-chip:hover svg {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .pj-fix-filter-chip.is-locked,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-fix-filter-chip.is-locked,
+html[data-theme='dark'] .pj-fix-filter-chip.is-locked:hover,
+html[data-theme='dark'] .admin-layout .pj-page-container .pj-fix-filter-chip.is-locked:hover {
+  background: transparent !important;
+  border: none !important;
+  color: #60a5fa;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .pj-fix-filter-chip.is-locked svg {
+  color: #60a5fa;
 }
 
 html[data-theme='dark'] .c-select-menu {
@@ -720,7 +798,6 @@ html[data-theme='dark'] .pj-card-footer,
 html[data-theme='dark'] .pj-sub-metric,
 html[data-theme='dark'] .ticket-view-toggle,
 html[data-theme='dark'] .pj-view-switcher,
-html[data-theme='dark'] .reports-view-selector-bar,
 html[data-theme='dark'] .ws-tab-strip {
   background: #0f172a;
   border-color: #1e293b;
@@ -762,6 +839,19 @@ html[data-theme='dark'] .ws-tab-btn.active {
   border-color: #3b82f6;
 }
 
+html[data-theme='dark'] .qa-period-btn:not(.active),
+html[data-theme='dark'] .qa-period-btn.qa-period-reset-btn,
+html[data-theme='dark'] .qa-date-picker-wrap {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .qa-date-picker-wrap input[type="date"] {
+  color: #f1f5f9;
+  color-scheme: dark;
+}
+
 /* ==========================================================================
    Projects Directory, Folder Cards & Project Master Spreadsheet View
    ========================================================================== */
@@ -783,19 +873,9 @@ html[data-theme='dark'] .pj-meta-item {
   color: #94a3b8;
 }
 
-html[data-theme='dark'] .pj-sub-metric.green {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.26);
-}
-
-html[data-theme='dark'] .pj-sub-metric.blue {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.26);
-}
-
-html[data-theme='dark'] .pj-sub-metric.orange {
-  background: rgba(249, 115, 22, 0.12);
-  border-color: rgba(249, 115, 22, 0.26);
+html[data-theme='dark'] .pj-sub-metric-icon,
+html[data-theme='dark'] .pj-sub-metric-label {
+  color: #94a3b8;
 }
 
 html[data-theme='dark'] .pj-sub-metric-val {
@@ -806,26 +886,16 @@ html[data-theme='dark'] .pj-card-actions-bar {
   border-top-color: #1e293b;
 }
 
-html[data-theme='dark'] .pj-card-action-btn.sheet {
-  background: rgba(16, 185, 129, 0.14);
-  border-color: rgba(16, 185, 129, 0.32);
-  color: #34d399;
+html[data-theme='dark'] .pj-card-action-btn {
+  background: #162033;
+  border-color: #334155;
+  color: #cbd5e1;
 }
 
-html[data-theme='dark'] .pj-card-action-btn.sheet:hover {
-  background: rgba(16, 185, 129, 0.24);
-  color: #6ee7b7;
-}
-
-html[data-theme='dark'] .pj-card-action-btn.workspace {
-  background: rgba(59, 130, 246, 0.14);
-  border-color: rgba(59, 130, 246, 0.32);
-  color: #93c5fd;
-}
-
-html[data-theme='dark'] .pj-card-action-btn.workspace:hover {
-  background: rgba(59, 130, 246, 0.24);
-  color: #bfdbfe;
+html[data-theme='dark'] .pj-card-action-btn:hover {
+  background: #1e293b;
+  border-color: #475569;
+  color: #ffffff;
 }
 
 html[data-theme='dark'] .pj-metric-icon-box.blue,
@@ -960,6 +1030,13 @@ html[data-theme='dark'] .ticket-status-open {
   background: rgba(239, 68, 68, 0.18);
   color: #fca5a5;
   border-color: rgba(239, 68, 68, 0.35);
+}
+
+html[data-theme='dark'] .tdm-sev-pill.block,
+html[data-theme='dark'] .rbt-sev-badge.block {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.35);
 }
 
 html[data-theme='dark'] .pj-priority-badge.high,
@@ -1128,11 +1205,16 @@ html[data-theme='dark'] .project-folder-icon {
 html[data-theme='dark'] .project-folder-copy strong,
 html[data-theme='dark'] .project-workspace-title h1,
 html[data-theme='dark'] .project-content-heading h2,
+html[data-theme='dark'] .project-content-heading > strong,
 html[data-theme='dark'] .project-details-grid dd,
 html[data-theme='dark'] .pw-lead-info h3,
 html[data-theme='dark'] .pw-dev-info strong,
 html[data-theme='dark'] .pw-section-sub h3 {
   color: #f8fafc;
+}
+
+html[data-theme='dark'] .project-content-heading {
+  border-bottom-color: #1e293b;
 }
 
 html[data-theme='dark'] .project-folder-copy small,
@@ -1171,10 +1253,65 @@ html[data-theme='dark'] .project-workspace-content table td span[style*='color']
   border-color: #1e293b !important;
 }
 
+html[data-theme='dark'] .project-ticket-list {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
 html[data-theme='dark'] .project-ticket-row {
   background: #162033;
   border-color: #1e293b;
   color: #e2e8f0;
+}
+
+html[data-theme='dark'] .project-ticket-row strong {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .project-ticket-row span {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .project-ticket-row .project-ticket-status.open {
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.32);
+  color: #93c5fd;
+}
+
+html[data-theme='dark'] .project-ticket-row .project-ticket-status.in-progress {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  color: #fcd34d;
+}
+
+html[data-theme='dark'] .project-ticket-row .project-ticket-status.resolved {
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.32);
+  color: #6ee7b7;
+}
+
+html[data-theme='dark'] .project-ticket-row .project-ticket-status.reopened {
+  background: rgba(244, 63, 94, 0.16);
+  border: 1px solid rgba(251, 113, 133, 0.32);
+  color: #fda4af;
+}
+
+html[data-theme='dark'] .project-ticket-row .project-ticket-status.closed {
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .pw-btn-preview {
+  background: #162033;
+  border-color: #334155;
+  color: #93c5fd;
+}
+
+html[data-theme='dark'] .pw-btn-preview:hover {
+  background: #1e293b;
+  border-color: #60a5fa;
+  color: #bfdbfe;
 }
 
 html[data-theme='dark'] .project-ticket-row:hover {
@@ -1648,10 +1785,37 @@ html[data-theme='dark'] .pjs-cell-ticket-badge {
   color: #bfdbfe;
 }
 
+html[data-theme='dark'] .pjs-badge-code {
+  color: #93c5fd;
+}
+
+html[data-theme='dark'] .pjs-badge-raised-tag {
+  color: #6ee7b7;
+}
+
+html[data-theme='dark'] .pjs-cell-ticket-status-pill {
+  background: rgba(59, 130, 246, 0.22);
+  color: #bfdbfe;
+}
+
 html[data-theme='dark'] .pjs-cell-ticket-badge.resolved {
   background: rgba(16, 185, 129, 0.18) !important;
   border-color: rgba(16, 185, 129, 0.38) !important;
   color: #6ee7b7 !important;
+}
+
+html[data-theme='dark'] .pjs-cell-ticket-badge.resolved .pjs-badge-check-icon,
+html[data-theme='dark'] .pjs-cell-ticket-badge.resolved .pjs-badge-raised-tag {
+  color: #6ee7b7;
+}
+
+html[data-theme='dark'] .pjs-cell-ticket-badge.resolved .pjs-cell-ticket-status-pill {
+  background: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+}
+
+html[data-theme='dark'] .pjs-badge-resolver {
+  color: #a7f3d0;
 }
 
 html[data-theme='dark'] .pjs-cell-ticket-badge.in-progress {
@@ -1660,16 +1824,46 @@ html[data-theme='dark'] .pjs-cell-ticket-badge.in-progress {
   color: #fcd34d !important;
 }
 
+html[data-theme='dark'] .pjs-cell-ticket-badge.in-progress .pjs-badge-check-icon,
+html[data-theme='dark'] .pjs-cell-ticket-badge.in-progress .pjs-badge-raised-tag {
+  color: #fcd34d;
+}
+
+html[data-theme='dark'] .pjs-cell-ticket-badge.in-progress .pjs-cell-ticket-status-pill {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fcd34d;
+}
+
 html[data-theme='dark'] .pjs-cell-ticket-badge.closed {
   background: #1e293b !important;
   border-color: #334155 !important;
   color: #cbd5e1 !important;
 }
 
+html[data-theme='dark'] .pjs-cell-ticket-badge.closed .pjs-badge-check-icon,
+html[data-theme='dark'] .pjs-cell-ticket-badge.closed .pjs-badge-raised-tag {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .pjs-cell-ticket-badge.closed .pjs-cell-ticket-status-pill {
+  background: #334155;
+  color: #e2e8f0;
+}
+
 html[data-theme='dark'] .pjs-cell-ticket-badge.reopened {
   background: rgba(239, 68, 68, 0.18) !important;
   border-color: rgba(239, 68, 68, 0.38) !important;
   color: #fca5a5 !important;
+}
+
+html[data-theme='dark'] .pjs-cell-ticket-badge.reopened .pjs-badge-check-icon,
+html[data-theme='dark'] .pjs-cell-ticket-badge.reopened .pjs-badge-raised-tag {
+  color: #fda4af;
+}
+
+html[data-theme='dark'] .pjs-cell-ticket-badge.reopened .pjs-cell-ticket-status-pill {
+  background: rgba(244, 63, 94, 0.22);
+  color: #fda4af;
 }
 
 /* ==========================================================================
@@ -1748,6 +1942,45 @@ html[data-theme='dark'] .ticket-folder-count-pill.empty {
   background: rgba(148, 163, 184, 0.12);
   border-color: #334155;
   color: #94a3b8;
+}
+
+html[data-theme='dark'] .folder-stat-chip.critical,
+html[data-theme='dark'] .tickets-page .priority-critical {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.34);
+  color: #fca5a5;
+}
+
+html[data-theme='dark'] .folder-stat-chip.block,
+html[data-theme='dark'] .tickets-page .priority-block {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(167, 139, 250, 0.34);
+  color: #c4b5fd;
+}
+
+html[data-theme='dark'] .folder-stat-chip.high,
+html[data-theme='dark'] .tickets-page .priority-high {
+  background: rgba(249, 115, 22, 0.16);
+  border-color: rgba(249, 115, 22, 0.34);
+  color: #fdba74;
+}
+
+html[data-theme='dark'] .folder-stat-chip.medium,
+html[data-theme='dark'] .tickets-page .priority-medium {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.34);
+  color: #93c5fd;
+}
+
+html[data-theme='dark'] .folder-stat-chip.low,
+html[data-theme='dark'] .tickets-page .priority-low {
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .folder-stat-chip.is-zero {
+  opacity: 0.52;
 }
 
 html[data-theme='dark'] .folder-stat-chip.open {
@@ -1958,70 +2191,85 @@ html[data-theme='dark'] .um-avatar-img {
   border-color: #334155;
 }
 
-html[data-theme='dark'] .um-dept-badge.dept-qa {
-  background: rgba(59, 130, 246, 0.14);
-  border-color: rgba(96, 165, 250, 0.28);
-  color: #93c5fd;
-}
-
-html[data-theme='dark'] .um-dept-badge.dept-dev {
-  background: rgba(16, 185, 129, 0.14);
-  border-color: rgba(52, 211, 153, 0.28);
-  color: #6ee7b7;
-}
-
-html[data-theme='dark'] .um-dept-badge.dept-ops {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(192, 132, 252, 0.28);
-  color: #d8b4fe;
-}
-
-html[data-theme='dark'] .um-dept-badge.dept-support {
-  background: rgba(249, 115, 22, 0.15);
-  border-color: rgba(251, 146, 60, 0.28);
-  color: #fdba74;
-}
-
-html[data-theme='dark'] .um-dept-badge.dept-management {
-  background: rgba(148, 163, 184, 0.14);
-  border-color: rgba(148, 163, 184, 0.28);
+html[data-theme='dark'] .um-dept-badge,
+html[data-theme='dark'] .um-role-badge {
+  background: transparent;
+  border: none;
   color: #cbd5e1;
 }
 
-html[data-theme='dark'] .um-role-badge.role-manager {
-  background: rgba(245, 158, 11, 0.15);
-  border-color: rgba(251, 191, 36, 0.28);
-  color: #fcd34d;
+html[data-theme='dark'] .um-auto-badge,
+html[data-theme='dark'] .um-status-readonly-badge {
+  background: #162033;
+  border-color: #334155;
+  color: #e2e8f0;
 }
 
-html[data-theme='dark'] .um-role-badge.role-qalead {
-  background: rgba(244, 63, 94, 0.15);
-  border-color: rgba(251, 113, 133, 0.28);
-  color: #fda4af;
-}
-
-html[data-theme='dark'] .um-role-badge.role-qamember {
-  background: rgba(14, 165, 233, 0.15);
-  border-color: rgba(56, 189, 248, 0.28);
-  color: #7dd3fc;
-}
-
-html[data-theme='dark'] .um-role-badge.role-developer {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(192, 132, 252, 0.28);
-  color: #d8b4fe;
-}
-
-html[data-theme='dark'] .um-role-badge.role-projectlead {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: rgba(52, 211, 153, 0.28);
+html[data-theme='dark'] .um-status-pill.status-active {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.35);
   color: #6ee7b7;
 }
 
-html[data-theme='dark'] .um-role-badge.role-fallback {
-  background: rgba(148, 163, 184, 0.14);
-  border-color: rgba(148, 163, 184, 0.28);
-  color: #cbd5e1;
+html[data-theme='dark'] .um-status-pill.status-inactive {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+html[data-theme='dark'] .um-status-pill.status-active .um-status-dot {
+  background: #10b981;
+}
+
+html[data-theme='dark'] .um-status-pill.status-inactive .um-status-dot {
+  background: #ef4444;
+}
+
+html[data-theme='dark'] .um-view-profile-header {
+  border-bottom-color: #1e293b;
+}
+
+html[data-theme='dark'] .um-view-profile-header h4 {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .um-view-profile-header div > div {
+  color: #94a3b8 !important;
+}
+
+html[data-theme='dark'] .um-view-avatar-img {
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .um-view-item {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+html[data-theme='dark'] .um-view-label {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .um-view-val {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .um-btn-secondary {
+  background: #162033;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .um-btn-secondary:hover {
+  background: #1e293b;
+  border-color: #475569;
+  color: #ffffff;
+}
+
+html[data-theme='dark'] .um-error-banner {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
 }
 
 html[data-theme='dark'] .role-icon-box,
@@ -2137,6 +2385,12 @@ html[data-theme='dark'] .admin-layout .approvals-table-card .priority-critical {
   border-color: rgba(239, 68, 68, 0.35);
 }
 
+html[data-theme='dark'] .admin-layout .approvals-table-card .priority-block {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.35);
+}
+
 html[data-theme='dark'] .admin-layout .approvals-table-card .status-in-progress {
   background: rgba(245, 158, 11, 0.16);
   color: #fcd34d;
@@ -2161,14 +2415,24 @@ html[data-theme='dark'] .ticket-modal-card,
 html[data-theme='dark'] .ticket-detail-card,
 html[data-theme='dark'] .daily-log-modal-content,
 html[data-theme='dark'] .pj-del-modal-card,
+html[data-theme='dark'] .notif-drawer-overlay {
+  background: rgba(2, 6, 23, 0.34);
+}
+
 html[data-theme='dark'] .pj-modal-card,
 html[data-theme='dark'] .pld-dev-modal-card,
-html[data-theme='dark'] .notif-drawer-card,
 html[data-theme='dark'] .notif-toast {
   background: #111827 !important;
   border-color: #334155 !important;
   color: #f1f5f9 !important;
   box-shadow: 0 24px 52px rgba(2, 6, 23, 0.72) !important;
+}
+
+html[data-theme='dark'] .notif-drawer-card {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+  box-shadow: -18px 0 48px rgba(2, 6, 23, 0.75) !important;
 }
 
 html[data-theme='dark'] .modal-header,
@@ -2337,6 +2601,29 @@ html[data-theme='dark'] .ws-feedback.error {
   color: #fca5a5;
 }
 
+html[data-theme='dark'] .ws-password-section {
+  border-top-color: #1e293b;
+}
+
+html[data-theme='dark'] .ws-password-icon {
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
+}
+
+html[data-theme='dark'] .ws-password-title strong {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .ws-password-title span,
+html[data-theme='dark'] .ws-password-eye-btn {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .ws-password-eye-btn:hover {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93c5fd;
+}
+
 /* ==========================================================================
    Login Screen (When Dark Theme is Persisted)
    ========================================================================== */
@@ -2376,4 +2663,149 @@ html[data-theme='dark'] .login-container .input-field::placeholder {
 
 html[data-theme='dark'] .eye-icon:hover {
   color: #f8fafc;
+}
+
+/* ==========================================================================
+   Projects 1st-Page Layout Parity (Dark Mode: Users, Tickets, Settings)
+   Explicitly excludes Dashboard, Reports, Approvals & Requests, and
+   Deployment Approvals Queue.
+   ========================================================================== */
+html[data-theme='dark'] .admin-layout.users-page .um-header-container,
+html[data-theme='dark'] .admin-layout.users-page .um-stat-card,
+html[data-theme='dark'] .admin-layout.users-page .um-stat-card:hover,
+html[data-theme='dark'] .admin-layout.users-page .um-controls-bar,
+html[data-theme='dark'] .admin-layout.tickets-page .projects-header-row,
+html[data-theme='dark'] .admin-layout.tickets-page .overview-card,
+html[data-theme='dark'] .admin-layout.tickets-page .overview-card:hover,
+html[data-theme='dark'] .admin-layout.tickets-page .users-filter-bar,
+html[data-theme='dark'] .admin-layout .ws-settings-page .ws-header-row {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-header-titles h1,
+html[data-theme='dark'] .admin-layout.tickets-page .projects-header-info h2,
+html[data-theme='dark'] .admin-layout .ws-settings-page .ws-header-row h1 {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-stat-number,
+html[data-theme='dark'] .admin-layout.tickets-page .overview-card .pj-metric-number {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-stat-label,
+html[data-theme='dark'] .admin-layout.tickets-page .overview-card .pj-metric-label {
+  color: #94a3b8 !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-stat-icon-wrap.icon-wrap-blue {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-stat-icon-wrap.icon-wrap-green {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-stat-icon-wrap.icon-wrap-orange {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-stat-icon-wrap.icon-wrap-purple {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-search-container,
+html[data-theme='dark'] .admin-layout.tickets-page .users-search-box {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-search-container:focus-within,
+html[data-theme='dark'] .admin-layout.tickets-page .users-search-box:focus-within {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18) !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-search-container input,
+html[data-theme='dark'] .admin-layout.tickets-page .users-search-box input {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-search-container input::placeholder,
+html[data-theme='dark'] .admin-layout.tickets-page .users-search-box input::placeholder {
+  color: #64748b !important;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip,
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip svg {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip:hover,
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip:hover svg {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip.is-locked,
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip.is-locked:hover,
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip.is-locked svg,
+html[data-theme='dark'] .admin-layout.users-page .um-fix-filter-chip.is-locked:hover svg {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #60a5fa;
+}
+
+/* ==========================================================================
+   Approvals & Requests (Dark Mode): Cardless Header & Filter Bar
+   ========================================================================== */
+html[data-theme='dark'] .admin-layout.approvals-page .projects-header-row,
+html[data-theme='dark'] .admin-layout.approvals-page .users-filter-bar {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .admin-layout.approvals-page .projects-header-info h2 {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .admin-layout.approvals-page .users-search-box {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme='dark'] .admin-layout.approvals-page .users-search-box:focus-within {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18) !important;
+}
+
+html[data-theme='dark'] .admin-layout.approvals-page .users-search-box input {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme='dark'] .admin-layout.approvals-page .users-search-box input::placeholder {
+  color: #64748b !important;
 }

@@ -5,12 +5,10 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowUpDown,
-  Bell,
   Briefcase,
   Building2,
   Calendar,
   Camera,
-  ChevronDown,
   Code2,
   Crown,
   Eye,
@@ -27,6 +25,7 @@ import {
   Settings,
   ShieldCheck,
   Trash2,
+  Unlock,
   Upload,
   UserCheck,
   UserPlus,
@@ -37,6 +36,7 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import './AdminUsers.css';
 
@@ -63,7 +63,7 @@ const DEPARTMENT_FILTER_OPTIONS = [
   ...AVAILABLE_DEPARTMENTS.map((dept) => ({
     value: dept,
     label: dept,
-    icon: <Building2 size={14} color="#2563eb" />
+    icon: <Building2 size={14} color="#64748b" />
   }))
 ];
 
@@ -72,7 +72,7 @@ const ROLE_FILTER_OPTIONS = [
   ...AVAILABLE_ROLES.map((role) => ({
     value: role,
     label: role,
-    icon: <ShieldCheck size={14} color="#0284c7" />
+    icon: <ShieldCheck size={14} color="#64748b" />
   }))
 ];
 
@@ -92,13 +92,13 @@ const SORT_BY_OPTIONS = [
 const MODAL_DEPARTMENT_OPTIONS = AVAILABLE_DEPARTMENTS.map((dept) => ({
   value: dept,
   label: dept,
-  icon: <Building2 size={15} color="#2563eb" />
+  icon: <Building2 size={15} color="#64748b" />
 }));
 
 const MODAL_ROLE_OPTIONS = AVAILABLE_ROLES.map((role) => ({
   value: role,
   label: role,
-  icon: <ShieldCheck size={15} color="#0284c7" />
+  icon: <ShieldCheck size={15} color="#64748b" />
 }));
 
 const MODAL_STATUS_OPTIONS = [
@@ -118,6 +118,19 @@ const initialFormData = {
   avatar: ''
 };
 
+const UM_FILTER_LOCK_STORAGE_KEY = 'um_locked_filters';
+
+const readLockedUserFiltersState = () => {
+  try {
+    const raw = localStorage.getItem(UM_FILTER_LOCK_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.locked ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 function AdminUsers() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
@@ -125,10 +138,42 @@ function AdminUsers() {
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('All');
-  const [roleFilter, setRoleFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('default');
+  const [filtersLocked, setFiltersLocked] = useState(() => Boolean(readLockedUserFiltersState()));
+  const [departmentFilter, setDepartmentFilter] = useState(
+    () => readLockedUserFiltersState()?.departmentFilter || 'All'
+  );
+  const [roleFilter, setRoleFilter] = useState(
+    () => readLockedUserFiltersState()?.roleFilter || 'All'
+  );
+  const [statusFilter, setStatusFilter] = useState(
+    () => readLockedUserFiltersState()?.statusFilter || 'All'
+  );
+  const [sortBy, setSortBy] = useState(
+    () => readLockedUserFiltersState()?.sortBy || 'default'
+  );
+
+  const toggleFilterLock = () => {
+    const nextLocked = !filtersLocked;
+    setFiltersLocked(nextLocked);
+    try {
+      if (nextLocked) {
+        localStorage.setItem(
+          UM_FILTER_LOCK_STORAGE_KEY,
+          JSON.stringify({
+            locked: true,
+            departmentFilter,
+            roleFilter,
+            statusFilter,
+            sortBy
+          })
+        );
+      } else {
+        localStorage.removeItem(UM_FILTER_LOCK_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage write failures
+    }
+  };
 
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -151,8 +196,6 @@ function AdminUsers() {
 
   const createFileInputRef = useRef(null);
   const editFileInputRef = useRef(null);
-
-  const [userEmail] = useState(() => localStorage.getItem('userEmail') || 'manager@gmail.com');
 
   const isProtectedUser = (email) => {
     return Boolean(email && PROTECTED_EMAILS.includes(email.toLowerCase().trim()));
@@ -671,15 +714,11 @@ function AdminUsers() {
     const total = users.length;
     const active = users.filter((u) => u.status !== 'Inactive').length;
     const inactive = users.filter((u) => u.status === 'Inactive').length;
-    const departments = new Set(
-      users.map((u) => u.department || 'Quality Assurance')
-    ).size;
 
     return {
       total,
       active,
-      inactive,
-      departments
+      inactive
     };
   }, [users]);
 
@@ -800,62 +839,13 @@ function AdminUsers() {
     );
   };
 
-  const displayName = userEmail ? userEmail.split('@')[0] : 'admin1';
-  const displayAvatar = displayName.charAt(0).toUpperCase();
-
   return (
-    <div className="admin-layout">
+    <div className="admin-layout users-page">
       {/* Admin Sidebar Navigation */}
       <AdminSidebar onLogout={() => setShowLogoutModal(true)} />
 
       {/* Main Content Area */}
       <main className="main-content">
-        {/* Top Header */}
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">›</span>
-            <span>Users</span>
-            <span className="breadcrumb-divider">›</span>
-            <strong>User Management</strong>
-          </div>
-
-          <div className="header-right">
-            <div className="header-search">
-              <Search size={14} />
-              <input
-                type="text"
-                placeholder="Search anything..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <button
-              className="notification-bell"
-              onClick={fetchUsers}
-              title="Refresh users directory"
-              aria-label="Refresh users list"
-            >
-              <Bell size={17} />
-              <span className="notification-count" />
-            </button>
-
-            <div className="profile-divider" />
-
-            <div className="user-profile">
-              <div className="avatar" style={{ background: '#9333ea', color: '#fff' }}>
-                {displayAvatar}
-              </div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">{currentUserRole}</span>
-              </div>
-              <ChevronDown size={14} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         {/* Dashboard Body */}
         <div className="dashboard-container">
           {/* Email Invitation / Action Success Toast */}
@@ -882,9 +872,6 @@ function AdminUsers() {
             {/* Page Header */}
             <div className="um-header-container">
               <div className="um-header-left">
-                <div className="um-header-icon-box">
-                  <Users size={24} />
-                </div>
                 <div className="um-header-titles">
                   <h1>{isQAMember ? 'Team Directory & Users' : 'User Management'}</h1>
                   <p>
@@ -928,7 +915,7 @@ function AdminUsers() {
               </div>
             )}
 
-            {/* 4 Summary Stat Cards */}
+            {/* Summary Stat Cards */}
             <div className="um-stats-grid">
               {/* Card 1: Total Users */}
               <div className="um-stat-card">
@@ -971,20 +958,6 @@ function AdminUsers() {
                   <div className="um-stat-label">Inactive Users</div>
                 </div>
               </div>
-
-              {/* Card 4: Departments */}
-              <div className="um-stat-card">
-                <div className="um-stat-icon-wrap icon-wrap-purple">
-                  <Building2 size={22} />
-                </div>
-                <div className="um-stat-content">
-                  <div className="um-stat-top">
-                    <span className="um-stat-number">{stats.departments}</span>
-                    <span className="um-stat-trend trend-neutral">0% No change</span>
-                  </div>
-                  <div className="um-stat-label">Departments</div>
-                </div>
-              </div>
             </div>
 
             {/* Filter and Search Bar */}
@@ -1003,41 +976,65 @@ function AdminUsers() {
                 {/* Department Dropdown */}
                 <CustomSelect
                   value={departmentFilter}
-                  onChange={setDepartmentFilter}
+                  onChange={(val) => {
+                    if (!filtersLocked) setDepartmentFilter(val);
+                  }}
                   options={DEPARTMENT_FILTER_OPTIONS}
                   icon={<Building2 size={14} color="#64748b" />}
                   placeholder="All Departments"
                   variant="filter"
+                  disabled={filtersLocked}
                 />
 
                 {/* Role Dropdown */}
                 <CustomSelect
                   value={roleFilter}
-                  onChange={setRoleFilter}
+                  onChange={(val) => {
+                    if (!filtersLocked) setRoleFilter(val);
+                  }}
                   options={ROLE_FILTER_OPTIONS}
                   icon={<ShieldCheck size={14} color="#64748b" />}
                   placeholder="All Roles"
                   variant="filter"
+                  disabled={filtersLocked}
                 />
 
                 {/* Status Dropdown */}
                 <CustomSelect
                   value={statusFilter}
-                  onChange={setStatusFilter}
+                  onChange={(val) => {
+                    if (!filtersLocked) setStatusFilter(val);
+                  }}
                   options={STATUS_FILTER_OPTIONS}
                   placeholder="All Status"
                   variant="filter"
+                  disabled={filtersLocked}
                 />
 
-                {/* Sort By Dropdown */}
-                <CustomSelect
-                  value={sortBy}
-                  onChange={setSortBy}
-                  options={SORT_BY_OPTIONS}
-                  icon={<ArrowUpDown size={14} color="#64748b" />}
-                  placeholder="Sort by"
-                  variant="filter"
-                />
+                {/* Sort By Dropdown & Filter Lock */}
+                <div className="um-sort-lock-group">
+                  <CustomSelect
+                    value={sortBy}
+                    onChange={(val) => {
+                      if (!filtersLocked) setSortBy(val);
+                    }}
+                    options={SORT_BY_OPTIONS}
+                    icon={<ArrowUpDown size={14} color="#64748b" />}
+                    placeholder="Sort by"
+                    variant="filter"
+                    disabled={filtersLocked}
+                  />
+
+                  <button
+                    type="button"
+                    className={`um-fix-filter-chip ${filtersLocked ? 'is-locked' : ''}`}
+                    onClick={toggleFilterLock}
+                    aria-pressed={filtersLocked}
+                    aria-label={filtersLocked ? 'Unlock filters' : 'Lock filters'}
+                  >
+                    {filtersLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1083,10 +1080,12 @@ function AdminUsers() {
                               className="um-btn-reset-filters"
                               onClick={() => {
                                 setSearchQuery('');
-                                setDepartmentFilter('All');
-                                setRoleFilter('All');
-                                setStatusFilter('All');
-                                setSortBy('default');
+                                if (!filtersLocked) {
+                                  setDepartmentFilter('All');
+                                  setRoleFilter('All');
+                                  setStatusFilter('All');
+                                  setSortBy('default');
+                                }
                               }}
                             >
                               Reset filters
@@ -1102,9 +1101,7 @@ function AdminUsers() {
                         const initialLetter = (user.full_name || user.email || 'U')
                           .charAt(0)
                           .toUpperCase();
-                        const joinedDateStr = user.created_at
-                          ? new Date(user.created_at).toLocaleDateString()
-                          : '10/8/2026';
+                        const joinedDateStr = formatIndianDate(user.created_at, '08/10/2026');
 
                         return (
                           <tr key={user.id}>
@@ -1902,9 +1899,7 @@ function AdminUsers() {
                 <div className="um-view-item">
                   <div className="um-view-label">Joined Date</div>
                   <div className="um-view-val">
-                    {viewingUser.created_at
-                      ? new Date(viewingUser.created_at).toLocaleDateString()
-                      : '10/8/2026'}
+                    {formatIndianDate(viewingUser.created_at, '08/10/2026')}
                   </div>
                 </div>
               </div>

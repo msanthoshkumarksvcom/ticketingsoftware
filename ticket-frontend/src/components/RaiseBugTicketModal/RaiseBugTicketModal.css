@@ -585,6 +585,7 @@
 }
 
 .rbt-sev-badge.critical { background: #FEE2E2; color: #991B1B; }
+.rbt-sev-badge.block { background: #F5F3FF; color: #6D28D9; }
 .rbt-sev-badge.high { background: #FFEDD5; color: #C2410C; }
 .rbt-sev-badge.medium { background: #FEF3C7; color: #B45309; }
 .rbt-sev-badge.low { background: #F1F5F9; color: #475569; }

@@ -8,13 +8,15 @@ import {
   Check,
   CheckCheck,
   CheckSquare,
-  ChevronDown,
+  Eye,
+  EyeOff,
   FolderKanban,
   Globe,
+  KeyRound,
+  Lock,
   LogOut,
   Moon,
   Palette,
-  RefreshCw,
   Rocket,
   Save,
   Search,
@@ -31,6 +33,7 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import { applyTheme, getSavedTheme } from '../../utils/theme';
+import { formatIndianDateTime } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import './AdminWorkspacePage.css';
 
@@ -135,6 +138,21 @@ function SettingsContent() {
     avatar: localStorage.getItem('userAvatar') || ''
   });
 
+  // Change Password state
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState({ text: '', type: '' });
+  const [passwordVisibility, setPasswordVisibility] = useState({
+    current: false,
+    next: false,
+    confirm: false
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: ''
+  });
+
   // Notifications state
   const [usersList, setUsersList] = useState([]);
   const [recipientSearch, setRecipientSearch] = useState('');
@@ -148,12 +166,10 @@ function SettingsContent() {
   const [historyTab, setHistoryTab] = useState('sent'); // 'sent' | 'inbox'
   const [sentNotifications, setSentNotifications] = useState([]);
   const [inboxNotifications, setInboxNotifications] = useState([]);
-  const [refreshingAll, setRefreshingAll] = useState(false);
 
   const loadSettingsData = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    setRefreshingAll(true);
     setProfileLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
@@ -217,7 +233,6 @@ function SettingsContent() {
       console.error('Error loading application settings:', err);
     } finally {
       setProfileLoading(false);
-      setRefreshingAll(false);
     }
   }, []);
 
@@ -343,6 +358,54 @@ function SettingsContent() {
     }
   };
 
+  const handleChangePassword = async (event) => {
+    event.preventDefault();
+    setPasswordFeedback({ text: '', type: '' });
+
+    const { current_password, new_password, confirm_password } = passwordForm;
+    if (!current_password || !new_password || !confirm_password) {
+      setPasswordFeedback({ text: 'Please fill in all password fields.', type: 'error' });
+      return;
+    }
+    if (new_password.length < 6) {
+      setPasswordFeedback({ text: 'New password must be at least 6 characters long.', type: 'error' });
+      return;
+    }
+    if (new_password !== confirm_password) {
+      setPasswordFeedback({ text: 'New password and confirm password do not match.', type: 'error' });
+      return;
+    }
+    if (current_password === new_password) {
+      setPasswordFeedback({ text: 'New password must be different from your current password.', type: 'error' });
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setPasswordSaving(true);
+    try {
+      const { data } = await axios.put(
+        'http://localhost:5000/api/auth/change-password',
+        { current_password, new_password, confirm_password },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+      setPasswordVisibility({ current: false, next: false, confirm: false });
+      setShowPasswordForm(false);
+      setPasswordFeedback({
+        text: data?.message || 'Password updated successfully.',
+        type: 'success'
+      });
+    } catch (err) {
+      setPasswordFeedback({
+        text: err.response?.data?.error || 'Failed to update password.',
+        type: 'error'
+      });
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   const filteredRecipients = useMemo(() => {
     const q = recipientSearch.trim().toLowerCase();
     if (!q) return usersList;
@@ -441,65 +504,16 @@ function SettingsContent() {
     } catch {}
   };
 
+  const unreadInboxCount = inboxNotifications.filter((n) => !n.is_read).length;
+
   const displayName =
     profileForm.full_name ||
     localStorage.getItem('userName') ||
     (profileForm.email ? profileForm.email.split('@')[0] : 'User');
   const avatarLabel = displayName.charAt(0).toUpperCase();
-  const unreadInboxCount = inboxNotifications.filter((n) => !n.is_read).length;
 
   return (
     <main className="main-content">
-      <div className="ws-top-bar">
-        <button
-          type="button"
-          className="notification-bell"
-          onClick={loadSettingsData}
-          title="Refresh settings"
-          aria-label="Refresh settings"
-        >
-          <RefreshCw size={17} className={refreshingAll ? 'animate-spin' : ''} />
-        </button>
-        <button
-          type="button"
-          className="notification-bell"
-          onClick={() => window.dispatchEvent(new Event('open-notifications-drawer'))}
-          title="Open notifications inbox"
-          aria-label="Open notifications inbox"
-        >
-          <Bell size={17} />
-          {unreadInboxCount > 0 && (
-            <span className="notification-count">{unreadInboxCount}</span>
-          )}
-        </button>
-        <div className="profile-divider" />
-        <div
-          className="user-profile"
-          onClick={() => document.getElementById('ws-profile-section')?.scrollIntoView({ behavior: 'smooth' })}
-          role="button"
-          tabIndex={0}
-          title="View Profile & Bio"
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="avatar" style={{ overflow: 'hidden' }}>
-            {profileForm.avatar ? (
-              <img
-                src={profileForm.avatar}
-                alt={displayName}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              avatarLabel
-            )}
-          </div>
-          <div className="user-info">
-            <span className="user-name">{displayName}</span>
-            <span className="user-role">{profileForm.role || 'Member'}</span>
-          </div>
-          <ChevronDown size={15} className="profile-chevron" />
-        </div>
-      </div>
-
       <div className="ws-settings-page">
         <div className="ws-header-row">
           <div>
@@ -720,6 +734,121 @@ function SettingsContent() {
                   </button>
                 </div>
               </form>
+
+              <div className="ws-password-section">
+                <div className="ws-password-header">
+                  <div className="ws-password-title">
+                    <div className="ws-password-icon">
+                      <Lock size={16} />
+                    </div>
+                    <div>
+                      <strong>Change Password</strong>
+                      <span>Update your workspace account password anytime.</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="ws-btn-secondary"
+                    onClick={() => {
+                      setShowPasswordForm((prev) => !prev);
+                      setPasswordFeedback({ text: '', type: '' });
+                    }}
+                  >
+                    <KeyRound size={14} />
+                    <span>{showPasswordForm ? 'Close' : 'Change Password'}</span>
+                  </button>
+                </div>
+
+                {passwordFeedback.text && (
+                  <div className={`ws-feedback ${passwordFeedback.type}`}>
+                    <span>{passwordFeedback.text}</span>
+                  </div>
+                )}
+
+                {showPasswordForm && (
+                  <form onSubmit={handleChangePassword} className="ws-form-grid">
+                    {[
+                      {
+                        key: 'current',
+                        field: 'current_password',
+                        id: 'ws-current-password',
+                        label: 'Current Password',
+                        placeholder: 'Enter current password',
+                        autoComplete: 'current-password',
+                        full: true
+                      },
+                      {
+                        key: 'next',
+                        field: 'new_password',
+                        id: 'ws-new-password',
+                        label: 'New Password',
+                        placeholder: 'Minimum 6 characters',
+                        autoComplete: 'new-password'
+                      },
+                      {
+                        key: 'confirm',
+                        field: 'confirm_password',
+                        id: 'ws-confirm-password',
+                        label: 'Confirm New Password',
+                        placeholder: 'Re-enter new password',
+                        autoComplete: 'new-password'
+                      }
+                    ].map(({ key, field, id, label, placeholder, autoComplete, full }) => {
+                      const isVisible = Boolean(passwordVisibility[key]);
+                      return (
+                        <div key={key} className={`ws-field${full ? ' full' : ''}`}>
+                          <label htmlFor={id}>{label}</label>
+                          <div className="ws-password-input-wrap">
+                            <input
+                              id={id}
+                              type={isVisible ? 'text' : 'password'}
+                              value={passwordForm[field]}
+                              onChange={(e) =>
+                                setPasswordForm((prev) => ({ ...prev, [field]: e.target.value }))
+                              }
+                              placeholder={placeholder}
+                              autoComplete={autoComplete}
+                              maxLength={128}
+                              required
+                            />
+                            <button
+                              type="button"
+                              className="ws-password-eye-btn"
+                              onClick={() =>
+                                setPasswordVisibility((prev) => ({
+                                  ...prev,
+                                  [key]: !prev[key]
+                                }))
+                              }
+                              aria-label={`${isVisible ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+                            >
+                              {isVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="ws-field full ws-card-actions">
+                      <button
+                        type="button"
+                        className="ws-btn-secondary"
+                        onClick={() => {
+                          setShowPasswordForm(false);
+                          setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+                          setPasswordFeedback({ text: '', type: '' });
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button type="submit" className="ws-btn-primary" disabled={passwordSaving}>
+                        <KeyRound size={15} />
+                        <span>{passwordSaving ? 'Updating Password...' : 'Update Password'}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </section>
 
           {/* 3. SEND NOTIFICATION (SELECTED USER OR COMMON TO ALL) */}
@@ -968,7 +1097,7 @@ function SettingsContent() {
                                 To: {item.audience === 'all' ? 'All active users' : item.recipients_summary}
                               </span>
                               <span>
-                                {item.created_at ? new Date(item.created_at).toLocaleString() : ''}
+                                {item.created_at ? formatIndianDateTime(item.created_at, '') : ''}
                               </span>
                             </div>
                           </div>
@@ -1001,7 +1130,7 @@ function SettingsContent() {
                               {item.audience === 'all' ? ' · Common to All' : ''}
                             </span>
                             <span>
-                              {item.created_at ? new Date(item.created_at).toLocaleString() : ''}
+                              {item.created_at ? formatIndianDateTime(item.created_at, '') : ''}
                             </span>
                           </div>
                         </div>
@@ -1020,8 +1149,6 @@ function SettingsContent() {
 function AdminWorkspacePage({ section }) {
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const userEmail = localStorage.getItem('userEmail') || 'Administrator';
-  const displayName = localStorage.getItem('userName') || userEmail.split('@')[0];
   const page = sections[section];
 
   useEffect(() => {
@@ -1071,26 +1198,6 @@ function AdminWorkspacePage({ section }) {
         <SettingsContent />
       ) : (
         <main className="main-content">
-          <header className="header">
-            <div className="breadcrumb">
-              <span>Workspace</span><span className="breadcrumb-divider">/</span><strong>{page.title}</strong>
-            </div>
-            <div className="header-right">
-              <label className="header-search">
-                <Search className="search-icon" size={17} />
-                <input type="search" aria-label={`Search ${page.title.toLowerCase()}`} placeholder={`Search ${page.title.toLowerCase()}...`} disabled />
-              </label>
-              <div className="profile-divider" />
-              <div className="user-profile">
-                <div className="avatar">{displayName.charAt(0).toUpperCase()}</div>
-                <div className="user-info">
-                  <span className="user-name">{displayName}</span>
-                  <span className="user-role">{localStorage.getItem('userRole') || 'Administrator'}</span>
-                </div>
-              </div>
-            </div>
-          </header>
-
           <div className="dashboard-container users-page">
             <section className="users-page-heading">
               <div>

@@ -3,16 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   CheckSquare,
-  Bell,
   LogOut,
-  ChevronDown,
   FolderKanban,
   Ticket,
   BarChart3,
   UsersRound,
   ArrowRight,
   Search,
-  RefreshCw,
   AlertCircle,
   ExternalLink,
   ShieldCheck,
@@ -21,6 +18,7 @@ import {
   Settings
 } from 'lucide-react';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import '../../styles/RoleDashboard.css';
 import './QAMemberDashboard.css';
@@ -30,7 +28,6 @@ export default function QAMemberDashboard() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [userName, setUserName] = useState(() => localStorage.getItem('userName') || 'QA Member');
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('userEmail') || 'qamember@gmail.com');
-  const [userRole, setUserRole] = useState(() => localStorage.getItem('userRole') || 'QA Member');
 
   const [stats, setStats] = useState({
     totalProjects: 0,
@@ -68,7 +65,6 @@ export default function QAMemberDashboard() {
         const u = meRes.data.user;
         setUserName(u.full_name || 'QA Member');
         setUserEmail(u.email || 'qamember@gmail.com');
-        setUserRole(u.role || 'QA Member');
         localStorage.setItem('userName', u.full_name || 'QA Member');
         localStorage.setItem('userEmail', u.email || 'qamember@gmail.com');
         localStorage.setItem('userRole', u.role || 'QA Member');
@@ -106,7 +102,6 @@ export default function QAMemberDashboard() {
   };
 
   const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'QA Member');
-  const avatarLabel = displayName.charAt(0).toUpperCase();
 
   // Filtered tickets
   const filteredTickets = useMemo(() => {
@@ -168,36 +163,6 @@ export default function QAMemberDashboard() {
       />
 
       <main className="main-content">
-        {/* Top Header */}
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">/</span>
-            <strong>QA Member Dashboard</strong>
-          </div>
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={fetchData}
-              title="Refresh dashboard data"
-              aria-label="Refresh data"
-            >
-              <RefreshCw size={17} className={loading ? 'refresh-spinning' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar" style={{ background: '#059669', color: '#ffffff' }}>
-                {avatarLabel}
-              </div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">QA Member</span>
-              </div>
-              <ChevronDown size={15} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         {/* Dashboard Content */}
         <div className="role-dashboard-container">
           <div className="qa-dashboard-layout">
@@ -230,7 +195,7 @@ export default function QAMemberDashboard() {
                   <span className="role-badge-pill" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#6ee7b7' }}>
                     Access: Projects &bull; Tickets &bull; Reports &bull; Users &bull; Settings
                   </span>
-                  <span>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+                  <span>{formatIndianDate(new Date())}</span>
                 </div>
               </div>
               <div

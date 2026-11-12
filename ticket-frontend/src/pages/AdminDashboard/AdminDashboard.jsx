@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   BarChart3,
-  Bell,
   ChevronDown,
   Clock3,
   FolderKanban,
@@ -14,6 +13,7 @@ import {
   UsersRound
 } from 'lucide-react';
 import AdminSidebar, { SmallCubeLogo } from '../../components/AdminSidebar/AdminSidebar';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 
 const initialStats = {
@@ -132,12 +132,7 @@ function AdminDashboard() {
   }));
   const maxChartValue = Math.max(...chartData.map(({ value }) => value), 1);
   const displayName = userEmail ? userEmail.split('@')[0] : 'Administrator';
-  const avatarLabel = displayName.charAt(0).toUpperCase();
-  const formattedDate = new Intl.DateTimeFormat(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric'
-  }).format(new Date());
+  const formattedDate = formatIndianDate(new Date());
 
   const focusApprovals = () => {
     document.getElementById('pending-approvals')?.scrollIntoView({
@@ -174,27 +169,6 @@ function AdminDashboard() {
       />
 
       <main className="main-content">
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span><span className="breadcrumb-divider">/</span><strong>Overview</strong>
-          </div>
-          <div className="header-right">
-            <button className="notification-bell" onClick={focusApprovals} aria-label="View pending approvals">
-              <Bell size={19} />
-              {stats.pendingApprovals > 0 && <span className="notification-count">{stats.pendingApprovals}</span>}
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar">{avatarLabel}</div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">{localStorage.getItem('userRole') || 'Administrator'}</span>
-              </div>
-              <ChevronDown size={15} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         <div className="dashboard-container">
           <section className="welcome-banner">
             <div className="welcome-content">

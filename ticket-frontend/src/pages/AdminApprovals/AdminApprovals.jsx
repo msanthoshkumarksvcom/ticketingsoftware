@@ -4,18 +4,17 @@ import axios from 'axios';
 import {
   CheckCircle2,
   CheckSquare,
-  ChevronDown,
   Clock,
   FileCheck2,
   LogOut,
   Plus,
-  RefreshCw,
   Search,
   X,
   XCircle
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import '../AdminProjects/AdminProjects.css';
@@ -217,11 +216,8 @@ function AdminApprovals() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const displayName = userEmail ? userEmail.split('@')[0] : 'Administrator';
-  const avatarLabel = displayName.charAt(0).toUpperCase();
-
   return (
-    <div className="admin-layout">
+    <div className="admin-layout approvals-page">
       {/* Logout Modal */}
       {showLogoutModal && (
         <div
@@ -254,31 +250,6 @@ function AdminApprovals() {
 
       {/* Main Content Area */}
       <main className="main-content">
-        <div
-          className="pj-top-utility-bar"
-          style={{ maxWidth: '1440px', padding: '18px clamp(18px, 3vw, 40px) 0' }}
-        >
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={fetchApprovals}
-              title="Refresh approvals"
-              aria-label="Refresh approvals list"
-            >
-              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar">{avatarLabel}</div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">{currentUserRole}</span>
-              </div>
-              <ChevronDown size={15} className="profile-chevron" />
-            </div>
-          </div>
-        </div>
-
         <div className="dashboard-container">
           <div className="projects-layout">
             {/* Header Card */}
@@ -416,7 +387,7 @@ function AdminApprovals() {
                           </span>
                         </td>
                         <td style={{ color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                          {a.created_at ? new Date(a.created_at).toLocaleDateString() : 'Recent'}
+                          {formatIndianDate(a.created_at, 'Recent')}
                         </td>
                         <td>
                           {a.status === 'Pending' && canReviewRequests ? (

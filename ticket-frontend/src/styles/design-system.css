@@ -260,7 +260,6 @@ body {
 /* Page Headers & Subheaders across All Modules */
 .header-titles h1,
 .um-header-titles h1,
-.pj-title-text h1,
 .tickets-page .projects-header-info h2,
 .dev-welcome-content h1,
 .pld-welcome-content h1,
@@ -304,7 +303,6 @@ body {
 }
 
 /* Universal Top KPI & Metric Cards */
-.um-stat-card,
 .report-kpi-card,
 .dev-metric-card,
 .pld-metric-card,
@@ -318,7 +316,6 @@ body {
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
 }
 
-.um-stat-card:hover,
 .report-kpi-card:hover,
 .dev-metric-card:hover,
 .pld-metric-card:hover,
@@ -329,7 +326,6 @@ body {
   border-color: var(--color-line-hover, #CBD5E1) !important;
 }
 
-.um-stat-value,
 .report-kpi-val,
 .dev-mc-val,
 .pld-mc-val,
@@ -342,7 +338,6 @@ body {
   letter-spacing: -0.02em !important;
 }
 
-.um-stat-label,
 .report-kpi-title,
 .dev-mc-label,
 .pld-mc-label,
@@ -461,14 +456,21 @@ table tbody tr:hover td,
 }
 
 /* Universal Search Inputs */
-.header-search,
+.header-search {
+  height: var(--input-height-md, 38px) !important;
+  border: 1.5px solid var(--color-line-hover, #CBD5E1) !important;
+  border-radius: 9999px !important;
+  background: #FFFFFF !important;
+  transition: all 0.15s ease !important;
+}
+
 .um-search-box,
 .pj-search-box,
 .report-search-box,
 .tickets-search-input {
   height: var(--input-height-md, 38px) !important;
   border: 1.5px solid var(--color-line-hover, #CBD5E1) !important;
-  border-radius: var(--radius-md, 8px) !important;
+  border-radius: 16px !important;
   background: #FFFFFF !important;
   transition: all 0.15s ease !important;
 }
@@ -862,9 +864,7 @@ table tbody tr:hover td,
 }
 
 .stat-card,
-.um-stat-card,
 .panel,
-.um-header-container,
 .project-workspace-content,
 .users-placeholder {
   border: 1px solid var(--color-line);
@@ -1030,8 +1030,6 @@ table tbody tr:hover td,
 .users-count,
 .pj-view-switcher,
 .pj-btn-filter,
-.pj-search-input-wrap input,
-.um-search-container,
 .pj-custom-select-wrap select {
   border-color: var(--color-line);
   border-radius: 9px;
@@ -1149,23 +1147,24 @@ table tbody tr:hover td,
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 12px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: #fff;
+  padding: 4px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .users-search-box {
   display: flex;
   min-width: min(100%, 240px);
-  min-height: 40px;
+  min-height: 38px;
   flex: 1 1 220px;
   align-items: center;
   gap: 9px;
-  padding: 0 11px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: #F8FAFC;
+  padding: 0 14px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 16px;
+  background: #FFFFFF;
 }
 
 .users-search-box:focus-within {
@@ -1186,13 +1185,13 @@ table tbody tr:hover td,
 }
 
 .users-filter-select {
-  min-width: 136px;
+  min-width: 120px;
   height: 38px;
   min-height: 38px;
-  padding: 0 32px 0 12px;
-  border: 1.5px solid #CBD5E1;
-  border-radius: 9px;
-  background-color: #FFFFFF;
+  padding: 0 30px 0 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: transparent;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
@@ -1204,21 +1203,22 @@ table tbody tr:hover td,
   -webkit-appearance: none;
   -moz-appearance: none;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: all 0.15s ease;
+  box-shadow: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .users-filter-select:hover {
-  border-color: #94A3B8;
-  background-color: #F8FAFC;
+  border: none;
+  background-color: rgba(15, 23, 42, 0.05);
   color: #0F172A;
 }
 
 .users-filter-select:focus {
   outline: none;
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-  background-color: #FFFFFF;
+  border: none;
+  box-shadow: none;
+  background-color: rgba(37, 99, 235, 0.08);
+  color: #1D4ED8;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232563EB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
@@ -2112,10 +2112,11 @@ body:has(.login-container) #root {
 .admin-layout .users-filter-bar,
 .admin-layout .um-controls-bar,
 .admin-layout .pj-filter-controls-row {
-  border: 1px solid #E2E8F0;
-  border-radius: 13px;
-  background: #FFFFFF;
-  padding: 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .admin-layout .users-table-card {
@@ -2300,8 +2301,11 @@ body:has(.login-container) #root {
   .admin-layout .users-filter-bar,
   .admin-layout .um-controls-bar,
   .admin-layout .pj-filter-controls-row {
-    border-radius: 12px;
-    padding: 10px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
   }
 
   .admin-layout .users-table-card {
@@ -2939,8 +2943,8 @@ body:has(.login-container) #root {
 }
 
 .admin-layout .pj-cards-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 13px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .admin-layout .pj-card {
@@ -3265,4 +3269,445 @@ body:has(.login-container) #root {
 
 .admin-layout .approvals-table-card .status-active {
   border: 1px solid #bbf7d0;
+}
+
+/* ==========================================================================
+   Projects 1st-Page Layout Parity (Users, Tickets, Application Settings)
+   Explicitly excludes Dashboard, Reports, Approvals & Requests, and
+   Deployment Approvals Queue.
+   ========================================================================== */
+.admin-layout.users-page .dashboard-container,
+.admin-layout.tickets-page .dashboard-container,
+.admin-layout .ws-settings-page {
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: clamp(28px, 3vw, 42px) clamp(20px, 3vw, 40px) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  box-sizing: border-box;
+}
+
+.admin-layout.users-page .users-page-layout {
+  display: grid;
+  grid-template-columns: minmax(350px, 1.02fr) minmax(420px, 1.38fr);
+  column-gap: 32px;
+  row-gap: 22px;
+  align-items: center;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-layout.tickets-page .projects-layout {
+  display: grid;
+  grid-template-columns: minmax(370px, 1.05fr) minmax(390px, 1.35fr);
+  column-gap: 32px;
+  row-gap: 22px;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-layout.users-page .users-page-layout > *:not(.um-stats-grid):not(.um-controls-bar),
+.admin-layout.tickets-page .projects-layout > *:not(.tickets-overview):not(.users-filter-bar) {
+  grid-column: 1 / -1;
+}
+
+.admin-layout.users-page .um-header-container,
+.admin-layout.tickets-page .projects-header-row,
+.admin-layout .ws-settings-page .ws-header-row {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 8px 0 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-layout.users-page .um-header-titles h1,
+.admin-layout.tickets-page .projects-header-info h2,
+.admin-layout .ws-settings-page .ws-header-row h1 {
+  font-family: 'Outfit', 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+  font-size: 32px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
+  color: var(--color-ink, #0f172a) !important;
+  margin: 0 !important;
+}
+
+.admin-layout.users-page .um-header-titles p,
+.admin-layout.tickets-page .projects-header-info p {
+  display: none !important;
+}
+
+.admin-layout.users-page .um-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 18px;
+  align-items: center;
+  padding: 4px 0 18px;
+  margin: 0;
+}
+
+.admin-layout.tickets-page .tickets-overview,
+.admin-layout.tickets-page .tickets-overview.folders-overview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  align-items: center;
+  padding: 4px 0 18px;
+  margin: 0;
+}
+
+.admin-layout.users-page .um-stat-card,
+.admin-layout.tickets-page .overview-card,
+.admin-layout.tickets-page .overview-card.total,
+.admin-layout.tickets-page .overview-card.open,
+.admin-layout.tickets-page .overview-card.progress,
+.admin-layout.tickets-page .overview-card.resolved {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: 48px !important;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  transition: transform 0.2s ease;
+}
+
+.admin-layout.users-page .um-stat-card:hover,
+.admin-layout.tickets-page .overview-card:hover {
+  transform: translateY(-2px);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.admin-layout.users-page .um-stat-icon-wrap {
+  width: 48px !important;
+  height: 48px !important;
+  flex: 0 0 48px !important;
+  border-radius: 13px !important;
+  border: none !important;
+}
+
+.admin-layout.users-page .icon-wrap-blue {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.admin-layout.users-page .icon-wrap-green {
+  background-color: #ecfdf5;
+  color: #16a34a;
+}
+
+.admin-layout.users-page .icon-wrap-orange {
+  background-color: #fff7ed;
+  color: #ea580c;
+}
+
+.admin-layout.users-page .icon-wrap-purple {
+  background-color: #f5f3ff;
+  color: #7c3aed;
+}
+
+.admin-layout.users-page .um-stat-content {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-layout.users-page .um-stat-trend {
+  display: none !important;
+}
+
+.admin-layout.users-page .um-stat-label {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  line-height: 1.3 !important;
+  margin: 0 !important;
+}
+
+.admin-layout.users-page .um-stat-number {
+  font-size: 28px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.5px !important;
+  margin: 0 !important;
+}
+
+.admin-layout.users-page .um-controls-bar,
+.admin-layout.tickets-page .users-filter-bar {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 4px 0 18px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.admin-layout.users-page .um-search-container,
+.admin-layout.tickets-page .users-search-box {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  flex: 0 0 auto;
+  border-radius: 20px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  padding: 0 16px;
+  box-sizing: border-box;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-layout.users-page .um-search-container:focus-within,
+.admin-layout.tickets-page .users-search-box:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.admin-layout.users-page .um-search-container input,
+.admin-layout.tickets-page .users-search-box input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+}
+
+.admin-layout.users-page .um-filter-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+.admin-layout.users-page .um-sort-lock-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-layout.users-page .um-sort-lock-group .c-select-filter {
+  flex: 1;
+}
+
+.admin-layout.users-page .um-fix-filter-chip {
+  height: 46px;
+  width: 34px;
+  flex: 0 0 34px;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: none;
+  transition: color 0.18s ease, transform 0.18s ease;
+  outline: none;
+}
+
+.admin-layout.users-page .um-fix-filter-chip svg {
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.admin-layout.users-page .um-fix-filter-chip:hover,
+.admin-layout.users-page .um-fix-filter-chip:hover svg {
+  background: transparent;
+  border: none;
+  color: #0f172a;
+}
+
+.admin-layout.users-page .um-fix-filter-chip.is-locked,
+.admin-layout.users-page .um-fix-filter-chip.is-locked:hover,
+.admin-layout.users-page .um-fix-filter-chip.is-locked svg,
+.admin-layout.users-page .um-fix-filter-chip.is-locked:hover svg {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  box-shadow: none;
+}
+
+.admin-layout.users-page .um-fix-filter-chip:focus,
+.admin-layout.users-page .um-fix-filter-chip:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
+
+.admin-layout.tickets-page .tickets-filter-dropdowns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.admin-layout.users-page .um-filter-selects .c-select-filter,
+.admin-layout.tickets-page .tickets-filter-dropdowns .c-select-filter {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-layout.users-page .um-filter-selects .c-select-filter .c-select-trigger,
+.admin-layout.tickets-page .tickets-filter-dropdowns .c-select-filter .c-select-trigger {
+  height: 46px;
+  border-radius: 10px;
+}
+
+.admin-layout.tickets-page .ticket-folders-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding-top: 8px;
+}
+
+@media (max-width: 1360px) {
+  .admin-layout.users-page .um-filter-selects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1120px) {
+  .admin-layout.users-page .users-page-layout,
+  .admin-layout.tickets-page .projects-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+  }
+
+  .admin-layout.users-page .um-stats-grid,
+  .admin-layout.users-page .um-controls-bar,
+  .admin-layout.tickets-page .tickets-overview,
+  .admin-layout.tickets-page .tickets-overview.folders-overview,
+  .admin-layout.tickets-page .users-filter-bar {
+    padding: 4px 0 10px;
+  }
+
+  .admin-layout.tickets-page .ticket-folders-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-layout.users-page .dashboard-container,
+  .admin-layout.tickets-page .dashboard-container,
+  .admin-layout .ws-settings-page {
+    padding: 20px 16px 32px;
+    gap: 18px;
+  }
+
+  .admin-layout.users-page .um-header-container,
+  .admin-layout.tickets-page .projects-header-row,
+  .admin-layout .ws-settings-page .ws-header-row {
+    padding: 4px 0 12px;
+  }
+
+  .admin-layout.users-page .um-header-titles h1,
+  .admin-layout.tickets-page .projects-header-info h2,
+  .admin-layout .ws-settings-page .ws-header-row h1 {
+    font-size: 24px !important;
+  }
+
+  .admin-layout.tickets-page .tickets-filter-dropdowns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-layout.tickets-page .ticket-folders-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding-top: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-layout.users-page .um-stats-grid,
+  .admin-layout.users-page .um-filter-selects,
+  .admin-layout.tickets-page .tickets-overview,
+  .admin-layout.tickets-page .tickets-overview.folders-overview,
+  .admin-layout.tickets-page .tickets-filter-dropdowns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ==========================================================================
+   Approvals & Requests: Cardless Header & Filter Bar
+   ========================================================================== */
+.admin-layout.approvals-page .projects-header-row,
+.admin-layout.approvals-page .users-filter-bar {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 6px 0;
+}
+
+.admin-layout.approvals-page .projects-header-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.admin-layout.approvals-page .users-search-box {
+  height: 44px;
+  min-height: 44px;
+  border-radius: 20px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  padding: 0 16px;
+  box-sizing: border-box;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-layout.approvals-page .users-search-box:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.admin-layout.approvals-page .users-filter-bar .c-select-filter .c-select-trigger {
+  height: 44px;
+  border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+  .admin-layout.approvals-page .projects-header-row,
+  .admin-layout.approvals-page .users-filter-bar {
+    padding: 4px 0;
+    border-radius: 0;
+  }
 }

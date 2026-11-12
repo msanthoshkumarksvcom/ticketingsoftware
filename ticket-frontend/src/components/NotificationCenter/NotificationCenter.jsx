@@ -1,8 +1,41 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { Bell, Check, CheckCheck, Globe, UserCheck, X, Clock } from 'lucide-react';
+import { formatIndianDateTime } from '../../utils/dateFormat';
 import './NotificationCenter.css';
+
+function NotificationDrawerPortal({ isOpen, onClose, children }) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  return createPortal(
+    <div
+      className={`notif-drawer-overlay${isOpen ? ' is-open' : ''}`}
+      aria-hidden={!isOpen}
+      onMouseDown={(event) => {
+        if (isOpen && event.target === event.currentTarget) {
+          onCloseRef.current();
+        }
+      }}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
 
 const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
@@ -211,54 +244,51 @@ function NotificationCenter({ collapsed = false }) {
         </div>
       )}
 
-      {drawerOpen && (
-        <div
-          className="notif-drawer-overlay"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setDrawerOpen(false);
-          }}
+      <NotificationDrawerPortal
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      >
+        <section
+          className="notif-drawer-card"
+          role="dialog"
+          aria-modal={drawerOpen}
+          aria-labelledby="notif-drawer-title"
         >
-          <section
-            className="notif-drawer-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="notif-drawer-title"
-          >
-            <header className="notif-drawer-header">
-              <div className="notif-drawer-title-group">
-                <div className="notif-drawer-icon-box">
-                  <Bell size={18} />
-                </div>
-                <div>
-                  <h3 id="notif-drawer-title">Notifications Inbox</h3>
-                  <p>
-                    {unreadCount > 0
-                      ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
-                      : 'All caught up'}
-                  </p>
-                </div>
+          <header className="notif-drawer-header">
+            <button
+              type="button"
+              className="notif-drawer-close-btn"
+              onClick={() => setDrawerOpen(false)}
+              aria-label="Close notifications"
+            >
+              <X size={18} />
+            </button>
+            <div className="notif-drawer-title-group">
+              <div className="notif-drawer-icon-box">
+                <Bell size={18} />
               </div>
+              <div>
+                <h3 id="notif-drawer-title">Notifications Inbox</h3>
+                <p>
+                  {unreadCount > 0
+                    ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
+                    : 'All caught up'}
+                </p>
+              </div>
+            </div>
+            {unreadCount > 0 && (
               <div className="notif-drawer-header-actions">
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    className="notif-mark-all-btn"
-                    onClick={handleMarkAllRead}
-                  >
-                    <CheckCheck size={14} />
-                    <span>Mark all read</span>
-                  </button>
-                )}
                 <button
                   type="button"
-                  className="notif-drawer-close-btn"
-                  onClick={() => setDrawerOpen(false)}
-                  aria-label="Close notifications"
+                  className="notif-mark-all-btn"
+                  onClick={handleMarkAllRead}
                 >
-                  <X size={18} />
+                  <CheckCheck size={14} />
+                  <span>Mark all read</span>
                 </button>
               </div>
-            </header>
+            )}
+          </header>
 
             <div className="notif-drawer-tabs">
               <button
@@ -335,7 +365,7 @@ function NotificationCenter({ collapsed = false }) {
                         <span className="notif-item-time">
                           <Clock size={11} />
                           {item.created_at
-                            ? new Date(item.created_at).toLocaleString()
+                            ? formatIndianDateTime(item.created_at, 'Just now')
                             : 'Just now'}
                         </span>
                       </div>
@@ -344,9 +374,8 @@ function NotificationCenter({ collapsed = false }) {
                 })
               )}
             </div>
-          </section>
-        </div>
-      )}
+        </section>
+      </NotificationDrawerPortal>
     </>
   );
 }

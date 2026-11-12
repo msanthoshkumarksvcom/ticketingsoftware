@@ -4,11 +4,13 @@
    ========================================================================== */
 
 /* Layout wrapper */
-.pj-page-container {
+.pj-page-container,
+.admin-layout .pj-page-container,
+.admin-layout .main-content .pj-page-container {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  padding: 14px 32px 48px;
+  padding: clamp(28px, 3vw, 42px) clamp(20px, 3vw, 40px) 48px;
   max-width: 1560px;
   margin: 0 auto;
   box-sizing: border-box;
@@ -28,14 +30,20 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   1. Subheader Row (Projects Directory Header)
+   1. Subheader Row (Projects Directory Header — no card wrapper)
    ────────────────────────────────────────────────────────────────────────── */
-.pj-subheader {
+.pj-subheader,
+.admin-layout .pj-page-container .pj-subheader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 8px 0 16px;
+  box-shadow: none;
 }
 
 .pj-title-group {
@@ -57,13 +65,15 @@
   flex-shrink: 0;
 }
 
-.pj-title-text h1 {
-  font-size: 22px;
-  font-weight: 800;
-  color: #0f172a;
+.pj-title-text h1,
+.admin-layout .pj-title-text h1 {
+  font-family: 'Outfit', 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-ink, #0f172a);
   margin: 0;
-  letter-spacing: -0.4px;
-  line-height: 1.2;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .pj-title-text p {
@@ -167,37 +177,70 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   2. Search and Filter Bar Row
+   2. Overview Split Row: Dashboard (2x2 Metrics) + Search & Filters (no cards)
    ────────────────────────────────────────────────────────────────────────── */
-.pj-filter-controls-row {
-  display: flex;
+.pj-overview-controls-row {
+  display: grid;
+  grid-template-columns: minmax(370px, 1.05fr) minmax(390px, 1.35fr);
+  gap: 32px;
+  padding: 4px 0 18px;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
-.pj-search-input-wrap {
-  flex: 1;
-  min-width: 280px;
+.pj-dashboard-panel {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.pj-filter-controls-row,
+.admin-layout .pj-page-container .pj-filter-controls-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  min-width: 0;
+}
+
+.pj-search-input-wrap,
+.admin-layout .pj-page-container .pj-search-input-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
   position: relative;
   display: flex;
   align-items: center;
+  border-radius: 20px;
 }
 
 .pj-search-input-wrap svg {
   position: absolute;
-  left: 14px;
+  left: 16px;
   color: #94a3b8;
   pointer-events: none;
 }
 
-.pj-search-input-wrap input {
+.pj-search-input-wrap input,
+.admin-layout .pj-page-container .pj-search-input-wrap input {
   width: 100%;
-  height: 42px;
-  padding: 0 14px 0 42px;
+  height: 46px;
+  padding: 0 16px 0 44px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 20px;
   font-size: 13px;
   color: #0f172a;
   outline: none;
@@ -213,11 +256,82 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
-.pj-dropdown-group {
-  display: flex;
-  align-items: center;
+.pj-dropdown-group,
+.admin-layout .pj-page-container .pj-dropdown-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   gap: 10px;
-  flex-wrap: wrap;
+  width: 100%;
+  align-items: stretch;
+}
+
+.pj-dropdown-group .c-select-container,
+.pj-dropdown-group .c-select-filter {
+  width: 100%;
+  min-width: 0;
+}
+
+.pj-dropdown-group .c-select-filter .c-select-trigger,
+.admin-layout .pj-page-container .pj-dropdown-group .c-select-filter .c-select-trigger {
+  height: 46px;
+  border-radius: 10px;
+}
+
+.pj-fix-filter-chip,
+.admin-layout .pj-page-container .pj-fix-filter-chip {
+  height: 46px;
+  width: 34px;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: none;
+  transition: color 0.18s ease, transform 0.18s ease;
+  outline: none;
+}
+
+.pj-fix-filter-chip svg {
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.pj-fix-filter-chip:hover,
+.admin-layout .pj-page-container .pj-fix-filter-chip:hover {
+  border: none;
+  background: transparent;
+  color: #0f172a;
+}
+
+.pj-fix-filter-chip:hover svg,
+.admin-layout .pj-page-container .pj-fix-filter-chip:hover svg {
+  color: #0f172a;
+}
+
+.pj-fix-filter-chip.is-locked,
+.admin-layout .pj-page-container .pj-fix-filter-chip.is-locked,
+.pj-fix-filter-chip.is-locked:hover,
+.admin-layout .pj-page-container .pj-fix-filter-chip.is-locked:hover {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  box-shadow: none;
+}
+
+.pj-fix-filter-chip:focus,
+.pj-fix-filter-chip:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
+
+.pj-fix-filter-chip.is-locked svg {
+  color: #2563eb;
 }
 
 .pj-custom-select-wrap {
@@ -261,41 +375,48 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   3. Four Metrics Cards Grid (Stats)
+   3. Four Metrics Grid (2x2 inside Dashboard — no card containers)
    ────────────────────────────────────────────────────────────────────────── */
 .pj-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  align-items: center;
+  flex: 1;
 }
 
 .pj-metric-card {
-  background: #ffffff;
-  border: 1px solid #f1f5f9;
-  border-radius: 16px;
-  padding: 18px 22px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-  transition: all 0.2s ease;
+  box-shadow: none;
+  transition: transform 0.2s ease;
+  min-width: 0;
 }
 
 .pj-metric-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .pj-metric-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  min-width: 0;
 }
 
 .pj-metric-icon-box {
   width: 48px;
   height: 48px;
-  border-radius: 14px;
+  border-radius: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -325,13 +446,17 @@
 .pj-metric-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .pj-metric-label {
-  font-size: 13px;
+  font-size: 14px;
   color: #64748b;
   font-weight: 500;
   margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pj-metric-number {
@@ -376,23 +501,27 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   4. Project Cards Grid (3 Columns)
+   4. Project Cards Grid (4 Columns)
    ────────────────────────────────────────────────────────────────────────── */
-.pj-cards-grid {
+.pj-cards-grid,
+.admin-layout .pj-page-container .pj-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding-top: 8px;
 }
 
-.pj-card {
+.pj-card,
+.admin-layout .pj-page-container .pj-card {
   background: #ffffff;
   border: 1px solid #f1f5f9;
   border-radius: 18px;
-  padding: 20px 22px;
+  padding: 18px 20px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
   position: relative;
+  min-width: 0;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -616,18 +745,21 @@
 /* 3 Bottom Metrics Boxes */
 .pj-card-metrics-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   margin-top: auto;
 }
 
 .pj-sub-metric {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 6px 8px;
   border-radius: 10px;
-  min-height: 44px;
+  min-height: 40px;
+  min-width: 0;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
 }
 
 
@@ -643,54 +775,29 @@
 
 .pj-card-action-btn {
   flex: 1;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   height: 34px;
-  padding: 0 12px;
+  padding: 0 8px;
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s ease;
-  border: 1px solid transparent;
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8f0;
 }
 
-.pj-card-action-btn.sheet {
-  background: #f0fdf4;
-  color: #166534;
-  border-color: #bbf7d0;
-}
-
-.pj-card-action-btn.sheet:hover {
-  background: #dcfce7;
-  border-color: #86efac;
+.pj-card-action-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
   transform: translateY(-1px);
-}
-
-.pj-card-action-btn.workspace {
-  background: #eff6ff;
-  color: #1e40af;
-  border-color: #bfdbfe;
-}
-
-.pj-card-action-btn.workspace:hover {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  transform: translateY(-1px);
-}
-
-.pj-sub-metric.green {
-  background-color: #f0fdf4;
-}
-
-.pj-sub-metric.blue {
-  background-color: #eff6ff;
-}
-
-.pj-sub-metric.orange {
-  background-color: #fff7ed;
 }
 
 .pj-sub-metric-icon {
@@ -698,18 +805,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.pj-sub-metric.green .pj-sub-metric-icon {
-  color: #16a34a;
-}
-
-.pj-sub-metric.blue .pj-sub-metric-icon {
-  color: #2563eb;
-}
-
-.pj-sub-metric.orange .pj-sub-metric-icon {
-  color: #ea580c;
+  color: #64748b;
 }
 
 .pj-sub-metric-content {
@@ -722,18 +818,7 @@
   font-weight: 600;
   line-height: 1.1;
   margin-bottom: 2px;
-}
-
-.pj-sub-metric.green .pj-sub-metric-label {
-  color: #15803d;
-}
-
-.pj-sub-metric.blue .pj-sub-metric-label {
-  color: #1d4ed8;
-}
-
-.pj-sub-metric.orange .pj-sub-metric-label {
-  color: #c2410c;
+  color: #64748b;
 }
 
 .pj-sub-metric-val {
@@ -970,9 +1055,10 @@
   padding: 20px;
 }
 
-.pj-modal-card {
-  width: 100%;
-  max-width: 600px;
+.pj-modal-card,
+.admin-layout .pj-modal-overlay .pj-modal-card {
+  width: min(100%, 640px);
+  max-width: 640px;
   background: #ffffff;
   border-radius: 18px;
   box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
@@ -1031,20 +1117,36 @@
   overflow-y: auto;
 }
 
-.pj-form-grid {
+.pj-form-grid,
+.admin-layout .pj-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.pj-form-row-3 {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 16px;
+  min-width: 0;
 }
 
 .pj-form-full {
-  grid-column: span 2;
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .pj-form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+}
+
+.pj-form-group > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pj-form-group label {
@@ -1146,16 +1248,24 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 1200px) {
-  .pj-cards-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 1120px) {
+  .pj-overview-controls-row {
+    grid-template-columns: 1fr;
+    gap: 18px;
   }
-  .pj-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .pj-cards-grid,
+  .admin-layout .pj-page-container .pj-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
+  .pj-page-container,
+  .admin-layout .pj-page-container,
+  .admin-layout .main-content .pj-page-container {
+    padding: 20px 16px 32px;
+    gap: 18px;
+  }
   .pj-top-utility-bar {
     padding: 14px 16px 0 64px;
   }
@@ -1171,17 +1281,52 @@
   .pj-profile-chevron {
     display: none;
   }
-  .pj-cards-grid {
+  .pj-subheader,
+  .admin-layout .pj-page-container .pj-subheader {
+    padding: 6px 0 12px;
+    border-radius: 0;
+  }
+  .pj-title-text h1,
+  .admin-layout .pj-title-text h1 {
+    font-size: 24px;
+  }
+  .pj-overview-controls-row {
+    padding: 4px 0 12px;
+    gap: 16px;
+  }
+  .pj-filter-controls-row,
+  .admin-layout .pj-page-container .pj-filter-controls-row {
+    padding: 0;
+    border-radius: 0;
+  }
+  .pj-dropdown-group,
+  .admin-layout .pj-page-container .pj-dropdown-group {
     grid-template-columns: 1fr;
   }
+  .pj-cards-grid,
+  .admin-layout .pj-page-container .pj-cards-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding-top: 4px;
+  }
+  .pj-card,
+  .admin-layout .pj-page-container .pj-card {
+    padding: 18px;
+  }
+  .pj-form-grid,
+  .admin-layout .pj-form-grid,
+  .pj-form-row-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pj-form-full,
+  .pj-form-row-3 {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 480px) {
   .pj-metrics-grid {
     grid-template-columns: 1fr;
-  }
-  .pj-form-grid {
-    grid-template-columns: 1fr;
-  }
-  .pj-form-full {
-    grid-column: span 1;
   }
 }
 

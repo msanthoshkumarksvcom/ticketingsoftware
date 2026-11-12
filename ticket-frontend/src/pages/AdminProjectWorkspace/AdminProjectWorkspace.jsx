@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
+import { formatIndianDate } from '../../utils/dateFormat';
 
 const TESTING_PRIORITY_OPTIONS = [
   { value: 'Critical', label: 'Critical' },
@@ -749,19 +750,7 @@ export default function AdminProjectWorkspace() {
   };
 
   // Format date to Indian Standard (DD/MM/YYYY)
-  const formatDate = (value) => {
-    if (!value) return 'Not set';
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
-      const [y, m, d] = value.trim().split('-');
-      return `${d}/${m}/${y}`;
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
+  const formatDate = (value) => formatIndianDate(value, 'Not set');
 
   const confirmLogout = () => {
     localStorage.clear();
@@ -1482,7 +1471,7 @@ export default function AdminProjectWorkspace() {
                             <td style={{ padding: '12px 16px', color: '#64748B' }}>{doc.file_size || '—'}</td>
                             <td style={{ padding: '12px 16px', color: '#334155', fontWeight: 500 }}>{doc.uploaded_by || 'Admin'}</td>
                             <td style={{ padding: '12px 16px', color: '#64748B' }}>
-                              {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : '—'}
+                              {formatIndianDate(doc.uploaded_at, '—')}
                             </td>
                             <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
@@ -1589,7 +1578,7 @@ export default function AdminProjectWorkspace() {
                         value={testingPriority}
                         onChange={setTestingPriority}
                         options={TESTING_PRIORITY_OPTIONS}
-                        variant="filter"
+                        variant="form"
                       />
                     </div>
 
@@ -1803,7 +1792,7 @@ export default function AdminProjectWorkspace() {
                     {previewDoc.name}
                   </h3>
                   <span style={{ fontSize: '12px', color: '#64748B' }}>
-                    {previewDoc.file_size} &bull; Uploaded by {previewDoc.uploaded_by || 'Admin'} on {previewDoc.uploaded_at ? new Date(previewDoc.uploaded_at).toLocaleDateString() : 'Recent'}
+                    {previewDoc.file_size} &bull; Uploaded by {previewDoc.uploaded_by || 'Admin'} on {formatIndianDate(previewDoc.uploaded_at, 'Recent')}
                   </span>
                 </div>
               </div>

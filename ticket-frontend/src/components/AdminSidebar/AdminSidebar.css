@@ -176,43 +176,73 @@
   align-items: center;
   gap: 10px;
   margin: 0 2px 10px;
-  padding: 11px 9px;
+  padding: 10px 10px;
   border: 1px solid rgba(255, 255, 255, .12);
   border-radius: 10px;
   background: rgba(255, 255, 255, .06);
+  text-decoration: none;
+  color: inherit;
+  transition: background .18s ease, border-color .18s ease;
 }
 
-.workspace-card-icon {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 8px;
-  background: rgba(147, 197, 253, .15);
-  color: #BFDBFE;
+.workspace-profile-card:hover {
+  background: rgba(255, 255, 255, .11);
+  border-color: rgba(255, 255, 255, .22);
 }
 
-.workspace-card strong,
-.workspace-card span {
+.workspace-profile-avatar {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border: 1.5px solid rgba(255, 255, 255, .28);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.workspace-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
 
-.workspace-card strong {
-  color: #fff;
-  font-size: 10px;
-  font-weight: 650;
+.workspace-profile-initial {
+  line-height: 1;
+  color: #ffffff;
 }
 
-.workspace-card div:nth-child(2) {
+.workspace-profile-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   min-width: 0;
 }
 
-.workspace-card div:nth-child(2) span {
-  margin-top: 3px;
+.workspace-card strong {
+  display: block;
+  overflow: hidden;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-profile-email {
+  display: block;
+  margin-top: 2px;
   overflow: hidden;
   color: #BFDBFE;
-  font-size: 9px;
+  font-size: 10.5px;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -278,7 +308,7 @@
 .sidebar-collapsed .brand-text-col,
 .sidebar-collapsed .sidebar-section-label,
 .sidebar-collapsed .nav-label,
-.sidebar-collapsed .workspace-card div:nth-child(2) {
+.sidebar-collapsed .workspace-profile-info {
   display: none;
 }
 
@@ -313,10 +343,10 @@
   border-radius: 10px;
 }
 
-.sidebar-collapsed .workspace-card-icon {
-  width: 100%;
-  height: 100%;
-  background: transparent;
+.sidebar-collapsed .workspace-profile-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
 }
 
 .sidebar-collapsed .workspace-card .connection-dot {
@@ -417,9 +447,10 @@
   .sidebar-collapsed .sidebar-section-label,
   .sidebar .nav-label,
   .sidebar-collapsed .nav-label,
-  .sidebar .workspace-card div:nth-child(2),
-  .sidebar-collapsed .workspace-card div:nth-child(2) {
+  .sidebar .workspace-profile-info,
+  .sidebar-collapsed .workspace-profile-info {
     display: flex;
+    flex-direction: column;
   }
 
   .sidebar .sidebar-section-label,
@@ -450,9 +481,17 @@
 
   .sidebar .workspace-card,
   .sidebar-collapsed .workspace-card {
+    width: auto;
+    height: auto;
     justify-content: flex-start;
     margin: 0 2px 10px;
-    padding: 11px 9px;
+    padding: 10px 10px;
+  }
+
+  .sidebar-collapsed .workspace-profile-avatar {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
   }
 
   .sidebar .workspace-card .connection-dot,

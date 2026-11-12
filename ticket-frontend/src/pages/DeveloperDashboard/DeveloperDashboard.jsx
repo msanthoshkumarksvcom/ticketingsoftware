@@ -16,9 +16,7 @@ import {
   Search,
   Filter,
   Eye,
-  RefreshCw,
   LogOut,
-  ChevronDown,
   Layers,
   ArrowRight,
   ExternalLink,
@@ -169,7 +167,6 @@ export default function DeveloperDashboard() {
   };
 
   const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'Developer');
-  const avatarLabel = displayName.charAt(0).toUpperCase();
 
   const assignedProjects = stats?.projects || [];
 
@@ -281,34 +278,6 @@ export default function DeveloperDashboard() {
       />
 
       <main className="main-content">
-        {/* Top Navbar */}
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">&gt;</span>
-            <strong>Developer Dashboard</strong>
-          </div>
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={() => { fetchStats(); fetchTickets(); }}
-              title="Refresh dashboard data"
-              aria-label="Refresh data"
-            >
-              <RefreshCw size={17} className={loading ? 'dev-spin' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar" style={{ background: '#EFF6FF', color: '#1E3A8A' }}>{avatarLabel}</div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">Developer</span>
-              </div>
-              <ChevronDown size={14} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         {/* Developer Dashboard Container */}
         <div className="dev-container">
           {/* Welcome Banner */}

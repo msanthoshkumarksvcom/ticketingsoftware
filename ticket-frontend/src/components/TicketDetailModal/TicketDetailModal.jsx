@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import CustomSelect from '../CustomSelect/CustomSelect';
+import { formatIndianDate, formatIndianDateTime, formatIndianTime } from '../../utils/dateFormat';
 import './TicketDetailModal.css';
 
 // Prepend backend host for relative image uploads so they never break
@@ -450,7 +451,7 @@ export default function TicketDetailModal({
                     </div>
                     {ticket.locked_at && (
                       <span className="tdm-lock-time-tag">
-                        Active since {new Date(ticket.locked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        Active since {formatIndianTime(ticket.locked_at)}
                       </span>
                     )}
                   </div>
@@ -585,7 +586,7 @@ export default function TicketDetailModal({
                     <div className="tdm-section-title">
                       <CheckCircle2 size={15} color="#16A34A" />
                       <span>Engineering Resolution Details</span>
-                      <span className="tdm-res-badge">Resolved by {ticket.resolved_by || 'Developer'}{ticket.resolved_at ? ` on ${new Date(ticket.resolved_at).toLocaleDateString()}` : ''}</span>
+                      <span className="tdm-res-badge">Resolved by {ticket.resolved_by || 'Developer'}{ticket.resolved_at ? ` on ${formatIndianDate(ticket.resolved_at)}` : ''}</span>
                     </div>
                     <div className="tdm-resolution-view">
                       <div className="tdm-res-field">
@@ -666,9 +667,9 @@ export default function TicketDetailModal({
                       <p>This defect was re-tested and marked as resolved by QA.</p>
                       <div className="tdm-audit-pill-row">
                         <span><strong>Resolved by:</strong> {ticket.resolved_by || 'Developer'}</span>
-                        {ticket.resolved_at && <span><strong>Resolved Date:</strong> {new Date(ticket.resolved_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                        {ticket.resolved_at && <span><strong>Resolved Date:</strong> {formatIndianDateTime(ticket.resolved_at)}</span>}
                         <span><strong>Closed by:</strong> {ticket.closed_by || 'QA Member'}</span>
-                        {ticket.closed_at && <span><strong>Closed Date:</strong> {new Date(ticket.closed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                        {ticket.closed_at && <span><strong>Closed Date:</strong> {formatIndianDateTime(ticket.closed_at)}</span>}
                       </div>
                     </div>
                   </div>
@@ -845,7 +846,7 @@ export default function TicketDetailModal({
                               label: `${dev.full_name} (${dev.email})`
                             }))
                           ]}
-                          variant="filter"
+                          variant="form"
                           placeholder="Unassigned"
                         />
                       </div>
@@ -914,7 +915,7 @@ export default function TicketDetailModal({
                     ) : (
                       <div className="tdm-status-notice closed">
                         <CheckCircle2 size={16} color="#16A34A" />
-                        <span>This defect is verified and closed{ticket.closed_by ? ` by ${ticket.closed_by}` : ''}{ticket.closed_at ? ` on ${new Date(ticket.closed_at).toLocaleDateString()}` : ''}.</span>
+                        <span>This defect is verified and closed{ticket.closed_by ? ` by ${ticket.closed_by}` : ''}{ticket.closed_at ? ` on ${formatIndianDate(ticket.closed_at)}` : ''}.</span>
                       </div>
                     )}
                   </div>
@@ -984,13 +985,13 @@ export default function TicketDetailModal({
                   <div className="tdm-meta-list">
                     <div><span>Project:</span> <strong>{ticket.project_name || ticket.project_code}</strong></div>
                     <div><span>Reported By:</span> <strong>{ticket.raised_by || ticket.reporter || 'QA Member'}</strong></div>
-                    <div><span>Reported Date:</span> <strong>{new Date(ticket.created_at).toLocaleDateString()}</strong></div>
+                    <div><span>Reported Date:</span> <strong>{formatIndianDate(ticket.created_at)}</strong></div>
                     <div><span>Priority:</span> <strong>{ticket.priority || 'Medium'}</strong></div>
                     <div><span>Severity:</span> <strong>{ticket.severity || 'Medium'}</strong></div>
                     {ticket.resolved_by && <div><span>Resolved By:</span> <strong>{ticket.resolved_by}</strong></div>}
-                    {ticket.resolved_at && <div><span>Resolved Date:</span> <strong>{new Date(ticket.resolved_at).toLocaleDateString()}</strong></div>}
+                    {ticket.resolved_at && <div><span>Resolved Date:</span> <strong>{formatIndianDate(ticket.resolved_at)}</strong></div>}
                     {ticket.closed_by && <div><span>Closed By:</span> <strong>{ticket.closed_by}</strong></div>}
-                    {ticket.closed_at && <div><span>Closed Date:</span> <strong>{new Date(ticket.closed_at).toLocaleDateString()}</strong></div>}
+                    {ticket.closed_at && <div><span>Closed Date:</span> <strong>{formatIndianDate(ticket.closed_at)}</strong></div>}
                   </div>
                 </div>
 
@@ -1007,7 +1008,7 @@ export default function TicketDetailModal({
                           <span className="tdm-history-dot" />
                           <div className="tdm-history-body">
                             <span className="tdm-history-action">{h.action}</span>
-                            <span className="tdm-history-user">{h.performed_by} &bull; {new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="tdm-history-user">{h.performed_by} &bull; {formatIndianDateTime(h.created_at)}</span>
                             {h.details && <p className="tdm-history-details">{h.details}</p>}
                           </div>
                         </div>

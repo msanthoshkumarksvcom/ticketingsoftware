@@ -2,11 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-  ChevronDown,
   Layers,
   LogOut,
   Plus,
-  RefreshCw,
   Rocket,
   Search,
   Server,
@@ -14,6 +12,7 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import '../AdminProjects/AdminProjects.css';
@@ -68,7 +67,6 @@ function AdminDeployments() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [userEmail] = useState(() => localStorage.getItem('userEmail') || '');
 
   const fetchDeployments = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -167,9 +165,6 @@ function AdminDeployments() {
     return matchesSearch && matchesEnv && matchesStatus;
   });
 
-  const displayName = userEmail ? userEmail.split('@')[0] : 'Administrator';
-  const avatarLabel = displayName.charAt(0).toUpperCase();
-
   return (
     <div className="admin-layout">
       {/* Logout Modal */}
@@ -204,33 +199,6 @@ function AdminDeployments() {
 
       {/* Main Content Area */}
       <main className="main-content">
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">/</span>
-            <strong>Deployment Approvals</strong>
-          </div>
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={fetchDeployments}
-              title="Refresh deployments"
-              aria-label="Refresh deployments list"
-            >
-              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar">{avatarLabel}</div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">Administrator</span>
-              </div>
-              <ChevronDown size={15} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         <div className="dashboard-container">
           <div className="projects-layout">
             {/* Header Card */}
@@ -356,7 +324,7 @@ function AdminDeployments() {
                           </span>
                         </td>
                         <td style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                          {d.created_at ? new Date(d.created_at).toLocaleDateString() : 'Recent'}
+                          {formatIndianDate(d.created_at, 'Recent')}
                         </td>
                       </tr>
                     ))

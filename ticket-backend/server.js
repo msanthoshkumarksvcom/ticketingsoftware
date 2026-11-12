@@ -262,6 +262,65 @@ app.put('/api/auth/theme', async (req, res) => {
   }
 });
 
+// Change Password for Logged-In User
+app.put('/api/auth/change-password', async (req, res) => {
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(authorization.slice('Bearer '.length), JWT_SECRET);
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  try {
+    const { current_password, new_password, confirm_password } = req.body || {};
+
+    if (!current_password || typeof current_password !== 'string') {
+      return res.status(400).json({ error: 'Current password is required.' });
+    }
+    if (!new_password || typeof new_password !== 'string') {
+      return res.status(400).json({ error: 'New password is required.' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+    if (new_password.length > 128) {
+      return res.status(400).json({ error: 'New password must be 128 characters or fewer.' });
+    }
+    if (confirm_password !== undefined && new_password !== String(confirm_password)) {
+      return res.status(400).json({ error: 'New password and confirm password do not match.' });
+    }
+
+    const userRes = await pool.query('SELECT id, password FROM users WHERE id = $1', [decoded.userId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const isMatch = await bcrypt.compare(current_password, userRes.rows[0].password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+
+    if (current_password === new_password) {
+      return res.status(400).json({ error: 'New password must be different from your current password.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(new_password, salt);
+
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, decoded.userId]);
+
+    res.json({ message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ error: 'Failed to update password.' });
+  }
+});
+
 // Admin Dashboard Stats Endpoint
 app.get('/api/admin/dashboard-stats', async (req, res) => {
   const authorization = req.headers.authorization;
@@ -2277,7 +2336,7 @@ app.post('/api/admin/tickets', async (req, res) => {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const { title, description, project_id, project_code, assigned_to, priority, type, status, reporter, attachments } = req.body;
+  const { title, description, project_id, project_code, assigned_to, priority, severity, type, status, reporter, attachments } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Ticket title is required.' });
@@ -2321,9 +2380,9 @@ app.post('/api/admin/tickets', async (req, res) => {
       `INSERT INTO tickets (
          ticket_code, title, description, project_id, project_code,
          assigned_to, assigned_developer_id, assigned_developer_name, assigned_developer_email,
-         priority, type, status, reporter, raised_by, raised_by_id, raised_at, attachments
+         priority, severity, type, status, reporter, raised_by, raised_by_id, raised_at, attachments
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14, CURRENT_TIMESTAMP, $15)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, CURRENT_TIMESTAMP, $16)
        RETURNING *`,
       [
         ticket_code,
@@ -2335,7 +2394,8 @@ app.post('/api/admin/tickets', async (req, res) => {
         assignedUser ? assignedUser.id : null,
         assignedUser ? assignedUser.full_name : null,
         assignedUser ? assignedUser.email : null,
-        priority || 'Medium',
+        priority || severity || 'Medium',
+        severity || priority || 'Medium',
         type || 'Bug',
         status || 'Open',
         reporterName,

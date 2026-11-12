@@ -3,6 +3,8 @@
 .c-select-container {
   position: relative;
   display: inline-block;
+  min-width: 0;
+  max-width: 100%;
   user-select: none;
   font-family: inherit;
   box-sizing: border-box;
@@ -16,40 +18,41 @@
    VARIANT: FILTER (For Filter Toolbar)
    ========================================= */
 .c-select-filter {
-  min-width: 136px;
+  min-width: 120px;
 }
 
 .c-select-filter .c-select-trigger {
   width: 100%;
+  min-width: 0;
   height: 38px;
-  background: #ffffff;
-  border: 1.5px solid #cbd5e1;
-  border-radius: 9px;
-  padding: 0 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   font-size: 13px;
   font-weight: 500;
   color: #1e293b;
   cursor: pointer;
   outline: none;
-  transition: all 0.18s ease;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: background-color 0.18s ease, color 0.18s ease;
+  box-shadow: none;
 }
 
 .c-select-filter .c-select-trigger:hover {
-  border-color: #94a3b8;
-  background: #f8fafc;
+  border: none;
+  background: rgba(15, 23, 42, 0.05);
   color: #0f172a;
 }
 
 .c-select-filter.is-open .c-select-trigger {
-  border-color: #2563eb;
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-  color: #0f172a;
+  border: none;
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: none;
+  color: #1d4ed8;
 }
 
 /* =========================================
@@ -62,6 +65,7 @@
 
 .c-select-form .c-select-trigger {
   width: 100%;
+  min-width: 0;
   height: 40px;
   background: #ffffff;
   border: 1.5px solid #cbd5e1;
@@ -102,6 +106,8 @@
 .c-select-trigger-left {
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 0;
   gap: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -122,6 +128,7 @@
 }
 
 .c-select-value {
+  min-width: 0;
   font-size: inherit;
   font-weight: inherit;
   color: inherit;
@@ -241,6 +248,7 @@
   align-items: center;
   gap: 8px;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -254,6 +262,7 @@
 }
 
 .c-select-item-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

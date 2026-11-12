@@ -16,20 +16,18 @@ import {
   Eye,
   Plus,
   ExternalLink,
-  ChevronDown,
-  RefreshCw,
   X,
   UserPlus,
   Trash2,
   History,
   ShieldCheck,
   Check,
-  Bell,
   LogOut
 } from 'lucide-react';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import './ProjectLeadDashboard.css';
 
@@ -215,7 +213,6 @@ export default function ProjectLeadDashboard() {
   };
 
   const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'Project Lead');
-  const avatarLabel = displayName.charAt(0).toUpperCase();
 
   // Filtered Tickets
   const filteredTickets = useMemo(() => {
@@ -289,34 +286,6 @@ export default function ProjectLeadDashboard() {
       />
 
       <main className="main-content">
-        {/* Top Navbar */}
-        <header className="header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            <span className="breadcrumb-divider">&gt;</span>
-            <strong>Project Lead Dashboard</strong>
-          </div>
-          <div className="header-right">
-            <button
-              className="notification-bell"
-              onClick={() => { fetchDashboardStats(); fetchTickets(); }}
-              title="Refresh dashboard data"
-              aria-label="Refresh data"
-            >
-              <RefreshCw size={17} className={loading ? 'tdm-spin' : ''} />
-            </button>
-            <div className="profile-divider" />
-            <div className="user-profile">
-              <div className="avatar" style={{ background: '#EFF6FF', color: '#1E3A8A' }}>{avatarLabel}</div>
-              <div className="user-info">
-                <span className="user-name">{displayName}</span>
-                <span className="user-role">Project Lead</span>
-              </div>
-              <ChevronDown size={14} className="profile-chevron" />
-            </div>
-          </div>
-        </header>
-
         {/* Dashboard Container */}
         <div className="pld-container">
           {/* Welcome Banner */}
@@ -691,7 +660,7 @@ export default function ProjectLeadDashboard() {
                         <div className="pld-dev-info">
                           <strong>{d.developer_name}</strong>
                           <span>{d.emp_id || 'EMP'} &bull; {d.developer_email}</span>
-                          <small>Assigned on {new Date(d.assigned_at).toLocaleDateString()}</small>
+                          <small>Assigned on {formatIndianDate(d.assigned_at)}</small>
                         </div>
                         <button
                           type="button"
@@ -717,7 +686,7 @@ export default function ProjectLeadDashboard() {
                       <div key={h.id} className="pld-hist-row">
                         <span><strong>{h.developer_name}</strong> ({h.developer_email})</span>
                         <span className={`pld-hist-status ${h.status.toLowerCase()}`}>{h.status}</span>
-                        <small>Assigned by {h.assigned_by} on {new Date(h.assigned_at).toLocaleDateString()}</small>
+                        <small>Assigned by {h.assigned_by} on {formatIndianDate(h.assigned_at)}</small>
                       </div>
                     ))}
                   </div>

@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   AlertTriangle,
-  Bell,
   Building2,
   Calendar,
-  ChevronDown,
   Clock,
   Edit2,
   FileSpreadsheet,
@@ -15,6 +13,7 @@ import {
   FolderPlus,
   LayoutGrid,
   List,
+  Lock,
   LogOut,
   MoreVertical,
   PlayCircle,
@@ -22,6 +21,7 @@ import {
   Search,
   Ticket,
   Trash2,
+  Unlock,
   User,
   Users,
   X
@@ -30,6 +30,7 @@ import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import FolderEmblem from './FolderEmblem';
 import ProjectSpreadsheetView from './ProjectSpreadsheetView';
+import { formatIndianDate } from '../../utils/dateFormat';
 import '../../styles/admin.css';
 import './AdminProjects.css';
 
@@ -183,15 +184,57 @@ const initialProjectForm = {
   end_date: ''
 };
 
+const PJ_FILTER_LOCK_STORAGE_KEY = 'pj_locked_filters';
+
+const readLockedFiltersState = () => {
+  try {
+    const raw = localStorage.getItem(PJ_FILTER_LOCK_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.locked ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 function AdminProjects() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [searchQuery, setSearchQuery] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('All Departments');
-  const [statusFilter, setStatusFilter] = useState('All Statuses');
-  const [sortBy, setSortBy] = useState('Last Updated');
+  const [filtersLocked, setFiltersLocked] = useState(() => Boolean(readLockedFiltersState()));
+  const [departmentFilter, setDepartmentFilter] = useState(
+    () => readLockedFiltersState()?.departmentFilter || 'All Departments'
+  );
+  const [statusFilter, setStatusFilter] = useState(
+    () => readLockedFiltersState()?.statusFilter || 'All Statuses'
+  );
+  const [sortBy, setSortBy] = useState(
+    () => readLockedFiltersState()?.sortBy || 'Last Updated'
+  );
+
+  const toggleFilterLock = () => {
+    const nextLocked = !filtersLocked;
+    setFiltersLocked(nextLocked);
+    try {
+      if (nextLocked) {
+        localStorage.setItem(
+          PJ_FILTER_LOCK_STORAGE_KEY,
+          JSON.stringify({
+            locked: true,
+            departmentFilter,
+            statusFilter,
+            sortBy
+          })
+        );
+      } else {
+        localStorage.removeItem(PJ_FILTER_LOCK_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  };
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -253,20 +296,9 @@ function AdminProjects() {
   // Logout modal
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // User Profile & Unread Notifications
-  const [userEmail] = useState(() => localStorage.getItem('userEmail') || 'manager@gmail.com');
-  const displayName = userEmail ? userEmail.split('@')[0] : 'manager';
+  // Role permissions
   const currentUserRole = localStorage.getItem('userRole') || 'Manager';
   const isQAMember = currentUserRole === 'QA Member';
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-
-  useEffect(() => {
-    const handleUnreadCount = (event) => {
-      setUnreadNotificationsCount(Number(event.detail?.unreadCount || 0));
-    };
-    window.addEventListener('notifications-unread-count', handleUnreadCount);
-    return () => window.removeEventListener('notifications-unread-count', handleUnreadCount);
-  }, []);
 
   // Fetch projects from backend
   const fetchProjects = useCallback(async () => {
@@ -304,19 +336,7 @@ function AdminProjects() {
   }, []);
 
   // Format date to Indian Standard (DD/MM/YYYY)
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'Not set';
-    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr.trim())) {
-      const [y, m, d] = dateStr.trim().split('-');
-      return `${d}/${m}/${y}`;
-    }
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return String(dateStr);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
+  const formatDate = (dateStr) => formatIndianDate(dateStr, 'Not set');
 
   const openProjectWorkspace = (project) => {
     navigate(`/admin/projects/${project.id}`, { state: { project } });
@@ -772,43 +792,11 @@ function AdminProjects() {
 
       {/* Main Content Pane */}
       <main className="main-content">
-        {/* Top Utility Actions: Notification Bell + Profile */}
-        <div className="pj-top-utility-bar">
-          <div className="header-right pj-exact-header-right">
-            <button
-              type="button"
-              className="notification-bell pj-header-bell-btn"
-              title="Notifications"
-              aria-label="Notifications"
-              onClick={() => window.dispatchEvent(new Event('open-notifications-drawer'))}
-            >
-              <Bell size={18} />
-              {unreadNotificationsCount > 0 && (
-                <span className="notification-count pj-bell-badge">
-                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-                </span>
-              )}
-            </button>
-
-            <div className="user-profile pj-header-profile" title="Administrator account">
-              <div className="avatar pj-profile-avatar">{displayName ? displayName.charAt(0).toUpperCase() : 'M'}</div>
-              <div className="user-info pj-profile-text">
-                <span className="user-name pj-profile-name">{displayName}</span>
-                <span className="user-role pj-profile-role">{currentUserRole}</span>
-              </div>
-              <ChevronDown size={14} className="profile-chevron pj-profile-chevron" />
-            </div>
-          </div>
-        </div>
-
         {/* Projects Page Container */}
         <div className="pj-page-container">
           {/* 1. Projects Directory Header Row */}
           <section className="pj-subheader">
             <div className="pj-title-group">
-              <div className="pj-folder-icon-box">
-                <Folder size={26} strokeWidth={2} />
-              </div>
               <div className="pj-title-text">
                 <h1>Projects Directory</h1>
               </div>
@@ -820,7 +808,6 @@ function AdminProjects() {
                 <button
                   className={`pj-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
                   onClick={() => setViewMode('grid')}
-                  title="Grid view"
                   aria-label="Grid view"
                 >
                   <LayoutGrid size={18} />
@@ -828,7 +815,6 @@ function AdminProjects() {
                 <button
                   className={`pj-view-btn ${viewMode === 'list' ? 'active' : ''}`}
                   onClick={() => setViewMode('list')}
-                  title="List view"
                   aria-label="List view"
                 >
                   <List size={18} />
@@ -836,7 +822,6 @@ function AdminProjects() {
                 <button
                   className={`pj-view-btn ${viewMode === 'sheet' ? 'active' : ''}`}
                   onClick={() => setViewMode('sheet')}
-                  title="Sheet / Spreadsheet view"
                   aria-label="Sheet view"
                 >
                   <FileSpreadsheet size={18} />
@@ -875,96 +860,120 @@ function AdminProjects() {
             </div>
           )}
 
-          {/* 2. Secondary Filter & Search Bar */}
-          <section className="pj-filter-controls-row">
-            <div className="pj-search-input-wrap">
-              <Search size={16} />
-              <input
-                type="text"
-                placeholder="Search by project name, code, project type..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="pj-dropdown-group" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <CustomSelect
-                value={departmentFilter}
-                onChange={setDepartmentFilter}
-                options={PJ_TYPE_OPTIONS}
-                variant="filter"
-                placeholder="All Project Types"
-              />
-
-              <CustomSelect
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={PJ_STATUS_OPTIONS}
-                variant="filter"
-                placeholder="All Statuses"
-              />
-
-              <CustomSelect
-                value={sortBy}
-                onChange={setSortBy}
-                options={PJ_SORT_OPTIONS}
-                variant="filter"
-                placeholder="Sort by"
-              />
-            </div>
-          </section>
-
-          {/* 3. Four Metric Cards Row (Total Projects, In Progress, Not Started, Completed) */}
-          <section className="pj-metrics-grid">
-            {/* Card 1: Total Projects */}
-            <div className="pj-metric-card">
-              <div className="pj-metric-left">
-                <div className="pj-metric-icon-box blue">
-                  <Folder size={22} />
+          {/* 2. Dashboard Metrics (2x2) + Search & Filter Panel */}
+          <section className="pj-overview-controls-row">
+            {/* Left: Dashboard 2x2 Metric Cards */}
+            <div className="pj-dashboard-panel">
+              <div className="pj-metrics-grid">
+                {/* Card 1: Total Projects */}
+                <div className="pj-metric-card">
+                  <div className="pj-metric-left">
+                    <div className="pj-metric-icon-box blue">
+                      <Folder size={24} />
+                    </div>
+                    <div className="pj-metric-info">
+                      <span className="pj-metric-label">Total Projects</span>
+                      <span className="pj-metric-number">{stats.total}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="pj-metric-info">
-                  <span className="pj-metric-label">Total Projects</span>
-                  <span className="pj-metric-number">{stats.total}</span>
+
+                {/* Card 2: In Progress */}
+                <div className="pj-metric-card">
+                  <div className="pj-metric-left">
+                    <div className="pj-metric-icon-box green">
+                      <PlayCircle size={24} />
+                    </div>
+                    <div className="pj-metric-info">
+                      <span className="pj-metric-label">In Progress</span>
+                      <span className="pj-metric-number">{stats.inProgress}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 3: Not Started */}
+                <div className="pj-metric-card">
+                  <div className="pj-metric-left">
+                    <div className="pj-metric-icon-box orange">
+                      <Clock size={24} />
+                    </div>
+                    <div className="pj-metric-info">
+                      <span className="pj-metric-label">Not Started</span>
+                      <span className="pj-metric-number">{stats.notStarted}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 4: Completed */}
+                <div className="pj-metric-card">
+                  <div className="pj-metric-left">
+                    <div className="pj-metric-icon-box purple">
+                      <FolderPlus size={24} />
+                    </div>
+                    <div className="pj-metric-info">
+                      <span className="pj-metric-label">Completed</span>
+                      <span className="pj-metric-number">{stats.completed}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: In Progress */}
-            <div className="pj-metric-card">
-              <div className="pj-metric-left">
-                <div className="pj-metric-icon-box green">
-                  <PlayCircle size={22} />
-                </div>
-                <div className="pj-metric-info">
-                  <span className="pj-metric-label">In Progress</span>
-                  <span className="pj-metric-number">{stats.inProgress}</span>
-                </div>
+            {/* Right: Search & Three Filters */}
+            <div className="pj-filter-controls-row">
+              <div className="pj-search-input-wrap">
+                <Search size={16} />
+                <input
+                  type="text"
+                  placeholder="Search by project name, code, project type..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
-            </div>
 
-            {/* Card 3: Not Started */}
-            <div className="pj-metric-card">
-              <div className="pj-metric-left">
-                <div className="pj-metric-icon-box orange">
-                  <Clock size={22} />
-                </div>
-                <div className="pj-metric-info">
-                  <span className="pj-metric-label">Not Started</span>
-                  <span className="pj-metric-number">{stats.notStarted}</span>
-                </div>
-              </div>
-            </div>
+              <div className="pj-dropdown-group">
+                <CustomSelect
+                  value={departmentFilter}
+                  onChange={(val) => {
+                    if (!filtersLocked) setDepartmentFilter(val);
+                  }}
+                  options={PJ_TYPE_OPTIONS}
+                  variant="filter"
+                  placeholder="All Project Types"
+                  disabled={filtersLocked}
+                />
 
-            {/* Card 4: Completed */}
-            <div className="pj-metric-card">
-              <div className="pj-metric-left">
-                <div className="pj-metric-icon-box purple">
-                  <FolderPlus size={22} />
-                </div>
-                <div className="pj-metric-info">
-                  <span className="pj-metric-label">Completed</span>
-                  <span className="pj-metric-number">{stats.completed}</span>
-                </div>
+                <CustomSelect
+                  value={statusFilter}
+                  onChange={(val) => {
+                    if (!filtersLocked) setStatusFilter(val);
+                  }}
+                  options={PJ_STATUS_OPTIONS}
+                  variant="filter"
+                  placeholder="All Statuses"
+                  disabled={filtersLocked}
+                />
+
+                <CustomSelect
+                  value={sortBy}
+                  onChange={(val) => {
+                    if (!filtersLocked) setSortBy(val);
+                  }}
+                  options={PJ_SORT_OPTIONS}
+                  variant="filter"
+                  placeholder="Sort by"
+                  disabled={filtersLocked}
+                />
+
+                <button
+                  type="button"
+                  className={`pj-fix-filter-chip ${filtersLocked ? 'is-locked' : ''}`}
+                  onClick={toggleFilterLock}
+                  aria-pressed={filtersLocked}
+                  aria-label={filtersLocked ? 'Unlock filters' : 'Lock filters'}
+                >
+                  {filtersLocked ? <Lock size={16} /> : <Unlock size={16} />}
+                </button>
               </div>
             </div>
           </section>
@@ -1009,7 +1018,6 @@ function AdminProjects() {
                   onDoubleClick={(event) => {
                     if (!event.target.closest('button')) openProjectWorkspace(project);
                   }}
-                  title="Double-click to open project"
                 >
                   {/* Top: Folder Graphic + Status Badge + Actions */}
                   <div className="pj-card-top">
@@ -1034,7 +1042,6 @@ function AdminProjects() {
                               setActiveMenuId(activeMenuId === project.id ? null : project.id)
                             }
                             aria-label="Project actions"
-                            title="More options"
                           >
                             <MoreVertical size={18} />
                           </button>
@@ -1071,19 +1078,19 @@ function AdminProjects() {
                   {/* 2x2 Metadata Grid */}
                   <div className="pj-card-meta-grid">
                     {/* Row 1, Col 1: Department */}
-                    <div className="pj-meta-item" title={project.department}>
+                    <div className="pj-meta-item">
                       <Building2 size={15} />
                       <span>{project.department || 'Website'}</span>
                     </div>
 
                     {/* Row 1, Col 2: Project Lead */}
-                    <div className="pj-meta-item" title={project.lead_name}>
+                    <div className="pj-meta-item">
                       <User size={15} />
                       <span>{project.lead_name || 'Lead Member'}</span>
                     </div>
 
                     {/* Row 2, Col 1: Start Date */}
-                    <div className="pj-meta-item" title={project.start_date}>
+                    <div className="pj-meta-item">
                       <Calendar size={15} />
                       <span>{formatDate(project.start_date)}</span>
                     </div>
@@ -1140,7 +1147,6 @@ function AdminProjects() {
                         e.stopPropagation();
                         navigate(`/admin/projects/${project.id}/sheet`);
                       }}
-                      title="Open Test Case Execution Sheet"
                     >
                       <FileSpreadsheet size={14} />
                       <span>Test Sheet</span>
@@ -1152,7 +1158,6 @@ function AdminProjects() {
                         e.stopPropagation();
                         openProjectWorkspace(project);
                       }}
-                      title="Open Project Workspace"
                     >
                       <Folder size={14} />
                       <span>Workspace</span>
@@ -1188,7 +1193,6 @@ function AdminProjects() {
                         onDoubleClick={(event) => {
                           if (!event.target.closest('button')) openProjectWorkspace(project);
                         }}
-                        title="Double-click to open project"
                       >
                         <td>
                           <strong>{project.project_code}</strong>
@@ -1208,15 +1212,15 @@ function AdminProjects() {
                         </td>
                         <td>{formatDate(project.start_date)}</td>
                         <td>{project.team_members ?? 0} Members</td>
-                        <td style={{ fontWeight: 700, color: '#16a34a' }}>{project.test_cases ?? 0}</td>
-                        <td style={{ fontWeight: 700, color: '#2563eb' }}>{project.documents ?? 0}</td>
-                        <td style={{ fontWeight: 700, color: '#ea580c' }}>{project.tickets_count ?? 0}</td>
+                        <td style={{ fontWeight: 700 }}>{project.test_cases ?? 0}</td>
+                        <td style={{ fontWeight: 700 }}>{project.documents ?? 0}</td>
+                        <td style={{ fontWeight: 700 }}>{project.tickets_count ?? 0}</td>
                         <td style={{ textAlign: 'right' }}>
                           <button
                             className="pj-btn-more"
-                            style={{ display: 'inline-flex', color: '#107c41', marginRight: '6px' }}
+                            style={{ display: 'inline-flex', marginRight: '6px' }}
                             onClick={() => navigate(`/admin/projects/${project.id}/sheet`)}
-                            title="Open Project Sheet Workspace"
+                            aria-label="Open Project Sheet Workspace"
                           >
                             <FileSpreadsheet size={15} />
                           </button>
@@ -1225,7 +1229,7 @@ function AdminProjects() {
                               className="pj-btn-more"
                               style={{ display: 'inline-flex' }}
                               onClick={() => openEditModal(project)}
-                              title="Edit"
+                              aria-label="Edit project"
                             >
                               <Edit2 size={15} />
                             </button>
@@ -1296,7 +1300,6 @@ function AdminProjects() {
                       value={formData.name}
                       onChange={handleInputChange}
                       pattern="[a-zA-Z\s]+"
-                      title="Only alphabetic characters and spaces are allowed"
                       required
                     />
                   </div>
@@ -1318,7 +1321,6 @@ function AdminProjects() {
                         color: '#0F172A',
                         fontWeight: 600
                       }}
-                      title="Auto-generated from Project Name"
                     />
                   </div>
 
@@ -1346,12 +1348,11 @@ function AdminProjects() {
                       value={formData.client_name || ''}
                       onChange={handleInputChange}
                       pattern="[a-zA-Z\s]+"
-                      title="Only alphabetic characters and spaces are allowed"
                       required
                     />
                   </div>
 
-                  <div className="pj-form-group">
+                  <div className="pj-form-group pj-form-full">
                     <label>
                       Project Lead <span className="req-star" style={{ color: '#EF4444' }}>*</span>
                     </label>
@@ -1371,28 +1372,46 @@ function AdminProjects() {
                     />
                   </div>
 
-                  <div className="pj-form-group">
-                    <label>
-                      Priority <span className="req-star" style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <CustomSelect
-                      value={formData.priority || 'Medium'}
-                      onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}
-                      options={MODAL_PROJECT_PRIORITY_OPTIONS}
-                      variant="form"
-                    />
-                  </div>
+                  <div className="pj-form-row-3">
+                    <div className="pj-form-group">
+                      <label>
+                        Priority <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <CustomSelect
+                        value={formData.priority || 'Medium'}
+                        onChange={(val) => setFormData((prev) => ({ ...prev, priority: val }))}
+                        options={MODAL_PROJECT_PRIORITY_OPTIONS}
+                        variant="form"
+                      />
+                    </div>
 
-                  <div className="pj-form-group">
-                    <label>
-                      Status <span className="req-star" style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <CustomSelect
-                      value={formData.status}
-                      onChange={(val) => setFormData((prev) => ({ ...prev, status: val }))}
-                      options={MODAL_PROJECT_STATUS_OPTIONS}
-                      variant="form"
-                    />
+                    <div className="pj-form-group">
+                      <label>
+                        Status <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <CustomSelect
+                        value={formData.status}
+                        onChange={(val) => setFormData((prev) => ({ ...prev, status: val }))}
+                        options={MODAL_PROJECT_STATUS_OPTIONS}
+                        variant="form"
+                      />
+                    </div>
+
+                    <div className="pj-form-group">
+                      <label>
+                        Team Members <span className="req-star" style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="team_members"
+                        min="1"
+                        max="9"
+                        placeholder="Team size (1 - 9)"
+                        value={formData.team_members}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
                   </div>
 
                   <div className="pj-form-group">
@@ -1419,22 +1438,6 @@ function AdminProjects() {
                       value={formData.end_date || ''}
                       min={getMinTargetDate(formData.start_date)}
                       onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="pj-form-group">
-                    <label>
-                      Team Members <span className="req-star" style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="team_members"
-                      min="1"
-                      max="9"
-                      placeholder="Enter team size (1 - 9)"
-                      value={formData.team_members}
-                      onChange={handleInputChange}
-                      required
                     />
                   </div>
 

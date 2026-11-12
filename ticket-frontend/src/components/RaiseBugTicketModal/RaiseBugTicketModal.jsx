@@ -18,9 +18,10 @@ import {
   Clock
 } from 'lucide-react';
 import CustomSelect from '../CustomSelect/CustomSelect';
+import { formatIndianDate } from '../../utils/dateFormat';
 import './RaiseBugTicketModal.css';
 
-const SEVERITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low'];
+const SEVERITY_OPTIONS = ['Critical', 'Block', 'High', 'Medium', 'Low'];
 const PRIORITY_OPTIONS = ['Urgent', 'High', 'Medium', 'Low'];
 const CATEGORY_OPTIONS = [
   'Functional Bug',
@@ -575,7 +576,7 @@ export default function RaiseBugTicketModal({
               {/* Reporter Metadata */}
               <div className="rbt-doc-meta-footer">
                 <div><span>Reported By:</span> <strong>{currentUser}</strong></div>
-                <div><span>Reported Date:</span> <strong>{new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</strong></div>
+                <div><span>Reported Date:</span> <strong>{formatIndianDate(new Date())}</strong></div>
                 <div><span>Project Ownership:</span> <strong>{project?.name}</strong></div>
               </div>
             </div>
