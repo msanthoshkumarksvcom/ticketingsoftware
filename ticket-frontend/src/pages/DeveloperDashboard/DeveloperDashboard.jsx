@@ -474,6 +474,7 @@ export default function DeveloperDashboard() {
                   id="dev-search-input"
                   type="text"
                   autoComplete="off"
+                  maxLength={100}
                   placeholder="Search by ticket ID, defect title, module, test case, project..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

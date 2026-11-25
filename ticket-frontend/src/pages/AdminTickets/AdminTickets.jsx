@@ -28,6 +28,7 @@ import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
+import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import FolderEmblem from '../AdminProjects/FolderEmblem';
 import { getValidToken, clearAuthSession } from '../../utils/auth';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -335,8 +336,12 @@ function AdminTickets() {
     e.preventDefault();
     setFormError('');
 
-    if (!formData.title.trim()) {
-      setFormError('Please enter the Ticket Title.');
+    const validationErr = validateFields([
+      { value: formData.title, options: { label: 'Ticket Title', required: true, maxLength: INPUT_LIMITS.TITLE } },
+      { value: formData.description, options: { label: 'Description', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } }
+    ]);
+    if (validationErr) {
+      setFormError(validationErr);
       return;
     }
 
@@ -899,6 +904,7 @@ function AdminTickets() {
                   id="tickets-search-input"
                   type="text"
                   autoComplete="off"
+                  maxLength={INPUT_LIMITS.SEARCH}
                   placeholder={
                     isShowingFoldersGrid
                       ? 'Search project folder, lead, department, or ticket...'
@@ -1330,6 +1336,7 @@ function AdminTickets() {
                     type="text"
                     name="title"
                     autoComplete="off"
+                    maxLength={INPUT_LIMITS.TITLE}
                     placeholder="Short summary of the issue or requirement"
                     required
                     value={formData.title}
@@ -1342,6 +1349,7 @@ function AdminTickets() {
                   <textarea
                     id="raise-ticket-description"
                     name="description"
+                    maxLength={INPUT_LIMITS.DESCRIPTION}
                     placeholder="Steps to reproduce, expected vs actual behavior..."
                     value={formData.description}
                     onChange={handleInputChange}

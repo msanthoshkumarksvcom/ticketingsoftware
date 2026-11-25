@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { INPUT_LIMITS, validateMeaningfulText } from '../../utils/inputValidation';
 import {
   FileSpreadsheet,
   ArrowLeft,
@@ -1586,7 +1587,16 @@ export default function AdminProjectSheet() {
   // Add Column
   const handleAddColumnSubmit = (e) => {
     e.preventDefault();
-    if (isDeveloper || !newColLabel.trim()) return;
+    if (isDeveloper) return;
+    const colErr = validateMeaningfulText(newColLabel, {
+      label: 'Column Header Name',
+      required: true,
+      maxLength: INPUT_LIMITS.NAME
+    });
+    if (colErr) {
+      showToast(colErr);
+      return;
+    }
 
     recordUndo();
     const newColId = `col_${Date.now()}`;
@@ -2815,6 +2825,7 @@ export default function AdminProjectSheet() {
             className="pjs-formula-input"
             placeholder={isDeveloper ? 'Read-only cell value...' : 'Type value or formula for selected cell...'}
             autoComplete="off"
+            maxLength={INPUT_LIMITS.CELL}
             value={formulaValue}
             onChange={(e) => {
               if (!isDeveloper) setFormulaValue(e.target.value);
@@ -3030,6 +3041,7 @@ export default function AdminProjectSheet() {
                                 type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
                                 className="pjs-cell-editor"
                                 autoComplete="off"
+                                maxLength={col.type === 'number' || col.type === 'date' ? undefined : INPUT_LIMITS.CELL}
                                 value={editValue}
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onBlur={() => commitEdit(rIdx, col.id, editValue)}
@@ -3326,6 +3338,7 @@ export default function AdminProjectSheet() {
                         type="text"
                         className="pjs-tab-rename-input"
                         autoComplete="off"
+                        maxLength={INPUT_LIMITS.NAME}
                         value={editingTabName}
                         onChange={(e) => setEditingTabName(e.target.value)}
                         onBlur={commitTabRename}
@@ -3531,6 +3544,7 @@ export default function AdminProjectSheet() {
                     type="text"
                     placeholder="e.g. Expected Result, Jira Ticket, Build"
                     autoComplete="off"
+                    maxLength={INPUT_LIMITS.NAME}
                     value={newColLabel}
                     onChange={(e) => setNewColLabel(e.target.value)}
                     autoFocus

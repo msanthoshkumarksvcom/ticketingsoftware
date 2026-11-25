@@ -720,6 +720,7 @@ export default function AdminReports() {
                         type="text"
                         placeholder="Search project code, name, lead..."
                         autoComplete="off"
+                        maxLength={100}
                         value={projectSearch}
                         onChange={(e) => setProjectSearch(e.target.value)}
                       />

@@ -376,6 +376,7 @@ function Login() {
                   autoComplete="off"
                   className="input-field" 
                   placeholder="Enter your email" 
+                  maxLength={150}
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -401,6 +402,7 @@ function Login() {
                   autoComplete="new-password"
                   className="input-field" 
                   placeholder="Enter your password" 
+                  maxLength={100}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -531,6 +533,7 @@ function Login() {
                         type="email"
                         className="input-field"
                         placeholder="e.g. member@qasoftware.com"
+                        maxLength={150}
                         value={forgotEmail}
                         onChange={(e) => {
                           setForgotEmail(e.target.value);

@@ -350,6 +350,7 @@ export default function QAMemberDashboard() {
                       id="qa-ticket-search"
                       type="text"
                       autoComplete="off"
+                      maxLength={100}
                       placeholder="Search ticket code, title..."
                       value={ticketSearch}
                       onChange={(e) => setTicketSearch(e.target.value)}

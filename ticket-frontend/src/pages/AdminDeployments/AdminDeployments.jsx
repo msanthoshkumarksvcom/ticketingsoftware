@@ -19,6 +19,7 @@ import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import { formatIndianDate } from '../../utils/dateFormat';
+import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
 import '../../styles/admin.css';
@@ -132,18 +133,15 @@ function AdminDeployments() {
     e.preventDefault();
     setFormError('');
 
-    if (!formData.deploy_code.trim()) {
-      setFormError('Please enter a Deployment Code (e.g. DEP-901).');
-      return;
-    }
-
-    if (!formData.service_name.trim()) {
-      setFormError('Please enter the Service or Microservice Name.');
-      return;
-    }
-
-    if (!formData.version.trim()) {
-      setFormError('Please enter the Release Version (e.g. v2.1.0).');
+    const validationErr = validateFields([
+      { value: formData.deploy_code, options: { label: 'Deployment Code', required: true, maxLength: INPUT_LIMITS.CODE } },
+      { value: formData.service_name, options: { label: 'Service / Application', required: true, maxLength: INPUT_LIMITS.NAME } },
+      { value: formData.version, options: { label: 'Release Version', required: true, maxLength: INPUT_LIMITS.VERSION } },
+      { value: formData.release_notes, options: { label: 'Release Notes / Changes', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } },
+      { value: formData.requested_by, options: { label: 'Requested By', required: false, maxLength: INPUT_LIMITS.NAME } }
+    ]);
+    if (validationErr) {
+      setFormError(validationErr);
       return;
     }
 
@@ -358,6 +356,7 @@ function AdminDeployments() {
                   type="text"
                   placeholder="Search deployment code, service, version, requester..."
                   autoComplete="off"
+                  maxLength={INPUT_LIMITS.SEARCH}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -639,6 +638,7 @@ function AdminDeployments() {
                       name="deploy_code"
                       placeholder="e.g. DEP-905"
                       autoComplete="off"
+                      maxLength={INPUT_LIMITS.CODE}
                       required
                       value={formData.deploy_code}
                       onChange={handleInputChange}
@@ -666,6 +666,7 @@ function AdminDeployments() {
                       name="service_name"
                       placeholder="e.g. Payment Gateway API"
                       autoComplete="off"
+                      maxLength={INPUT_LIMITS.NAME}
                       required
                       value={formData.service_name}
                       onChange={handleInputChange}
@@ -680,6 +681,7 @@ function AdminDeployments() {
                       name="version"
                       placeholder="e.g. v2.4.1"
                       autoComplete="off"
+                      maxLength={INPUT_LIMITS.VERSION}
                       required
                       value={formData.version}
                       onChange={handleInputChange}
@@ -695,6 +697,7 @@ function AdminDeployments() {
                     name="release_notes"
                     placeholder="Summary of bug fixes, performance improvements, or PR links..."
                     autoComplete="off"
+                    maxLength={INPUT_LIMITS.DESCRIPTION}
                     value={formData.release_notes}
                     onChange={handleInputChange}
                   />
@@ -708,6 +711,7 @@ function AdminDeployments() {
                       type="text"
                       name="requested_by"
                       autoComplete="name"
+                      maxLength={INPUT_LIMITS.NAME}
                       value={formData.requested_by}
                       onChange={handleInputChange}
                     />

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
+import { INPUT_LIMITS, validateMeaningfulText } from '../../utils/inputValidation';
 import {
   AlertTriangle,
   Building2,
@@ -493,9 +494,13 @@ function AdminProjects() {
     e.preventDefault();
     const alphaRegex = /^[a-zA-Z\s]+$/;
 
-    // 1. Project Name validation (alphabets only)
+    // 1. Project Name validation (alphabets only, bounded length)
     if (!formData.name?.trim()) {
       setFormError('Please enter a Project Name.');
+      return;
+    }
+    if (formData.name.trim().length > INPUT_LIMITS.NAME) {
+      setFormError(`Project Name must not exceed ${INPUT_LIMITS.NAME} characters.`);
       return;
     }
     if (!alphaRegex.test(formData.name.trim())) {
@@ -515,9 +520,13 @@ function AdminProjects() {
       return;
     }
 
-    // 4. Client Name validation (alphabets only)
+    // 4. Client Name validation (alphabets only, bounded length)
     if (!formData.client_name?.trim()) {
       setFormError('Please enter a Client Name.');
+      return;
+    }
+    if (formData.client_name.trim().length > INPUT_LIMITS.NAME) {
+      setFormError(`Client Name must not exceed ${INPUT_LIMITS.NAME} characters.`);
       return;
     }
     if (!alphaRegex.test(formData.client_name.trim())) {
@@ -570,8 +579,13 @@ function AdminProjects() {
     }
 
     // 11. Project Description validation
-    if (!formData.description?.trim()) {
-      setFormError('Please enter a Project Description.');
+    const descErr = validateMeaningfulText(formData.description, {
+      label: 'Project Description',
+      required: true,
+      maxLength: INPUT_LIMITS.DESCRIPTION
+    });
+    if (descErr) {
+      setFormError(descErr);
       return;
     }
 
@@ -859,6 +873,7 @@ function AdminProjects() {
                     id="pj-search-input"
                     type="text"
                     autoComplete="off"
+                    maxLength={INPUT_LIMITS.SEARCH}
                     placeholder="Search by project name, code, project type..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -1294,6 +1309,7 @@ function AdminProjects() {
                       type="text"
                       name="name"
                       autoComplete="off"
+                      maxLength={INPUT_LIMITS.NAME}
                       placeholder="e.g. Customer Support Portal"
                       value={formData.name}
                       onChange={handleInputChange}
@@ -1347,6 +1363,7 @@ function AdminProjects() {
                       type="text"
                       name="client_name"
                       autoComplete="off"
+                      maxLength={INPUT_LIMITS.NAME}
                       placeholder="e.g. Acme Health Corp"
                       value={formData.client_name || ''}
                       onChange={handleInputChange}
@@ -1461,6 +1478,7 @@ function AdminProjects() {
                       id="pj-modal-description"
                       name="description"
                       rows="3"
+                      maxLength={INPUT_LIMITS.DESCRIPTION}
                       placeholder="Brief overview of project scope and objectives..."
                       value={formData.description}
                       onChange={handleInputChange}

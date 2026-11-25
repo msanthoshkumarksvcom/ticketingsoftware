@@ -31,3 +31,7 @@ Whenever performing **any** frontend development work—including:
 5. **Logic & API Preservation**: Never break backend API routes, authentication tokens, Axios interceptors in `src/main.jsx`, or existing form validation functions.
 6. **Verification**: Always run `npm run build` in `ticket-frontend` to confirm zero compilation errors before completing a task.
 
+## Git Branch Workflow
+- Active development/deployment updates must be reflected in **both** `Production` and `Developement` branches (`origin/Production` and `origin/Developement`).
+- When committing or pushing changes, ensure both `Production` and `Developement` point to the updated commit.
+

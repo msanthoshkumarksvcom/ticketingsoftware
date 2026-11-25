@@ -499,6 +499,7 @@ export default function ProjectLeadDashboard() {
                   id="pld-search-input"
                   type="text"
                   autoComplete="off"
+                  maxLength={100}
                   placeholder="Search by ticket ID, title, module..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -731,6 +732,7 @@ export default function ProjectLeadDashboard() {
                     className="rbt-input"
                     placeholder="e.g. Frontend bug fixes, API endpoint investigation"
                     autoComplete="off"
+                    maxLength={120}
                     value={devAssignmentNotes}
                     onChange={(e) => setDevAssignmentNotes(e.target.value)}
                   />

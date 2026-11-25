@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import CustomSelect from '../CustomSelect/CustomSelect';
+import { INPUT_LIMITS, validateFields, validateMeaningfulText } from '../../utils/inputValidation';
 import { formatIndianDate, formatIndianDateTime, formatIndianTime } from '../../utils/dateFormat';
 import SkeletonLoader from '../SkeletonLoader/SkeletonLoader';
 import './TicketDetailModal.css';
@@ -313,8 +314,15 @@ export default function TicketDetailModal({
   // 4. Developer Submits Resolution
   const handleSubmitResolution = async (e) => {
     e.preventDefault();
-    if (!resDescription.trim() || !rootCause.trim() || !fixImplemented.trim() || !resRemarks.trim()) {
-      setActionError('All mandatory fields (Description, Root Cause, Fix, Remarks) must be filled.');
+    const validationErr = validateFields([
+      { value: rootCause, options: { label: 'Root Cause', required: true, maxLength: INPUT_LIMITS.TITLE } },
+      { value: fixImplemented, options: { label: 'Fix Implemented', required: true, maxLength: INPUT_LIMITS.DESCRIPTION } },
+      { value: filesChanged, options: { label: 'Files / Components Changed', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } },
+      { value: resDescription, options: { label: 'Resolution Description', required: true, maxLength: INPUT_LIMITS.DESCRIPTION } },
+      { value: resRemarks, options: { label: 'Resolution Remarks', required: true, maxLength: INPUT_LIMITS.TITLE } }
+    ]);
+    if (validationErr) {
+      setActionError(validationErr);
       return;
     }
 
@@ -355,9 +363,16 @@ export default function TicketDetailModal({
 
   // 5. QA Verification
   const handleQAVerify = async (action) => {
-    if (action === 'reopen' && !reopenComments.trim()) {
-      setActionError('Please provide a comment explaining why the fix was rejected.');
-      return;
+    if (action === 'reopen') {
+      const reopenErr = validateMeaningfulText(reopenComments, {
+        label: 'Reopen Comments',
+        required: true,
+        maxLength: INPUT_LIMITS.DESCRIPTION
+      });
+      if (reopenErr) {
+        setActionError(reopenErr);
+        return;
+      }
     }
 
     setVerifyingQA(true);
@@ -727,6 +742,7 @@ export default function TicketDetailModal({
                           onChange={(e) => setRootCause(e.target.value)}
                           onKeyDown={() => notifyTyping('root_cause')}
                           placeholder="e.g. Unhandled null response from auth token service"
+                          maxLength={INPUT_LIMITS.TITLE}
                           autoComplete="off"
                           required
                         />
@@ -741,6 +757,7 @@ export default function TicketDetailModal({
                           onChange={(e) => setFixImplemented(e.target.value)}
                           onKeyDown={() => notifyTyping('fix_implemented')}
                           placeholder="Describe the code solution implemented..."
+                          maxLength={INPUT_LIMITS.DESCRIPTION}
                           required
                         />
                       </div>
@@ -754,6 +771,7 @@ export default function TicketDetailModal({
                           onChange={(e) => setFilesChanged(e.target.value)}
                           onKeyDown={() => notifyTyping('files_changed')}
                           placeholder="e.g. src/auth/loginService.js, src/components/LoginForm.jsx"
+                          maxLength={INPUT_LIMITS.DESCRIPTION}
                           autoComplete="off"
                         />
                       </div>
@@ -767,6 +785,7 @@ export default function TicketDetailModal({
                           onChange={(e) => setResDescription(e.target.value)}
                           onKeyDown={() => notifyTyping('description')}
                           placeholder="Detailed instructions for QA verification..."
+                          maxLength={INPUT_LIMITS.DESCRIPTION}
                           required
                         />
                       </div>
@@ -780,6 +799,7 @@ export default function TicketDetailModal({
                           onChange={(e) => setResRemarks(e.target.value)}
                           onKeyDown={() => notifyTyping('remarks')}
                           placeholder="e.g. Verified locally on build v1.4.0 with regression tests passing"
+                          maxLength={INPUT_LIMITS.TITLE}
                           autoComplete="off"
                           required
                         />
@@ -850,6 +870,7 @@ export default function TicketDetailModal({
                         className="tdm-textarea"
                         value={reopenComments}
                         onChange={(e) => setReopenComments(e.target.value)}
+                        maxLength={INPUT_LIMITS.DESCRIPTION}
                         placeholder="Explain why the fix did not resolve the defect during re-testing..."
                       />
                       <div className="tdm-form-actions">

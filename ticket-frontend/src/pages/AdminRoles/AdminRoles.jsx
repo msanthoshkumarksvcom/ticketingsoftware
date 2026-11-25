@@ -17,6 +17,7 @@ import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
+import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import '../../styles/admin.css';
 import '../AdminUsers/AdminUsers.css';
 import './AdminRoles.css';
@@ -97,8 +98,12 @@ function AdminRoles() {
     e.preventDefault();
     setFormError('');
 
-    if (!formData.role_name.trim()) {
-      setFormError('Please enter a role name.');
+    const validationErr = validateFields([
+      { value: formData.role_name, options: { label: 'Role Name', required: true, maxLength: INPUT_LIMITS.NAME } },
+      { value: formData.description, options: { label: 'Description', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } }
+    ]);
+    if (validationErr) {
+      setFormError(validationErr);
       return;
     }
 
@@ -206,6 +211,7 @@ function AdminRoles() {
                   type="text"
                   placeholder="Search role name or capability..."
                   autoComplete="off"
+                  maxLength={INPUT_LIMITS.SEARCH}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -302,6 +308,7 @@ function AdminRoles() {
                     name="role_name"
                     placeholder="e.g. Release Manager or Security Auditor"
                     autoComplete="off"
+                    maxLength={INPUT_LIMITS.NAME}
                     required
                     value={formData.role_name}
                     onChange={handleInputChange}
@@ -316,6 +323,7 @@ function AdminRoles() {
                     name="description"
                     placeholder="Brief description of this role's purpose..."
                     autoComplete="off"
+                    maxLength={INPUT_LIMITS.DESCRIPTION}
                     value={formData.description}
                     onChange={handleInputChange}
                   />

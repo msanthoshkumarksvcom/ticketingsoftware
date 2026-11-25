@@ -1273,6 +1273,7 @@ function AdminUsers() {
                   id="um-search-input"
                   type="text"
                   autoComplete="off"
+                  maxLength={100}
                   placeholder="Search by name, email, employee ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

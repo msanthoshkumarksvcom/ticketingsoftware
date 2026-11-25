@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import CustomSelect from '../CustomSelect/CustomSelect';
 import { formatIndianDate } from '../../utils/dateFormat';
+import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import './RaiseBugTicketModal.css';
 
 const SEVERITY_OPTIONS = ['Critical', 'Block', 'High', 'Medium', 'Low'];
@@ -174,8 +175,14 @@ export default function RaiseBugTicketModal({
   };
 
   const handleSubmit = async (forceCreate = false) => {
-    if (!title.trim()) {
-      setSubmitError('Please enter a clear bug title.');
+    const validationErr = validateFields([
+      { value: title, options: { label: 'Bug Title', required: true, maxLength: INPUT_LIMITS.TITLE } },
+      { value: actualResult, options: { label: 'Actual Result Observed', required: true, maxLength: INPUT_LIMITS.DESCRIPTION } },
+      { value: stepsToReproduce, options: { label: 'Steps to Reproduce', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } },
+      { value: description, options: { label: 'Additional Description & Notes', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } }
+    ]);
+    if (validationErr) {
+      setSubmitError(validationErr);
       return;
     }
 
@@ -312,6 +319,7 @@ export default function RaiseBugTicketModal({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Concise defect title..."
+                    maxLength={INPUT_LIMITS.TITLE}
                     autoComplete="off"
                   />
                 </div>
@@ -361,6 +369,7 @@ export default function RaiseBugTicketModal({
                     className="rbt-textarea"
                     value={actualResult}
                     onChange={(e) => setActualResult(e.target.value)}
+                    maxLength={INPUT_LIMITS.DESCRIPTION}
                     placeholder="Describe what actually occurred during test execution..."
                   />
                 </div>
@@ -374,6 +383,7 @@ export default function RaiseBugTicketModal({
                     className="rbt-textarea"
                     value={stepsToReproduce}
                     onChange={(e) => setStepsToReproduce(e.target.value)}
+                    maxLength={INPUT_LIMITS.DESCRIPTION}
                     placeholder="Step-by-step reproduction instructions for engineering developers..."
                   />
                 </div>
@@ -387,6 +397,7 @@ export default function RaiseBugTicketModal({
                     className="rbt-textarea"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
+                    maxLength={INPUT_LIMITS.DESCRIPTION}
                     placeholder="System logs, browser version, device info, error stack, etc..."
                   />
                 </div>

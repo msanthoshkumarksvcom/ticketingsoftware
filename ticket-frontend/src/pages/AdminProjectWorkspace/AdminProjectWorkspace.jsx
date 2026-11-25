@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE } from '../../utils/apiConfig';
+import { INPUT_LIMITS, validateFields, validateMeaningfulText } from '../../utils/inputValidation';
 import {
   ArrowLeft,
   CalendarDays,
@@ -413,6 +414,15 @@ export default function AdminProjectWorkspace() {
       return;
     }
 
+    const linkErr = validateFields([
+      { value: applicationUrl, options: { label: 'Application URL', required: false, isUrl: true, maxLength: INPUT_LIMITS.URL } },
+      { value: applicationGithubLink, options: { label: 'Application GitHub Link', required: false, isUrl: true, maxLength: INPUT_LIMITS.URL } }
+    ]);
+    if (linkErr) {
+      setDocError(linkErr);
+      return;
+    }
+
     const token = localStorage.getItem('token');
     setLinksSaving(true);
     setDocError('');
@@ -511,6 +521,15 @@ export default function AdminProjectWorkspace() {
     if (e) e.preventDefault();
     if (!canManageTestingRequest) {
       setTestingMsg({ text: 'Access Denied: Only Project Lead and Manager can raise a request for testing.', type: 'error' });
+      return;
+    }
+    const notesErr = validateMeaningfulText(testingNotes, {
+      label: 'Testing Notes',
+      required: false,
+      maxLength: INPUT_LIMITS.DESCRIPTION
+    });
+    if (notesErr) {
+      setTestingMsg({ text: notesErr, type: 'error' });
       return;
     }
     const token = localStorage.getItem('token');
@@ -1308,6 +1327,7 @@ export default function AdminProjectWorkspace() {
                         className={`pw-input${!canEditDocsAndLinks || linksMeta.links_locked ? ' pw-input-readonly' : ''}`}
                         placeholder="https://app.example.com"
                         autoComplete="url"
+                        maxLength={INPUT_LIMITS.URL}
                         value={applicationUrl}
                         onChange={(e) => setApplicationUrl(e.target.value)}
                         readOnly={!canEditDocsAndLinks || linksMeta.links_locked}
@@ -1340,6 +1360,7 @@ export default function AdminProjectWorkspace() {
                         className={`pw-input${!canEditDocsAndLinks || linksMeta.links_locked ? ' pw-input-readonly' : ''}`}
                         placeholder="https://github.com/organization/repository"
                         autoComplete="url"
+                        maxLength={INPUT_LIMITS.URL}
                         value={applicationGithubLink}
                         onChange={(e) => setApplicationGithubLink(e.target.value)}
                         readOnly={!canEditDocsAndLinks || linksMeta.links_locked}
@@ -1658,6 +1679,7 @@ export default function AdminProjectWorkspace() {
                         className="pw-input"
                         placeholder="e.g. Build v1.0 deployed on staging, credentials & test scope in Documents..."
                         autoComplete="off"
+                        maxLength={INPUT_LIMITS.DESCRIPTION}
                         value={testingNotes}
                         onChange={(e) => setTestingNotes(e.target.value)}
                       />

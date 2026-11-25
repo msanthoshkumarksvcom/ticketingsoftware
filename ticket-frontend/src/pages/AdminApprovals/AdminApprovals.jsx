@@ -20,6 +20,7 @@ import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import { formatIndianDate } from '../../utils/dateFormat';
+import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
 import '../../styles/admin.css';
@@ -167,8 +168,12 @@ export default function AdminApprovals() {
     if (!canCreateRequest) return;
     setFormError('');
 
-    if (!formData.title.trim()) {
-      setFormError('Please enter a Project Name.');
+    const validationErr = validateFields([
+      { value: formData.title, options: { label: 'Project Name', required: true, maxLength: INPUT_LIMITS.NAME } },
+      { value: formData.details, options: { label: 'Notes', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } }
+    ]);
+    if (validationErr) {
+      setFormError(validationErr);
       return;
     }
 
@@ -449,6 +454,7 @@ export default function AdminApprovals() {
                   type="text"
                   placeholder="Search request code, project, note, requester..."
                   autoComplete="off"
+                  maxLength={INPUT_LIMITS.SEARCH}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -804,6 +810,7 @@ export default function AdminApprovals() {
                       name="title"
                       placeholder="Enter project name"
                       autoComplete="off"
+                      maxLength={INPUT_LIMITS.NAME}
                       required
                       value={formData.title}
                       onChange={handleInputChange}
@@ -822,6 +829,7 @@ export default function AdminApprovals() {
                       name="details"
                       placeholder="Enter testing notes or request details..."
                       autoComplete="off"
+                      maxLength={INPUT_LIMITS.DESCRIPTION}
                       value={formData.details}
                       onChange={handleInputChange}
                     />

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import {
   BarChart3,
   Bell,
@@ -313,8 +314,12 @@ function SettingsContent() {
     setProfileFeedback({ text: '', type: '' });
 
     const trimmedName = profileForm.full_name.trim();
-    if (!trimmedName) {
-      setProfileFeedback({ text: 'Full Name is required.', type: 'error' });
+    const profileErr = validateFields([
+      { value: trimmedName, options: { label: 'Full Name', required: true, maxLength: INPUT_LIMITS.NAME } },
+      { value: profileForm.bio, options: { label: 'Bio', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } }
+    ]);
+    if (profileErr) {
+      setProfileFeedback({ text: profileErr, type: 'error' });
       return;
     }
 
@@ -425,8 +430,12 @@ function SettingsContent() {
     event.preventDefault();
     setNotifFeedback({ text: '', type: '' });
 
-    if (!notifTitle.trim() || !notifMessage.trim()) {
-      setNotifFeedback({ text: 'Please enter both a notification title and message.', type: 'error' });
+    const notifErr = validateFields([
+      { value: notifTitle, options: { label: 'Notification Title', required: true, maxLength: INPUT_LIMITS.TITLE } },
+      { value: notifMessage, options: { label: 'Message', required: true, maxLength: INPUT_LIMITS.DESCRIPTION } }
+    ]);
+    if (notifErr) {
+      setNotifFeedback({ text: notifErr, type: 'error' });
       return;
     }
     if (targetType === 'selected' && selectedUserIds.length === 0) {
@@ -698,7 +707,7 @@ function SettingsContent() {
                       setProfileForm((prev) => ({ ...prev, full_name: e.target.value }))
                     }
                     placeholder="Enter your full name"
-                    maxLength={150}
+                    maxLength={INPUT_LIMITS.NAME}
                     required
                   />
                 </div>
@@ -930,6 +939,7 @@ function SettingsContent() {
                               type="text"
                               placeholder="Search users by name, role, emp ID, email..."
                               autoComplete="off"
+                              maxLength={INPUT_LIMITS.SEARCH}
                               value={recipientSearch}
                               onChange={(e) => setRecipientSearch(e.target.value)}
                             />
@@ -1021,7 +1031,7 @@ function SettingsContent() {
                       onChange={(e) => setNotifTitle(e.target.value)}
                       placeholder="e.g., Regression Build Ready or Maintenance Notice"
                       autoComplete="off"
-                      maxLength={200}
+                      maxLength={INPUT_LIMITS.TITLE}
                       required
                     />
                   </div>
@@ -1047,6 +1057,7 @@ function SettingsContent() {
                       value={notifMessage}
                       onChange={(e) => setNotifMessage(e.target.value)}
                       placeholder="Write the notification message..."
+                      maxLength={INPUT_LIMITS.DESCRIPTION}
                       rows={3}
                       required
                     />
