@@ -25,7 +25,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { io } from 'socket.io-client';
-import { INPUT_LIMITS, validateFields, validateMeaningfulText } from '../../utils/inputValidation';
+import { INPUT_LIMITS, validateMeaningfulText } from '../../utils/inputValidation';
 import { formatIndianDate, formatIndianDateTime, formatIndianTime } from '../../utils/dateFormat';
 import {
   getFullMediaUrl,
@@ -65,10 +65,6 @@ export default function TicketDetailModal({
   // Developer Resolution Form
   const [showResolutionForm, setShowResolutionForm] = useState(false);
   const [resDescription, setResDescription] = useState('');
-  const [rootCause, setRootCause] = useState('');
-  const [fixImplemented, setFixImplemented] = useState('');
-  const [filesChanged, setFilesChanged] = useState('');
-  const [resRemarks, setResRemarks] = useState('');
   const [resAttachments, setResAttachments] = useState([]);
   const [uploadingResMedia, setUploadingResMedia] = useState(false);
   const [uploadResError, setUploadResError] = useState('');
@@ -297,18 +293,11 @@ export default function TicketDetailModal({
     setResAttachments((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  // 4. Developer Submits Resolution
+  // 4. Developer Submits Resolution (Notes & media are optional)
   const handleSubmitResolution = async (e) => {
     e.preventDefault();
-    const validationErr = validateFields([
-      { value: rootCause, options: { label: 'Root Cause', required: true, maxLength: INPUT_LIMITS.TITLE } },
-      { value: fixImplemented, options: { label: 'Fix Implemented', required: true, maxLength: INPUT_LIMITS.DESCRIPTION } },
-      { value: filesChanged, options: { label: 'Files / Components Changed', required: false, maxLength: INPUT_LIMITS.DESCRIPTION } },
-      { value: resDescription, options: { label: 'Resolution Description', required: true, maxLength: INPUT_LIMITS.DESCRIPTION } },
-      { value: resRemarks, options: { label: 'Resolution Remarks', required: true, maxLength: INPUT_LIMITS.TITLE } }
-    ]);
-    if (validationErr) {
-      setActionError(validationErr);
+    if (resDescription.trim().length > INPUT_LIMITS.DESCRIPTION) {
+      setActionError(`Resolution Notes must be ${INPUT_LIMITS.DESCRIPTION} characters or fewer.`);
       return;
     }
 
@@ -318,12 +307,13 @@ export default function TicketDetailModal({
 
     try {
       const token = localStorage.getItem('token');
+      const cleanNotes = resDescription.trim();
       const payload = {
-        resolution_description: resDescription.trim(),
-        root_cause: rootCause.trim(),
-        fix_implemented: fixImplemented.trim(),
-        files_changed: filesChanged.trim(),
-        resolution_remarks: resRemarks.trim(),
+        resolution_description: cleanNotes,
+        root_cause: '',
+        fix_implemented: '',
+        files_changed: '',
+        resolution_remarks: cleanNotes,
         resolution_attachments: resAttachments
       };
 
@@ -628,17 +618,21 @@ export default function TicketDetailModal({
                       <span className="tdm-res-badge">Resolved by {ticket.resolved_by || 'Developer'}{ticket.resolved_at ? ` on ${formatIndianDate(ticket.resolved_at)}` : ''}</span>
                     </div>
                     <div className="tdm-resolution-view">
+                      {ticket.root_cause && (
+                        <div className="tdm-res-field">
+                          <label>Root Cause</label>
+                          <p>{ticket.root_cause}</p>
+                        </div>
+                      )}
+                      {ticket.fix_implemented && (
+                        <div className="tdm-res-field">
+                          <label>Fix Implemented</label>
+                          <p>{ticket.fix_implemented}</p>
+                        </div>
+                      )}
                       <div className="tdm-res-field">
-                        <label>Root Cause</label>
-                        <p>{ticket.root_cause || 'Identified and fixed.'}</p>
-                      </div>
-                      <div className="tdm-res-field">
-                        <label>Fix Implemented</label>
-                        <p>{ticket.fix_implemented || 'Code patch applied.'}</p>
-                      </div>
-                      <div className="tdm-res-field">
-                        <label>Resolution Remarks & Verification Notes</label>
-                        <p>{ticket.resolution_remarks || ticket.resolution_description || 'Ready for QA verification.'}</p>
+                        <label>Resolution Notes</label>
+                        <p>{ticket.resolution_description || ticket.resolution_remarks || 'Marked as resolved and ready for QA verification.'}</p>
                       </div>
                       {ticket.files_changed && (
                         <div className="tdm-res-field">
@@ -732,79 +726,20 @@ export default function TicketDetailModal({
                   <div className="tdm-section-card tdm-form-card">
                     <div className="tdm-section-title">
                       <Code2 size={15} color="#2563EB" />
-                      <span>Submit Resolution Details (Mandatory)</span>
+                      <span>Submit Resolution</span>
                     </div>
-                    <form id="tdm-resolution-form" onSubmit={handleSubmitResolution} className="tdm-resolution-form">
+                    <form id="tdm-resolution-form" onSubmit={handleSubmitResolution} className="tdm-resolution-form" noValidate>
                       <div className="tdm-form-group">
-                        <label htmlFor="tdm-root-cause">Root Cause *</label>
-                        <input
-                          id="tdm-root-cause"
-                          type="text"
-                          className="tdm-input"
-                          value={rootCause}
-                          onChange={(e) => setRootCause(e.target.value)}
-                          onKeyDown={() => notifyTyping('root_cause')}
-                          placeholder="e.g. Unhandled null response from auth token service"
-                          maxLength={INPUT_LIMITS.TITLE}
-                          autoComplete="off"
-                          required
-                        />
-                      </div>
-                      <div className="tdm-form-group">
-                        <label htmlFor="tdm-fix-implemented">Fix Implemented *</label>
-                        <textarea
-                          id="tdm-fix-implemented"
-                          rows={2}
-                          className="tdm-textarea"
-                          value={fixImplemented}
-                          onChange={(e) => setFixImplemented(e.target.value)}
-                          onKeyDown={() => notifyTyping('fix_implemented')}
-                          placeholder="Describe the code solution implemented..."
-                          maxLength={INPUT_LIMITS.DESCRIPTION}
-                          required
-                        />
-                      </div>
-                      <div className="tdm-form-group">
-                        <label htmlFor="tdm-files-changed">Files / Components Changed</label>
-                        <input
-                          id="tdm-files-changed"
-                          type="text"
-                          className="tdm-input"
-                          value={filesChanged}
-                          onChange={(e) => setFilesChanged(e.target.value)}
-                          onKeyDown={() => notifyTyping('files_changed')}
-                          placeholder="e.g. src/auth/loginService.js, src/components/LoginForm.jsx"
-                          maxLength={INPUT_LIMITS.DESCRIPTION}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div className="tdm-form-group">
-                        <label htmlFor="tdm-res-description">Resolution Description & Verification Instructions *</label>
+                        <label htmlFor="tdm-res-description">Resolution Notes (Optional)</label>
                         <textarea
                           id="tdm-res-description"
-                          rows={2}
+                          rows={3}
                           className="tdm-textarea"
                           value={resDescription}
                           onChange={(e) => setResDescription(e.target.value)}
-                          onKeyDown={() => notifyTyping('description')}
-                          placeholder="Detailed instructions for QA verification..."
+                          onKeyDown={() => notifyTyping('notes')}
+                          placeholder="Add optional notes or verification details for QA..."
                           maxLength={INPUT_LIMITS.DESCRIPTION}
-                          required
-                        />
-                      </div>
-                      <div className="tdm-form-group">
-                        <label htmlFor="tdm-res-remarks">Resolution Remarks *</label>
-                        <input
-                          id="tdm-res-remarks"
-                          type="text"
-                          className="tdm-input"
-                          value={resRemarks}
-                          onChange={(e) => setResRemarks(e.target.value)}
-                          onKeyDown={() => notifyTyping('remarks')}
-                          placeholder="e.g. Verified locally on build v1.4.0 with regression tests passing"
-                          maxLength={INPUT_LIMITS.TITLE}
-                          autoComplete="off"
-                          required
                         />
                       </div>
                       <div className="tdm-form-group">

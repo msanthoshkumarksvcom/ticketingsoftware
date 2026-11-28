@@ -1552,20 +1552,13 @@ export function registerWorkflowRoutes(app, io) {
 
     const ticketId = req.params.id;
     const {
-      resolution_description,
-      root_cause,
-      fix_implemented,
-      files_changed,
-      resolution_remarks,
+      resolution_description = '',
+      root_cause = '',
+      fix_implemented = '',
+      files_changed = '',
+      resolution_remarks = '',
       resolution_attachments
-    } = req.body;
-
-    // Enforce mandatory resolution fields
-    if (!resolution_description?.trim() || !root_cause?.trim() || !fix_implemented?.trim() || !resolution_remarks?.trim()) {
-      return res.status(400).json({
-        error: 'Mandatory resolution details missing: Description, Root Cause, Fix Implemented, and Remarks are required.'
-      });
-    }
+    } = req.body || {};
 
     try {
       const ticketRes = await pool.query(
@@ -1642,11 +1635,11 @@ export function registerWorkflowRoutes(app, io) {
          WHERE id = $9
          RETURNING *`,
         [
-          resolution_description.trim(),
-          root_cause.trim(),
-          fix_implemented.trim(),
-          files_changed || '',
-          resolution_remarks.trim(),
+          String(resolution_description || '').trim(),
+          String(root_cause || '').trim(),
+          String(fix_implemented || '').trim(),
+          String(files_changed || '').trim(),
+          String(resolution_remarks || '').trim(),
           JSON.stringify(processedResAttachments),
           user.full_name,
           user.id,
