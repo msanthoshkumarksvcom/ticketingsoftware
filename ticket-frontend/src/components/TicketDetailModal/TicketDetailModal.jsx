@@ -5,7 +5,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  User,
   FolderKanban,
   FileSpreadsheet,
   Upload,
@@ -28,7 +27,6 @@ import {
   Trash2
 } from 'lucide-react';
 import { io } from 'socket.io-client';
-import CustomSelect from '../CustomSelect/CustomSelect';
 import { INPUT_LIMITS, validateFields, validateMeaningfulText } from '../../utils/inputValidation';
 import { formatIndianDate, formatIndianDateTime, formatIndianTime } from '../../utils/dateFormat';
 import {
@@ -65,11 +63,6 @@ export default function TicketDetailModal({
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
 
-  // Available developers for assignment (for Project Lead / Admin)
-  const [availableDevelopers, setAvailableDevelopers] = useState([]);
-  const [selectedDevId, setSelectedDevId] = useState('');
-  const [assigningDev, setAssigningDev] = useState(false);
-
   // Developer Resolution Form
   const [showResolutionForm, setShowResolutionForm] = useState(false);
   const [resDescription, setResDescription] = useState('');
@@ -101,6 +94,7 @@ export default function TicketDetailModal({
   const currentUserName = localStorage.getItem('userName') || 'Developer';
   const isDeveloper = currentUserRole.toLowerCase() === 'developer';
   const isProjectLead = currentUserRole.toLowerCase() === 'project lead';
+  const canResolveTicket = isDeveloper || isProjectLead;
   const isQA = ['qa member', 'qa lead', 'manager', 'super admin', 'admin', 'administrator'].includes(currentUserRole.toLowerCase());
   const isQAMember = currentUserRole.toLowerCase() === 'qa member';
   const [deletingTicket, setDeletingTicket] = useState(false);
@@ -113,9 +107,6 @@ export default function TicketDetailModal({
   useEffect(() => {
     if (isOpen && ticketId) {
       fetchTicketDetails();
-      if (!isDeveloper) {
-        fetchDevelopers();
-      }
 
       // Connect to Socket.IO for real-time developer lock & intimation
       const socket = io(SOCKET_URL, {
@@ -186,9 +177,6 @@ export default function TicketDetailModal({
         headers: { Authorization: `Bearer ${token}` }
       });
       setTicket(res.data);
-      if (res.data.assigned_developer_id) {
-        setSelectedDevId(String(res.data.assigned_developer_id));
-      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load ticket details.');
     } finally {
@@ -196,43 +184,7 @@ export default function TicketDetailModal({
     }
   };
 
-  const fetchDevelopers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/admin/developers', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setAvailableDevelopers(res.data || []);
-    } catch (err) {
-      // quiet fallback
-    }
-  };
-
-  // 1. Assign Developer
-  const handleAssignDeveloper = async () => {
-    if (!selectedDevId) return;
-    setAssigningDev(true);
-    setActionError('');
-    setActionSuccess('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.put(
-        `http://localhost:5000/api/admin/tickets/${ticketId}/assign-developer`,
-        { developer_id: Number(selectedDevId) },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setActionSuccess(res.data.message || 'Developer assigned successfully.');
-      fetchTicketDetails();
-      if (onTicketUpdated) onTicketUpdated(res.data.ticket);
-    } catch (err) {
-      setActionError(err.response?.data?.error || 'Failed to assign developer.');
-    } finally {
-      setAssigningDev(false);
-    }
-  };
-
-  // 2. Developer starts resolving & claims exclusive lock
+  // Developer starts resolving & claims exclusive lock
   const handleStartResolving = async () => {
     setActionError('');
     setActionSuccess('');
@@ -523,7 +475,7 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {!isLockedByOther && !isLockedByMe && isExpiredLock && isDeveloper && (
+                {!isLockedByOther && !isLockedByMe && isExpiredLock && canResolveTicket && (
                   <div className="tdm-alert-box" style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E3A8A' }}>
                     <Clock size={16} color="#2563EB" />
                     <span>
@@ -796,8 +748,8 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {/* DEVELOPER ACTION: Resolution Form */}
-                {isDeveloper && (ticket.status === 'In Progress' || ticket.status === 'Reopened') && showResolutionForm && (
+                {/* DEVELOPER / PROJECT LEAD ACTION: Resolution Form */}
+                {canResolveTicket && (ticket.status === 'In Progress' || ticket.status === 'Reopened') && showResolutionForm && (
                   <div className="tdm-section-card tdm-form-card">
                     <div className="tdm-section-title">
                       <Code2 size={15} color="#2563EB" />
@@ -1034,52 +986,14 @@ export default function TicketDetailModal({
                 )}
               </div>
 
-              {/* Right Sidebar: Assignment & Status Actions */}
+              {/* Right Sidebar: Status & Resolution Actions */}
               <div className="tdm-side-col">
-                {/* 1. Developer Assignment Panel (Project Lead / Manager) */}
-                {!isDeveloper && (
-                  <div id="tdm-assign-card" className="tdm-side-card">
-                    <h3 id="tdm-assign-heading">Assigned Developer</h3>
-                    <div className="tdm-assign-box">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <CustomSelect
-                          id="tdm-assign-developer"
-                          value={selectedDevId}
-                          onChange={setSelectedDevId}
-                          options={[
-                            { value: '', label: 'Unassigned' },
-                            ...availableDevelopers.map((dev) => ({
-                              value: String(dev.id),
-                              label: `${dev.full_name} (${dev.email})`
-                            }))
-                          ]}
-                          variant="form"
-                          placeholder="Unassigned"
-                        />
-                      </div>
-                      <button
-                        id="tdm-assign-btn"
-                        type="button"
-                        className="tdm-btn-assign"
-                        onClick={handleAssignDeveloper}
-                        disabled={assigningDev || !selectedDevId || selectedDevId === String(ticket.assigned_developer_id)}
-                      >
-                        {assigningDev ? 'Saving...' : 'Assign'}
-                      </button>
-                    </div>
-                    {ticket.assigned_to && ticket.assigned_to !== 'Unassigned' && (
-                      <div className="tdm-assigned-info">
-                        <User size={13} />
-                        <span>Currently: <strong>{ticket.assigned_to}</strong></span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 2. Actions Card for Developer */}
-                {isDeveloper && (
+                {/* 1. Resolution Actions Card for Developer & Project Lead */}
+                {canResolveTicket && (
                   <div id="tdm-dev-actions-card" className="tdm-side-card">
-                    <h3 id="tdm-dev-actions-heading">Developer Actions</h3>
+                    <h3 id="tdm-dev-actions-heading">
+                      {isProjectLead ? 'Resolve Bug (Project Lead)' : 'Developer Actions'}
+                    </h3>
                     {isLockedByOther ? (
                       <div>
                         <button
@@ -1093,7 +1007,7 @@ export default function TicketDetailModal({
                           <span>Locked by {ticket.locked_by}</span>
                         </button>
                         <p className="tdm-lock-note">
-                          {ticket.locked_by} holds an active claim ({lockRemainingLabel}). If unresolved after {TICKET_WORK_LOCK_HOURS} hours, any project developer can resolve it.
+                          {ticket.locked_by} holds an active claim ({lockRemainingLabel}). If unresolved after {TICKET_WORK_LOCK_HOURS} hours, any assigned developer or lead can resolve it.
                         </p>
                       </div>
                     ) : ticket.status === 'Open' || ticket.status === 'Reopened' ? (
@@ -1104,7 +1018,13 @@ export default function TicketDetailModal({
                         onClick={handleStartResolving}
                       >
                         <Clock size={16} />
-                        <span>{isExpiredLock ? 'Take Over & Claim Ticket' : 'Start Working & Claim Ticket'}</span>
+                        <span>
+                          {isExpiredLock
+                            ? 'Take Over & Resolve Ticket'
+                            : isProjectLead
+                            ? 'Start Working & Resolve'
+                            : 'Start Working & Claim Ticket'}
+                        </span>
                       </button>
                     ) : ticket.status === 'In Progress' ? (
                       !showResolutionForm && (
@@ -1112,7 +1032,7 @@ export default function TicketDetailModal({
                           {isLockedByMe && (
                             <div className="tdm-status-notice" style={{ fontSize: '12px' }}>
                               <Clock size={14} color="#2563EB" />
-                              <span>Claimed by you ({lockRemainingLabel}). Stay locked while coding.</span>
+                              <span>Claimed by you ({lockRemainingLabel}). Auto-assigned to you on resolve.</span>
                             </div>
                           )}
                           <button
@@ -1156,8 +1076,8 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {/* 2b. Non-Developer View: Read-only Defect Status Notice */}
-                {!isDeveloper && (
+                {/* 2b. QA / Manager Read-only Defect Status Notice */}
+                {!canResolveTicket && (
                   <div id="tdm-defect-status-card" className="tdm-side-card">
                     <h3 id="tdm-defect-status-heading">Defect Status</h3>
                     {ticket.status === 'Open' ? (

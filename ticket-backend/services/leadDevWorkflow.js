@@ -53,6 +53,49 @@ export const getTicketLockState = (ticket, requesterId, requesterName = '') => {
   };
 };
 
+// Authorize Developer or Project Lead to work on / claim / resolve a ticket
+const canUserWorkOnTicket = async (user, ticket) => {
+  if (!user || !ticket) return false;
+  if (user.role === 'Project Lead') {
+    if (!ticket.project_id) return true;
+    const isDirectLead =
+      Number(ticket.project_lead_id) === Number(user.id) ||
+      (user.full_name && ticket.project_lead_name?.trim().toLowerCase() === user.full_name.trim().toLowerCase()) ||
+      (user.full_name && ticket.lead_name?.trim().toLowerCase() === user.full_name.trim().toLowerCase());
+    if (isDirectLead) return true;
+    const projRes = await pool.query(
+      'SELECT id, project_lead_id, lead_name FROM projects WHERE id = $1 LIMIT 1',
+      [ticket.project_id]
+    );
+    const proj = projRes.rows[0];
+    if (!proj) return true;
+    if (!proj.project_lead_id && !proj.lead_name) return true;
+    return (
+      Number(proj.project_lead_id) === Number(user.id) ||
+      (user.full_name && proj.lead_name?.trim().toLowerCase() === user.full_name.trim().toLowerCase()) ||
+      (user.email && proj.lead_name?.trim().toLowerCase() === user.email.trim().toLowerCase())
+    );
+  }
+
+  if (user.role === 'Developer') {
+    const isDirect =
+      ticket.assigned_developer_id === user.id ||
+      (user.full_name && ticket.assigned_to?.toLowerCase() === user.full_name.toLowerCase()) ||
+      (user.email && ticket.assigned_to?.toLowerCase() === user.email.toLowerCase());
+    if (isDirect) return true;
+    if (ticket.assigned_to === 'Project Team') return true;
+    if (ticket.project_id) {
+      const projCheck = await pool.query(
+        `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
+        [ticket.project_id, user.id]
+      );
+      if (projCheck.rows.length > 0) return true;
+    }
+  }
+
+  return false;
+};
+
 // Short-TTL auth user cache avoids hitting remote Neon DB on every single API request
 const USER_AUTH_CACHE_TTL_MS = 15000;
 const userAuthCache = new Map();
@@ -1246,27 +1289,38 @@ export function registerWorkflowRoutes(app, io) {
     }
   });
 
-  // Developer starts working on ticket
+  // Developer or Project Lead starts working on ticket
   app.put('/api/admin/tickets/:id/start-progress', async (req, res) => {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-    // Strict RBAC: Only the Development team can start work on bug tickets
-    if (user.role !== 'Developer') {
-      return res.status(403).json({ error: 'Access denied: Only members of the Development team can mark tickets In Progress.' });
+    // Strict RBAC: Developers and Project Leads can work on bug tickets
+    if (!['Developer', 'Project Lead'].includes(user.role)) {
+      return res.status(403).json({ error: 'Access denied: Only Developers or Project Leads can mark tickets In Progress.' });
     }
 
     const ticketId = req.params.id;
 
     try {
-      const ticketRes = await pool.query('SELECT * FROM tickets WHERE id = $1', [ticketId]);
+      const ticketRes = await pool.query(
+        `SELECT t.*, p.project_lead_id, p.lead_name
+         FROM tickets t
+         LEFT JOIN projects p ON p.id = t.project_id
+         WHERE t.id = $1`,
+        [ticketId]
+      );
       if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
       const ticket = ticketRes.rows[0];
+
+      const allowed = await canUserWorkOnTicket(user, ticket);
+      if (!allowed) {
+        return res.status(403).json({ error: 'You are only authorized to work on tickets in your assigned projects.' });
+      }
 
       const lockState = getTicketLockState(ticket, user.id, user.full_name);
       if (lockState.isLockedByOther) {
         return res.status(423).json({
-          error: `Ticket is currently being worked on by ${ticket.locked_by}. Another developer cannot start work on it until resolved or the ${TICKET_WORK_LOCK_HOURS}-hour claim expires.`,
+          error: `Ticket is currently being worked on by ${ticket.locked_by}. Another user cannot start work on it until resolved or the ${TICKET_WORK_LOCK_HOURS}-hour claim expires.`,
           locked_by: ticket.locked_by,
           locked_by_id: ticket.locked_by_id,
           locked_at: ticket.locked_at,
@@ -1328,40 +1382,34 @@ export function registerWorkflowRoutes(app, io) {
     }
   });
 
-  // Developer claims exclusive lock to work on & resolve ticket (Prevents collision for 2 hours)
+  // Developer or Project Lead claims exclusive lock to work on & resolve ticket (Prevents collision for 2 hours)
   app.post('/api/admin/tickets/:id/lock', async (req, res) => {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
     const ticketId = req.params.id;
     try {
-      const ticketRes = await pool.query('SELECT * FROM tickets WHERE id = $1', [ticketId]);
+      const ticketRes = await pool.query(
+        `SELECT t.*, p.project_lead_id, p.lead_name
+         FROM tickets t
+         LEFT JOIN projects p ON p.id = t.project_id
+         WHERE t.id = $1`,
+        [ticketId]
+      );
       if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found.' });
       const ticket = ticketRes.rows[0];
 
-      // Strict RBAC: Only members of the Development team can claim locks to resolve bugs
-      if (user.role !== 'Developer') {
-        return res.status(403).json({ error: 'Access denied: Only members of the Development team can lock and resolve defect tickets.' });
+      // Strict RBAC: Developers and Project Leads can lock and resolve bug tickets
+      if (!['Developer', 'Project Lead'].includes(user.role)) {
+        return res.status(403).json({ error: 'Access denied: Only Developers or Project Leads can lock and resolve defect tickets.' });
       }
 
       if (ticket.status === 'Resolved' || ticket.status === 'Closed') {
         return res.status(400).json({ error: `Ticket is already ${ticket.status} and cannot be locked.` });
       }
 
-      const isDirect = ticket.assigned_developer_id === user.id ||
-                       ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
-                       ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
-      let isProjDev = false;
-      if (!isDirect && ticket.project_id) {
-        const projCheck = await pool.query(
-          `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
-          [ticket.project_id, user.id]
-        );
-        if (projCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
-          isProjDev = true;
-        }
-      }
-      if (!isDirect && !isProjDev) {
+      const allowed = await canUserWorkOnTicket(user, ticket);
+      if (!allowed) {
         return res.status(403).json({ error: 'You are only authorized to lock tickets in your assigned projects.' });
       }
 
@@ -1492,14 +1540,14 @@ export function registerWorkflowRoutes(app, io) {
     }
   });
 
-  // Developer resolves bug ticket (Mandatory resolution form)
+  // Developer or Project Lead resolves bug ticket (Mandatory resolution form, auto-assigns resolver)
   app.put('/api/admin/tickets/:id/resolve', async (req, res) => {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-    // Strict RBAC: Only members of the Development team can resolve bug tickets
-    if (user.role !== 'Developer') {
-      return res.status(403).json({ error: 'Access denied: Only members of the Development team can resolve bug tickets.' });
+    // Strict RBAC: Developers and Project Leads can resolve bug tickets
+    if (!['Developer', 'Project Lead'].includes(user.role)) {
+      return res.status(403).json({ error: 'Access denied: Only Developers or Project Leads can resolve bug tickets.' });
     }
 
     const ticketId = req.params.id;
@@ -1521,7 +1569,7 @@ export function registerWorkflowRoutes(app, io) {
 
     try {
       const ticketRes = await pool.query(
-        `SELECT t.*, p.project_lead_id, p.name as project_name 
+        `SELECT t.*, p.project_lead_id, p.lead_name, p.name as project_name 
          FROM tickets t 
          LEFT JOIN projects p ON p.id = t.project_id 
          WHERE t.id = $1`,
@@ -1530,25 +1578,13 @@ export function registerWorkflowRoutes(app, io) {
       if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
       const ticket = ticketRes.rows[0];
 
-      // Verify that this developer belongs to this project or ticket
-      const isDirect = ticket.assigned_developer_id === user.id ||
-                       ticket.assigned_to?.toLowerCase() === user.full_name?.toLowerCase() ||
-                       ticket.assigned_to?.toLowerCase() === user.email?.toLowerCase();
-      let isProjDev = false;
-      if (!isDirect && ticket.project_id) {
-        const projCheck = await pool.query(
-          `SELECT 1 FROM project_developer_assignments WHERE project_id = $1 AND developer_id = $2 AND status != 'Removed'`,
-          [ticket.project_id, user.id]
-        );
-        if (projCheck.rows.length > 0 || ticket.assigned_to === 'Project Team') {
-          isProjDev = true;
-        }
-      }
-      if (!isDirect && !isProjDev) {
+      // Verify Developer belongs to project/ticket or Project Lead manages the project
+      const allowed = await canUserWorkOnTicket(user, ticket);
+      if (!allowed) {
         return res.status(403).json({ error: 'You are only authorized to resolve tickets in your assigned projects.' });
       }
 
-      // If actively locked by another developer within the 2-hour window, block collision
+      // If actively locked by another user within the 2-hour window, block collision
       const lockState = getTicketLockState(ticket, user.id, user.full_name);
       if (lockState.isLockedByOther) {
         return res.status(423).json({
@@ -1596,10 +1632,10 @@ export function registerWorkflowRoutes(app, io) {
              resolved_by = $7::varchar,
              resolved_by_id = $8,
              resolved_at = CURRENT_TIMESTAMP,
-             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $7::varchar),
-             assigned_developer_id = COALESCE(assigned_developer_id, $8),
-             assigned_developer_name = COALESCE(assigned_developer_name, $7::varchar),
-             assigned_developer_email = COALESCE(assigned_developer_email, $10::varchar),
+             assigned_to = $7::varchar,
+             assigned_developer_id = $8,
+             assigned_developer_name = $7::varchar,
+             assigned_developer_email = $10::varchar,
              locked_by = NULL,
              locked_by_id = NULL,
              locked_at = NULL
@@ -1690,15 +1726,15 @@ export function registerWorkflowRoutes(app, io) {
         'Resolved',
         user.full_name,
         user.id,
-        `Developer resolved ticket. Root cause: ${root_cause.substring(0, 100)}...`
+        `${user.role} ${user.full_name} resolved ticket. Root cause: ${root_cause.substring(0, 100)}...`
       );
 
-      // Notify Project Lead and QA
-      if (ticket.project_lead_id) {
+      // Notify Project Lead (when resolved by someone else) and QA reporter
+      if (ticket.project_lead_id && Number(ticket.project_lead_id) !== Number(user.id)) {
         await sendInAppNotification(
           ticket.project_lead_id,
           'Ticket Resolved - Ready for QA',
-          `Developer ${user.full_name} resolved ticket ${ticket.ticket_code}. Ready for verification.`,
+          `${user.role} ${user.full_name} resolved ticket ${ticket.ticket_code}. Ready for verification.`,
           'ticket_resolved',
           `/admin/tickets`
         );

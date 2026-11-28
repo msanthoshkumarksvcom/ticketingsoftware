@@ -29,6 +29,7 @@ import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import {
+  isTicketLockedByMe,
   isTicketLockedByOther,
   isTicketLockExpired,
   getTicketLockRemainingLabel
@@ -557,11 +558,20 @@ export default function DeveloperDashboard() {
                     {filteredTickets.map((ticket) => {
                       const isPendingFix = ticket.status === 'Open' || ticket.status === 'In Progress' || ticket.status === 'Reopened';
                       const currentUserId = localStorage.getItem('userId');
+                      const lockedByMe = isTicketLockedByMe(ticket, currentUserId, displayName);
                       const lockedOther = isTicketLockedByOther(ticket, currentUserId, displayName);
                       const lockExpired = isTicketLockExpired(ticket);
                       const lockRemaining = getTicketLockRemainingLabel(ticket);
+                      const lockOwnerFirst = ticket.locked_by ? ticket.locked_by.trim().split(/\s+/)[0] : '';
+                      const rowStateClass = isPendingFix
+                        ? lockedByMe
+                          ? 'dev-row-mine'
+                          : lockedOther
+                          ? 'dev-row-locked'
+                          : ''
+                        : '';
                       return (
-                        <tr key={ticket.id}>
+                        <tr key={ticket.id} className={rowStateClass}>
                           <td>
                             <span className="dev-ticket-code-tag">{ticket.ticket_code}</span>
                           </td>
@@ -583,33 +593,40 @@ export default function DeveloperDashboard() {
                             <span className="dev-tc-pill">{ticket.test_case_id || 'TC-GEN'}</span>
                           </td>
                           <td>
-                            <span className={`dev-sev-badge ${(ticket.severity || 'medium').toLowerCase()}`}>
+                            <span className={`dev-sev-badge ${(ticket.severity || 'medium').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>
                               {ticket.severity || 'Medium'}
                             </span>
                           </td>
                           <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div className="dev-status-stack">
                               <span className={`dev-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
                                 {ticket.status}
                               </span>
-                              {lockedOther && ticket.locked_by && (
+                              {isPendingFix && lockedByMe && (
                                 <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                    fontSize: '10.5px',
-                                    fontWeight: '600',
-                                    color: '#b45309',
-                                    background: '#fef3c7',
-                                    border: '1px solid #fde68a',
-                                    borderRadius: '4px',
-                                    padding: '1px 6px',
-                                    width: 'fit-content'
-                                  }}
-                                  title={`Locked by ${ticket.locked_by} (${lockRemaining})`}
+                                  className="dev-claim-pill mine"
+                                  title={`Claimed by you${lockRemaining ? ` (${lockRemaining})` : ''}`}
                                 >
-                                  <Lock size={10} /> {ticket.locked_by} ({lockRemaining})
+                                  <CheckCircle2 size={11} />
+                                  <span>Your Claim{lockRemaining ? ` · ${lockRemaining}` : ''}</span>
+                                </span>
+                              )}
+                              {isPendingFix && lockedOther && ticket.locked_by && (
+                                <span
+                                  className="dev-claim-pill other"
+                                  title={`Locked by ${ticket.locked_by}${lockRemaining ? ` (${lockRemaining})` : ''}`}
+                                >
+                                  <Lock size={11} />
+                                  <span>{lockOwnerFirst}{lockRemaining ? ` · ${lockRemaining}` : ''}</span>
+                                </span>
+                              )}
+                              {isPendingFix && !lockedByMe && !lockedOther && lockExpired && ticket.locked_by && (
+                                <span
+                                  className="dev-claim-pill expired"
+                                  title={`Previous claim by ${ticket.locked_by} expired — available to take over`}
+                                >
+                                  <RotateCcw size={11} />
+                                  <span>Claim Expired</span>
                                 </span>
                               )}
                             </div>
@@ -621,19 +638,48 @@ export default function DeveloperDashboard() {
                             <button
                               id={`dev-ticket-action-btn-${ticket.id}`}
                               type="button"
-                              className={`dev-btn-action-ticket ${isPendingFix ? 'action-work' : 'action-view'}`}
+                              className={`dev-btn-action-ticket ${
+                                !isPendingFix
+                                  ? 'action-view'
+                                  : lockedOther
+                                  ? 'action-locked'
+                                  : lockedByMe
+                                  ? 'action-work mine'
+                                  : 'action-work'
+                              }`}
+                              title={
+                                isPendingFix && lockedOther && ticket.locked_by
+                                  ? `Currently locked by ${ticket.locked_by}${lockRemaining ? ` (${lockRemaining})` : ''} — click to inspect`
+                                  : undefined
+                              }
                               onClick={() => setSelectedTicketId(ticket.id)}
                             >
-                              <Eye size={13} />
-                              <span>
-                                {isPendingFix
-                                  ? lockedOther
-                                    ? `Locked (${ticket.locked_by.split(' ')[0]})`
-                                    : lockExpired
-                                    ? 'Take Over Defect'
-                                    : 'Work on Defect'
-                                  : 'View Report'}
-                              </span>
+                              {!isPendingFix ? (
+                                <>
+                                  <Eye size={13} />
+                                  <span>View Report</span>
+                                </>
+                              ) : lockedOther ? (
+                                <>
+                                  <Lock size={13} />
+                                  <span>Locked</span>
+                                </>
+                              ) : lockedByMe ? (
+                                <>
+                                  <ArrowRight size={13} />
+                                  <span>Continue Fix</span>
+                                </>
+                              ) : lockExpired ? (
+                                <>
+                                  <RotateCcw size={13} />
+                                  <span>Take Over</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Eye size={13} />
+                                  <span>Work on Defect</span>
+                                </>
+                              )}
                             </button>
                           </td>
                         </tr>
