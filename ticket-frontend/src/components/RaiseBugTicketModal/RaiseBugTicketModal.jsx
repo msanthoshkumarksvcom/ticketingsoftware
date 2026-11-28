@@ -27,6 +27,7 @@ import {
   validateMediaFile,
   readFileAsDataUrl
 } from '../../utils/mediaPreview';
+import UniversalFileViewer from '../UniversalFileViewer/UniversalFileViewer';
 import './RaiseBugTicketModal.css';
 
 const SEVERITY_OPTIONS = ['Critical', 'Block', 'High', 'Medium', 'Low'];
@@ -723,28 +724,12 @@ export default function RaiseBugTicketModal({
         </div>
       </div>
 
-      {/* Lightbox Full Zoom View */}
-      {zoomMedia && (
-        <div id="rbt-zoom-lightbox" className="rbt-zoom-lightbox" onClick={() => setZoomMedia(null)}>
-          <div id="rbt-zoom-content" className="rbt-zoom-content" onClick={(e) => e.stopPropagation()}>
-            {zoomMedia.mediaType === 'video' ? (
-              <video
-                key={zoomMedia.url}
-                src={zoomMedia.url}
-                controls
-                autoPlay
-                playsInline
-                className="rbt-zoom-img"
-              />
-            ) : (
-              <img src={zoomMedia.url} alt={zoomMedia.name || 'Full Resolution'} className="rbt-zoom-img" />
-            )}
-            <button id="rbt-zoom-close-btn" type="button" className="rbt-zoom-close" onClick={() => setZoomMedia(null)}>
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* In-App Universal Viewer (Zoom / Video Theater) */}
+      <UniversalFileViewer
+        isOpen={Boolean(zoomMedia)}
+        file={zoomMedia}
+        onClose={() => setZoomMedia(null)}
+      />
     </div>
   );
 }

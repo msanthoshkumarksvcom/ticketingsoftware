@@ -3798,3 +3798,120 @@ html[data-theme='dark'] .dev-sev-badge.ui-usability {
   color: #93c5fd;
   border-color: rgba(59, 130, 246, 0.35);
 }
+
+/* Universal In-App File Viewer Dark Theme */
+html[data-theme='dark'] .ufv-modal {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+html[data-theme='dark'] .ufv-header {
+  background: #0f172a;
+  border-bottom-color: #1e293b;
+}
+html[data-theme='dark'] .ufv-title-row h3 {
+  color: #f8fafc;
+}
+html[data-theme='dark'] .ufv-subtitle {
+  color: #94a3b8;
+}
+html[data-theme='dark'] .ufv-nav-group,
+html[data-theme='dark'] .ufv-toolbar-controls {
+  background: #1e293b;
+  border-color: #334155;
+}
+html[data-theme='dark'] .ufv-nav-counter,
+html[data-theme='dark'] .ufv-zoom-label {
+  color: #e2e8f0;
+}
+html[data-theme='dark'] .ufv-tool-btn,
+html[data-theme='dark'] .ufv-close-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+html[data-theme='dark'] .ufv-tool-btn:hover:not(:disabled),
+html[data-theme='dark'] .ufv-tool-btn.active {
+  background: rgba(37, 99, 235, 0.25);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #93c5fd;
+}
+html[data-theme='dark'] .ufv-body,
+html[data-theme='dark'] .ufv-pdf-stage,
+html[data-theme='dark'] .ufv-ppt-main,
+html[data-theme='dark'] .ufv-word-stage {
+  background: #0b1120;
+}
+html[data-theme='dark'] .ufv-error-card,
+html[data-theme='dark'] .ufv-audio-card,
+html[data-theme='dark'] .ufv-ppt-sidebar,
+html[data-theme='dark'] .ufv-excel-stage,
+html[data-theme='dark'] .ufv-archive-stage {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+html[data-theme='dark'] .ufv-error-card h4,
+html[data-theme='dark'] .ufv-audio-card h4,
+html[data-theme='dark'] .ufv-ppt-thumb-title {
+  color: #f8fafc;
+}
+html[data-theme='dark'] .ufv-excel-topbar,
+html[data-theme='dark'] .ufv-ppt-controls,
+html[data-theme='dark'] .ufv-archive-summary {
+  background: #111827;
+  border-color: #1e293b;
+  color: #cbd5e1;
+}
+html[data-theme='dark'] .ufv-sheet-tab,
+html[data-theme='dark'] .ufv-ppt-thumb,
+html[data-theme='dark'] .ufv-ppt-nav-btn,
+html[data-theme='dark'] .ufv-ppt-notes-toggle,
+html[data-theme='dark'] .ufv-excel-search {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+html[data-theme='dark'] .ufv-sheet-tab.active,
+html[data-theme='dark'] .ufv-ppt-thumb.active {
+  background: rgba(37, 99, 235, 0.22);
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+html[data-theme='dark'] .ufv-excel-search input {
+  color: #f8fafc;
+}
+html[data-theme='dark'] .ufv-excel-table th,
+html[data-theme='dark'] .ufv-archive-table th {
+  background: #1e293b;
+  color: #94a3b8;
+  border-color: #334155;
+}
+html[data-theme='dark'] .ufv-excel-table td,
+html[data-theme='dark'] .ufv-archive-table td {
+  color: #e2e8f0;
+  border-color: #1e293b;
+}
+html[data-theme='dark'] .ufv-excel-rownum {
+  background: #111827 !important;
+  color: #94a3b8 !important;
+}
+html[data-theme='dark'] .ufv-excel-table tr.ufv-excel-first-row td:not(.ufv-excel-rownum) {
+  background: rgba(37, 99, 235, 0.16);
+  color: #93c5fd;
+}
+html[data-theme='dark'] .ufv-ppt-notes-box {
+  background: #111827;
+  border-color: #334155;
+}
+html[data-theme='dark'] .ufv-ppt-notes-box p {
+  color: #cbd5e1;
+}
+html[data-theme='dark'] .ufv-word-paper {
+  background: #111827;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+html[data-theme='dark'] .ufv-word-html h1,
+html[data-theme='dark'] .ufv-word-html h2,
+html[data-theme='dark'] .ufv-word-html h3 {
+  color: #f8fafc;
+}

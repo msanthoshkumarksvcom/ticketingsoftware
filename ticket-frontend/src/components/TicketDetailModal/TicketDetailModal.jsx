@@ -19,8 +19,6 @@ import {
   Check,
   AlertTriangle,
   Lock,
-  ExternalLink,
-  Download,
   Eye,
   Play,
   RefreshCw,
@@ -43,6 +41,7 @@ import {
   getTicketLockRemainingLabel
 } from '../../utils/ticketLock';
 import SkeletonLoader from '../SkeletonLoader/SkeletonLoader';
+import UniversalFileViewer from '../UniversalFileViewer/UniversalFileViewer';
 import './TicketDetailModal.css';
 import { API_BASE, SOCKET_URL } from '../../utils/apiConfig';
 
@@ -611,16 +610,6 @@ export default function TicketDetailModal({
                                   {isVideo ? <Play size={12} /> : <Eye size={12} />}
                                   <span>{isVideo ? 'Play' : 'View'}</span>
                                 </button>
-                                <a
-                                  id={`tdm-evidence-open-link-${idx}`}
-                                  href={media.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="tdm-evidence-download-btn"
-                                  title={`Open ${isVideo ? 'video' : 'image'} in new tab`}
-                                >
-                                  <ExternalLink size={12} />
-                                </a>
                               </div>
                             </div>
                           </div>
@@ -706,16 +695,6 @@ export default function TicketDetailModal({
                                         {isVideo ? <Play size={12} /> : <Eye size={12} />}
                                         <span>{isVideo ? 'Play' : 'View'}</span>
                                       </button>
-                                      <a
-                                        id={`tdm-res-evidence-open-link-${idx}`}
-                                        href={media.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="tdm-evidence-download-btn"
-                                        title={`Open ${isVideo ? 'video' : 'image'} in new tab`}
-                                      >
-                                        <ExternalLink size={12} />
-                                      </a>
                                     </div>
                                   </div>
                                 </div>
@@ -1198,55 +1177,12 @@ export default function TicketDetailModal({
         </div>
       </div>
 
-      {/* High-Resolution Image & Video Lightbox */}
-      {zoomMedia && (
-        <div id="tdm-zoom-lightbox" className="tdm-zoom-lightbox" onClick={() => setZoomMedia(null)}>
-          <div id="tdm-zoom-content" className="tdm-zoom-content" onClick={(e) => e.stopPropagation()}>
-            <div className="tdm-zoom-toolbar">
-              <a
-                id="tdm-zoom-open-link"
-                href={zoomMedia.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tdm-zoom-tool-btn"
-                title={`Open ${zoomMedia.mediaType === 'video' ? 'video' : 'image'} in new tab`}
-              >
-                <ExternalLink size={16} />
-              </a>
-              <a
-                id="tdm-zoom-download-link"
-                href={zoomMedia.url}
-                download={zoomMedia.name || (zoomMedia.mediaType === 'video' ? 'ticket-video.mp4' : 'defect-screenshot.png')}
-                className="tdm-zoom-tool-btn"
-                title="Download original file"
-              >
-                <Download size={16} />
-              </a>
-              <button
-                id="tdm-zoom-close-btn"
-                type="button"
-                className="tdm-zoom-tool-btn tdm-zoom-close"
-                onClick={() => setZoomMedia(null)}
-                title="Close Preview (Esc)"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            {zoomMedia.mediaType === 'video' ? (
-              <video
-                key={zoomMedia.url}
-                src={zoomMedia.url}
-                controls
-                autoPlay
-                playsInline
-                className="tdm-zoom-video"
-              />
-            ) : (
-              <img src={zoomMedia.url} alt={zoomMedia.name || 'Enlarged defect screenshot'} className="tdm-zoom-img" />
-            )}
-          </div>
-        </div>
-      )}
+      {/* In-App Universal Media & File Viewer */}
+      <UniversalFileViewer
+        isOpen={Boolean(zoomMedia)}
+        file={zoomMedia}
+        onClose={() => setZoomMedia(null)}
+      />
     </div>
   );
 }
