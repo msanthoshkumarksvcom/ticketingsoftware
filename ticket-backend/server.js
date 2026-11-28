@@ -3663,6 +3663,26 @@ io.on('connection', (socket) => {
     }
   });
 
+  const getUniqueSheetViewers = (roomMap) => {
+    if (!roomMap) return [];
+    const uniqueByUser = new Map();
+    for (const [sockId, viewer] of roomMap.entries()) {
+      if (!io.sockets.sockets.has(sockId)) {
+        roomMap.delete(sockId);
+        continue;
+      }
+      const userKey = viewer?.id != null
+        ? `id:${String(viewer.id).trim().toLowerCase()}`
+        : viewer?.email
+        ? `email:${String(viewer.email).trim().toLowerCase()}`
+        : `name:${String(viewer?.name || sockId).trim().toLowerCase()}|${String(viewer?.role || '').trim().toLowerCase()}`;
+      if (!uniqueByUser.has(userKey)) {
+        uniqueByUser.set(userKey, viewer);
+      }
+    }
+    return Array.from(uniqueByUser.values());
+  };
+
   // 1. Join Sheet Room
   socket.on('join_sheet_room', ({ projectId, sheetId, user } = {}) => {
     if (!projectId) return;
@@ -3677,7 +3697,7 @@ io.on('connection', (socket) => {
     }
     roomViewers.get(roomId).set(socket.id, currentUser);
 
-    const viewersList = Array.from(roomViewers.get(roomId).values());
+    const viewersList = getUniqueSheetViewers(roomViewers.get(roomId));
     io.to(roomId).emit('sheet_presence_updated', {
       roomId,
       viewers: viewersList
@@ -3691,7 +3711,7 @@ io.on('connection', (socket) => {
     socket.leave(roomId);
     if (roomViewers.has(roomId)) {
       roomViewers.get(roomId).delete(socket.id);
-      const viewersList = Array.from(roomViewers.get(roomId).values());
+      const viewersList = getUniqueSheetViewers(roomViewers.get(roomId));
       io.to(roomId).emit('sheet_presence_updated', {
         roomId,
         viewers: viewersList
@@ -3786,7 +3806,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     if (currentRoom && roomViewers.has(currentRoom)) {
       roomViewers.get(currentRoom).delete(socket.id);
-      const viewersList = Array.from(roomViewers.get(currentRoom).values());
+      const viewersList = getUniqueSheetViewers(roomViewers.get(currentRoom));
       io.to(currentRoom).emit('sheet_presence_updated', {
         roomId: currentRoom,
         viewers: viewersList

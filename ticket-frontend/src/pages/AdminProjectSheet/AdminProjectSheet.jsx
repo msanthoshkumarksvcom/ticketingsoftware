@@ -501,7 +501,19 @@ export default function AdminProjectSheet() {
 
     socket.on('sheet_presence_updated', (data) => {
       if (Array.isArray(data?.viewers)) {
-        setActiveViewers(data.viewers);
+        const seen = new Set();
+        const uniqueViewers = data.viewers.filter((v) => {
+          if (!v) return false;
+          const key = v.id != null
+            ? `id:${String(v.id).trim().toLowerCase()}`
+            : v.email
+            ? `email:${String(v.email).trim().toLowerCase()}`
+            : `name:${String(v.name || '').trim().toLowerCase()}|${String(v.role || '').trim().toLowerCase()}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setActiveViewers(uniqueViewers);
       }
     });
 
