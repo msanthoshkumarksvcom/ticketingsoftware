@@ -37,11 +37,14 @@
   background: #ffffff;
 }
 
+.pjs-layout .pjs-main.is-fullscreen,
 .pjs-main.is-fullscreen {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
+  margin-left: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
   z-index: 950;
 }
 
@@ -276,7 +279,8 @@
 .pjs-header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .pjs-header-stat-chip {
