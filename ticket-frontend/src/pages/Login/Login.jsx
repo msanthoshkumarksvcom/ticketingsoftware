@@ -5,13 +5,14 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  KeyRound,
-  X,
+  ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Copy,
   Check,
-  ShieldCheck
+  ShieldCheck,
+  FileSpreadsheet,
+  Bug,
+  Rocket
 } from 'lucide-react';
 import { applyTheme } from '../../utils/theme';
 import './Login.css';
