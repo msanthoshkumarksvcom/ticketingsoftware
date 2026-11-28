@@ -47,8 +47,10 @@ export default function AdminReports() {
   }, [userRole]);
 
   // Exclusive Active Report State: 'projects' or 'qa'
-  // When one report is opened, the other is automatically closed
-  const [activeReport, setActiveReport] = useState('projects');
+  // QA Members default to 'qa' (QA Members Performance) first
+  const [activeReport, setActiveReport] = useState(() =>
+    userRole.toLowerCase() === 'qa member' ? 'qa' : 'projects'
+  );
 
   // Daily Work Tracking Filter States for QA Members
   const [selectedPeriod, setSelectedPeriod] = useState('all'); // 'all', 'today', 'yesterday', '7days', '30days', 'custom'
@@ -620,27 +622,6 @@ export default function AdminReports() {
                   </div>
                 </div>
                 <span className="um-stat-badge badge-orange">Pass Ratio</span>
-              </div>
-
-              {/* Card 4: Defects Resolved */}
-              <div id="reports-kpi-defects-card" className="um-stat-card card-departments">
-                <div className="um-stat-left">
-                  <div className="um-stat-icon-wrap icon-wrap-purple">
-                    <Bug size={22} />
-                  </div>
-                  <div className="um-stat-info">
-                    <span className="um-stat-label">Defects Resolved</span>
-                    <span className="um-stat-number">
-                      {(projectOverall?.total_resolved || 0) + (projectOverall?.total_closed || 0)}
-                      <span style={{ fontSize: '0.9rem', color: '#64748B', fontWeight: '500' }}>
-                        {' '}/ {projectOverall?.total_tickets || 0}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-                <span className="um-stat-badge badge-purple">
-                  {projectOverall?.global_resolution_rate || 0}% Fixed
-                </span>
               </div>
             </section>
 
