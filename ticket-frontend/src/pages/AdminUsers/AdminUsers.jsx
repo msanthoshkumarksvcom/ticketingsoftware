@@ -93,8 +93,6 @@ const SYSTEM_PERMISSIONS = [
 const AVAILABLE_DEPARTMENTS = [
   'Quality Assurance',
   'Development',
-  'Operations',
-  'Support',
   'Management'
 ];
 

@@ -317,15 +317,7 @@ function Login() {
         <div className="hero-orb orb-2" aria-hidden="true" />
         <div className="hero-grid-pattern" aria-hidden="true" />
 
-        <div className="hero-content-wrapper">
-          {/* Top Brand Pill */}
-          <div className="hero-topbar">
-            <div className="hero-brand-pill">
-              <span className="hero-brand-dot" aria-hidden="true" />
-              <span>QA ENTERPRISE CLOUD</span>
-            </div>
-          </div>
-
+        <div className="hero-content-wrapper" style={{ justifyContent: 'center' }}>
           {/* Center Brand Showcase */}
           <div className="hero-center-body">
             <div className="hero-cube-pedestal">
@@ -341,15 +333,6 @@ function Login() {
             <p className="hero-subtitle">
               Next-generation quality management, continuous test execution matrix, and release workflow automation.
             </p>
-          </div>
-
-          {/* Bottom Trust & Status Row */}
-          <div className="hero-bottom-bar">
-            <div className="hero-status-pill">
-              <span className="status-indicator-dot" />
-              <span>Systems Operational â€¢ 99.9% Uptime</span>
-            </div>
-            <span className="hero-copy-text">Â© 2026 QA Software Enterprise</span>
           </div>
         </div>
       </div>
@@ -372,10 +355,6 @@ function Login() {
               {/* â”€â”€ PANEL 1: Welcome Back (Sign In) â”€â”€ */}
               <div className="login-slider-panel">
                 <div className="login-form-header">
-                  <div className="login-secure-chip">
-                    <ShieldCheck size={13} />
-                    <span>SECURE ACCESS PORTAL</span>
-                  </div>
                   <h2 id="login-welcome-heading" className="login-welcome-title">
                     Welcome <span className="title-highlight">Back</span>
                   </h2>
@@ -511,10 +490,6 @@ function Login() {
               {/* â”€â”€ PANEL 2: Reset Password (Email + 6-Box OTP) â”€â”€ */}
               <div className="login-slider-panel">
                 <div className="login-form-header">
-                  <div className="login-secure-chip">
-                    <ShieldCheck size={13} />
-                    <span>SECURE ACCESS PORTAL</span>
-                  </div>
                   <h2 id="reset-password-heading" className="login-welcome-title">
                     Reset Password
                   </h2>
@@ -648,10 +623,6 @@ function Login() {
               {/* â”€â”€ PANEL 3: Set New Password â”€â”€ */}
               <div className="login-slider-panel">
                 <div className="login-form-header">
-                  <div className="login-secure-chip">
-                    <ShieldCheck size={13} />
-                    <span>SECURE ACCESS PORTAL</span>
-                  </div>
                   <h2 id="set-password-heading" className="login-welcome-title">
                     Set New Password
                   </h2>

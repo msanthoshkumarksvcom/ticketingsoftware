@@ -3752,3 +3752,14 @@ html[data-theme='dark'] .um-btn-reset-filters:hover {
   border-color: #475569 !important;
   color: #ffffff !important;
 }
+
+/* Dark mode for Form & Modal Validation Error Banners */
+html[data-theme='dark'] .user-error-banner,
+html[data-theme='dark'] .um-error-banner,
+html[data-theme='dark'] .error-banner,
+html[data-theme='dark'] .pj-del-error-banner,
+html[data-theme='dark'] .pw-alert.error {
+  background: rgba(239, 68, 68, 0.14) !important;
+  border: 1px solid rgba(248, 113, 113, 0.45) !important;
+  color: #fca5a5 !important;
+}
