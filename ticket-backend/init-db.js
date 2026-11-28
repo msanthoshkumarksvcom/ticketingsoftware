@@ -70,6 +70,7 @@ export const initDatabase = async () => {
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS lead_assigned_by VARCHAR(150);
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS application_url TEXT DEFAULT '';
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS application_github_link TEXT DEFAULT '';
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS custom_links JSONB DEFAULT '[]'::jsonb;
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked BOOLEAN DEFAULT FALSE;
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked_by VARCHAR(150);
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS links_locked_at TIMESTAMP;
@@ -290,6 +291,7 @@ export const initDatabase = async () => {
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS title VARCHAR(255);
       ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE;
       ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_by VARCHAR(150);
       ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP;

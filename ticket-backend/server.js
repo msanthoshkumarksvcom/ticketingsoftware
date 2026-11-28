@@ -1925,11 +1925,70 @@ const normalizeSafeUrl = (rawValue) => {
   }
 };
 
+const parseCustomLinks = (rawLinks) => {
+  let list = rawLinks;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((item) => item && typeof item === 'object')
+    .map((item, idx) => ({
+      id: item.id || `link-${idx + 1}`,
+      name: typeof item.name === 'string' ? item.name.trim() : '',
+      url: typeof item.url === 'string' ? item.url.trim() : '',
+      details: typeof item.details === 'string' ? item.details.trim() : ''
+    }));
+};
+
+const validateCustomLinksPayload = (rawLinks) => {
+  if (!Array.isArray(rawLinks)) {
+    return { valid: true, value: [] };
+  }
+  const cleaned = [];
+  for (let i = 0; i < rawLinks.length; i += 1) {
+    const entry = rawLinks[i] || {};
+    const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+    const urlRaw = typeof entry.url === 'string' ? entry.url.trim() : '';
+    const details = typeof entry.details === 'string' ? entry.details.trim() : '';
+
+    if (!name && !urlRaw && !details) continue;
+    if (!name) {
+      return { valid: false, error: `Link #${i + 1}: Link name is required.` };
+    }
+    if (name.length > 120) {
+      return { valid: false, error: `Link #${i + 1}: Link name cannot exceed 120 characters.` };
+    }
+    if (!urlRaw) {
+      return { valid: false, error: `Link "${name}": URL is required.` };
+    }
+    const urlCheck = normalizeSafeUrl(urlRaw);
+    if (!urlCheck.valid) {
+      return { valid: false, error: `Link "${name}": ${urlCheck.error}` };
+    }
+    if (details.length > 300) {
+      return { valid: false, error: `Link "${name}": Details cannot exceed 300 characters.` };
+    }
+    cleaned.push({
+      id: entry.id || `link-${Date.now()}-${i}`,
+      name,
+      url: urlCheck.value,
+      details
+    });
+  }
+  return { valid: true, value: cleaned };
+};
+
 const findProjectWithRoles = async (projectIdOrCode, user) => {
   const projRes = await pool.query(
     `SELECT id, project_code, name, project_lead_id, lead_name,
             COALESCE(application_url, '') as application_url,
             COALESCE(application_github_link, '') as application_github_link,
+            COALESCE(custom_links, '[]'::jsonb) as custom_links,
             COALESCE(links_locked, FALSE) as links_locked,
             links_locked_by, links_locked_at,
             COALESCE(documents_locked, FALSE) as documents_locked,
@@ -2051,14 +2110,17 @@ const enrichDocumentRow = (row) => {
   return { ...row, is_empty: !row.file_url };
 };
 
-const insertProjectDocumentRecord = async ({ projId, name, fileUrl, fileSize, fileType, user }) => {
+const insertProjectDocumentRecord = async ({ projId, title, name, fileUrl, fileSize, fileType, user }) => {
+  const cleanName = name.trim();
+  const cleanTitle = (typeof title === 'string' && title.trim()) ? title.trim() : cleanName;
   const result = await pool.query(
-    `INSERT INTO project_documents (project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING *`,
+    `INSERT INTO project_documents (project_id, title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, project_id, COALESCE(NULLIF(title, ''), name) as title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at, COALESCE(is_locked, FALSE) as is_locked, locked_by, locked_at`,
     [
       projId,
-      name.trim(),
+      cleanTitle,
+      cleanName,
       fileUrl,
       fileSize || 'Unknown',
       fileType,
@@ -2165,7 +2227,7 @@ app.get('/api/admin/projects/:id/documents', async (req, res) => {
     const projId = projRes.rows[0].id;
 
     const docsRes = await pool.query(
-      `SELECT id, project_id, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at,
+      `SELECT id, project_id, COALESCE(NULLIF(title, ''), name) as title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at,
               COALESCE(is_locked, FALSE) as is_locked, locked_by, locked_at
        FROM project_documents 
        WHERE project_id = $1 
@@ -2268,6 +2330,14 @@ app.post('/api/admin/projects/:id/documents/upload', async (req, res) => {
     fileName = String(rawNameHeader).trim();
   }
 
+  const rawTitleHeader = req.headers['x-document-title'] || req.query.title || '';
+  let docTitle = '';
+  try {
+    docTitle = decodeURIComponent(String(rawTitleHeader)).trim();
+  } catch {
+    docTitle = String(rawTitleHeader).trim();
+  }
+
   if (!fileName) {
     req.resume();
     return res.status(400).json({ error: 'File name is required.' });
@@ -2306,6 +2376,7 @@ app.post('/api/admin/projects/:id/documents/upload', async (req, res) => {
 
     const doc = await insertProjectDocumentRecord({
       projId: ctx.proj.id,
+      title: docTitle || fileName,
       name: fileName,
       fileUrl,
       fileSize,
@@ -2328,7 +2399,7 @@ app.post('/api/admin/projects/:id/documents', async (req, res) => {
   }
 
   const { id } = req.params;
-  const { name, file_url, file_size, file_type } = req.body;
+  const { title, name, file_url, file_size, file_type } = req.body;
 
   if (!name || !file_url) {
     return res.status(400).json({ error: 'Document name and file data are required.' });
@@ -2373,6 +2444,7 @@ app.post('/api/admin/projects/:id/documents', async (req, res) => {
 
     const doc = await insertProjectDocumentRecord({
       projId: ctx.proj.id,
+      title: title || name,
       name,
       fileUrl: finalFileUrl,
       fileSize: finalFileSize,
@@ -2493,6 +2565,7 @@ app.get('/api/admin/projects/:id/links', async (req, res) => {
     res.json({
       application_url: proj.application_url || '',
       application_github_link: proj.application_github_link || '',
+      custom_links: parseCustomLinks(proj.custom_links),
       links_locked: Boolean(proj.links_locked),
       links_locked_by: proj.links_locked_by || null,
       links_locked_at: proj.links_locked_at || null,
@@ -2506,7 +2579,7 @@ app.get('/api/admin/projects/:id/links', async (req, res) => {
   }
 });
 
-// PUT /api/admin/projects/:id/links - Save application URL & GitHub link (All except QA Member, when unlocked)
+// PUT /api/admin/projects/:id/links - Save application URL, GitHub link & custom links (All except QA Member, when unlocked)
 app.put('/api/admin/projects/:id/links', async (req, res) => {
   const user = await getUserFromReq(req);
   if (!user) return res.status(401).json({ error: 'Authentication required' });
@@ -2533,17 +2606,31 @@ app.put('/api/admin/projects/:id/links', async (req, res) => {
       return res.status(400).json({ error: `Application GitHub Link: ${githubUrlCheck.error}` });
     }
 
+    const customLinksCheck = req.body?.custom_links !== undefined
+      ? validateCustomLinksPayload(req.body.custom_links)
+      : { valid: true, value: parseCustomLinks(ctx.proj.custom_links) };
+
+    if (!customLinksCheck.valid) {
+      return res.status(400).json({ error: customLinksCheck.error });
+    }
+
     const updated = await pool.query(
       `UPDATE projects
-       SET application_url = $1, application_github_link = $2
-       WHERE id = $3
-       RETURNING id, application_url, application_github_link, links_locked, links_locked_by, links_locked_at, documents_locked, documents_locked_by, documents_locked_at`,
-      [appUrlCheck.value, githubUrlCheck.value, ctx.proj.id]
+       SET application_url = $1,
+           application_github_link = $2,
+           custom_links = $3::jsonb
+       WHERE id = $4
+       RETURNING id, application_url, application_github_link, COALESCE(custom_links, '[]'::jsonb) as custom_links, links_locked, links_locked_by, links_locked_at, documents_locked, documents_locked_by, documents_locked_at`,
+      [appUrlCheck.value, githubUrlCheck.value, JSON.stringify(customLinksCheck.value), ctx.proj.id]
     );
 
+    const savedRow = updated.rows[0];
     res.json({
       message: 'Project links saved successfully.',
-      links: updated.rows[0]
+      links: {
+        ...savedRow,
+        custom_links: parseCustomLinks(savedRow.custom_links)
+      }
     });
   } catch (error) {
     console.error('Error updating project links:', error);
@@ -2556,7 +2643,7 @@ app.put('/api/admin/projects/:id/locks', async (req, res) => {
   const user = await getUserFromReq(req);
   if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-  const { target = 'all', locked = true, application_url, application_github_link } = req.body || {};
+  const { target = 'all', locked = true, application_url, application_github_link, custom_links } = req.body || {};
   const nextLocked = Boolean(locked);
 
   try {
@@ -2572,6 +2659,7 @@ app.put('/api/admin/projects/:id/locks', async (req, res) => {
 
     let nextAppUrl = ctx.proj.application_url || '';
     let nextGithubUrl = ctx.proj.application_github_link || '';
+    let nextCustomLinks = parseCustomLinks(ctx.proj.custom_links);
 
     // Save pending URL inputs cleanly when locking links if they were currently unlocked
     if ((target === 'links' || target === 'all') && nextLocked && !ctx.proj.links_locked) {
@@ -2585,6 +2673,11 @@ app.put('/api/admin/projects/:id/locks', async (req, res) => {
         if (!check.valid) return res.status(400).json({ error: `Application GitHub Link: ${check.error}` });
         nextGithubUrl = check.value;
       }
+      if (custom_links !== undefined) {
+        const check = validateCustomLinksPayload(custom_links);
+        if (!check.valid) return res.status(400).json({ error: check.error });
+        nextCustomLinks = check.value;
+      }
     }
 
     if (target === 'links' || target === 'all') {
@@ -2592,11 +2685,12 @@ app.put('/api/admin/projects/:id/locks', async (req, res) => {
         `UPDATE projects
          SET application_url = $1,
              application_github_link = $2,
-             links_locked = $3,
-             links_locked_by = $4,
-             links_locked_at = $5
-         WHERE id = $6`,
-        [nextAppUrl, nextGithubUrl, nextLocked, lockerName, lockedAt, ctx.proj.id]
+             custom_links = $3::jsonb,
+             links_locked = $4,
+             links_locked_by = $5,
+             links_locked_at = $6
+         WHERE id = $7`,
+        [nextAppUrl, nextGithubUrl, JSON.stringify(nextCustomLinks), nextLocked, lockerName, lockedAt, ctx.proj.id]
       );
     }
 
@@ -2623,6 +2717,7 @@ app.put('/api/admin/projects/:id/locks', async (req, res) => {
     const refreshed = await pool.query(
       `SELECT COALESCE(application_url, '') as application_url,
               COALESCE(application_github_link, '') as application_github_link,
+              COALESCE(custom_links, '[]'::jsonb) as custom_links,
               COALESCE(links_locked, FALSE) as links_locked,
               links_locked_by, links_locked_at,
               COALESCE(documents_locked, FALSE) as documents_locked,
@@ -2631,10 +2726,14 @@ app.put('/api/admin/projects/:id/locks', async (req, res) => {
        WHERE id = $1`,
       [ctx.proj.id]
     );
+    const refreshedRow = refreshed.rows[0] || {};
 
     res.json({
       message: nextLocked ? 'Locked successfully (read-only).' : 'Unlocked successfully (editable).',
-      links: refreshed.rows[0]
+      links: {
+        ...refreshedRow,
+        custom_links: parseCustomLinks(refreshedRow.custom_links)
+      }
     });
   } catch (error) {
     console.error('Error updating project lock state:', error);
