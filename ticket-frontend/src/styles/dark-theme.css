@@ -3764,3 +3764,43 @@ html[data-theme='dark'] .pw-alert.error {
   border: 1px solid rgba(248, 113, 113, 0.45) !important;
   color: #fca5a5 !important;
 }
+
+/* Developer Ticket Claim Pills & Row Highlights */
+html[data-theme='dark'] .dev-table tr.dev-row-mine td {
+  background: rgba(37, 99, 235, 0.12);
+}
+html[data-theme='dark'] .dev-table tr.dev-row-mine td:first-child {
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+html[data-theme='dark'] .dev-table tr.dev-row-locked td {
+  background: rgba(15, 23, 42, 0.45);
+}
+html[data-theme='dark'] .dev-claim-pill.mine {
+  background: rgba(37, 99, 235, 0.22);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+html[data-theme='dark'] .dev-claim-pill.other {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+html[data-theme='dark'] .dev-claim-pill.expired {
+  background: #1e293b;
+  color: #94a3b8;
+  border-color: #334155;
+}
+html[data-theme='dark'] .dev-btn-action-ticket.action-locked {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+html[data-theme='dark'] .dev-btn-action-ticket.action-locked:hover {
+  background: #334155;
+  color: #e2e8f0;
+}
+html[data-theme='dark'] .dev-sev-badge.ui-usability {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.35);
+}
