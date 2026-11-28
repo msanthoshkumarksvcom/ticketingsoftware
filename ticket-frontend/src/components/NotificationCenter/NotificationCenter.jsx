@@ -11,7 +11,9 @@ import { getRolePath } from '../../utils/roleRoutes';
 
 function NotificationDrawerPortal({ isOpen, onClose, children }) {
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -63,7 +65,6 @@ function NotificationCenter({ collapsed = false, hideTrigger = false }) {
   // Check and proactively request OS desktop notification permission
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return undefined;
-    setOsPermission(Notification.permission);
     const askPermission = () => {
       if (Notification.permission === 'default') {
         Notification.requestPermission()
