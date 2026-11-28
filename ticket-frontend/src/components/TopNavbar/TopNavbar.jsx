@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -29,6 +30,7 @@ export default function TopNavbar({
   const [theme, setTheme] = useState(() => getSavedTheme());
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -81,7 +83,25 @@ export default function TopNavbar({
     };
   }, [dropdownOpen]);
 
-  const handleLogout = () => {
+  // Close logout confirmation modal on Escape
+  useEffect(() => {
+    if (!showLogoutModal) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowLogoutModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showLogoutModal]);
+
+  const handleRequestLogout = () => {
+    setDropdownOpen(false);
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
     setDropdownOpen(false);
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
@@ -330,7 +350,7 @@ export default function TopNavbar({
                   type="button"
                   className="dropdown-menu-item logout-item"
                   role="menuitem"
-                  onClick={handleLogout}
+                  onClick={handleRequestLogout}
                 >
                   <LogOut size={16} className="dropdown-item-icon logout-icon" />
                   <span>Sign out</span>
@@ -342,6 +362,52 @@ export default function TopNavbar({
       </div>
     </header>
     <NotificationCenter hideTrigger />
+    {showLogoutModal && typeof document !== 'undefined' && createPortal(
+      <div
+        id="top-nav-logout-modal-overlay"
+        className="topnav-logout-overlay"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowLogoutModal(false);
+        }}
+      >
+        <section
+          id="top-nav-logout-modal"
+          className="topnav-logout-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="top-nav-logout-title"
+        >
+          <div className="topnav-logout-icon">
+            <LogOut size={22} />
+          </div>
+          <h2 id="top-nav-logout-title" className="topnav-logout-title">
+            Sign out of your workspace?
+          </h2>
+          <p className="topnav-logout-text">
+            You will be returned to the login screen and can sign back in at any time with your credentials.
+          </p>
+          <div className="topnav-logout-actions">
+            <button
+              id="top-nav-logout-cancel-btn"
+              type="button"
+              className="topnav-logout-btn cancel"
+              onClick={() => setShowLogoutModal(false)}
+            >
+              Stay signed in
+            </button>
+            <button
+              id="top-nav-logout-confirm-btn"
+              type="button"
+              className="topnav-logout-btn confirm"
+              onClick={confirmLogout}
+            >
+              Sign out
+            </button>
+          </div>
+        </section>
+      </div>,
+      document.body
+    )}
   </div>
   );
 }
