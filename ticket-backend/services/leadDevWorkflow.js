@@ -1937,6 +1937,7 @@ export function registerWorkflowRoutes(app, io) {
       res.json({
         summary: {
           assignedProjectsCount: projectsRes.rows.length,
+          totalAssignedProjects: projectsRes.rows.length,
           totalAssignedTickets: tickets.length,
           openTickets,
           inProgressTickets,

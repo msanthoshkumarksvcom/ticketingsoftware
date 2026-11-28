@@ -260,14 +260,11 @@ body {
    4. UNIVERSAL COMPONENT & TYPOGRAPHY HARMONIZATION (Across Entire App)
    ========================================================================== */
 
-/* Page Headers & Subheaders across All Modules */
+/* Page Headers & Subheaders across Light Modules */
 .header-titles h1,
 .um-header-titles h1,
 .tickets-page .projects-header-info h2,
-.dev-welcome-content h1,
-.pld-welcome-content h1,
 .reports-header-text h2,
-.role-welcome-card h1,
 .dashboard-heading h1 {
   font-size: var(--fs-h1, 1.375rem) !important;
   font-weight: 800 !important;
@@ -285,14 +282,31 @@ body {
 .um-header-titles p,
 .pj-title-text p,
 .tickets-page .projects-header-info p,
-.dev-welcome-content p,
-.pld-welcome-content p,
 .reports-header-text p,
-.role-welcome-card p,
 .dashboard-heading p {
   font-size: var(--fs-body, 0.84375rem) !important;
   color: var(--color-ink-secondary, #475569) !important;
   line-height: 1.5 !important;
+}
+
+/* Dark Hero Welcome Banners (Developer, Project Lead, QA Member) */
+.dev-welcome-content h1,
+.pld-welcome-content h1,
+.role-welcome-card h1 {
+  font-size: var(--fs-h1, 1.375rem) !important;
+  font-weight: 800 !important;
+  color: #FFFFFF !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.25 !important;
+  margin-bottom: 6px !important;
+}
+
+.dev-welcome-content p,
+.pld-welcome-content p,
+.role-welcome-card p {
+  font-size: var(--fs-body, 0.84375rem) !important;
+  color: #DBEAFE !important;
+  line-height: 1.55 !important;
 }
 
 /* Universal Section Titles */
