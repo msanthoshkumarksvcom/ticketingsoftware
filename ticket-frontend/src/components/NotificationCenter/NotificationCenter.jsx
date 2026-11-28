@@ -53,7 +53,7 @@ const TYPE_META = {
 function NotificationCenter({ collapsed = false, hideTrigger = false }) {
   const [notifications, setNotifications] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [filterTab, setFilterTab] = useState('all');
+  const [filterTab, setFilterTab] = useState('unread');
   const [loading, setLoading] = useState(false);
   const [liveToast, setLiveToast] = useState(null);
   const [osPermission, setOsPermission] = useState(
@@ -141,6 +141,7 @@ function NotificationCenter({ collapsed = false, hideTrigger = false }) {
 
   useEffect(() => {
     const handleOpen = () => {
+      setFilterTab('unread');
       setDrawerOpen(true);
       fetchNotifications();
     };
@@ -276,6 +277,7 @@ function NotificationCenter({ collapsed = false, hideTrigger = false }) {
           type="button"
           className="nav-item sidebar-notif-trigger"
           onClick={() => {
+            setFilterTab('unread');
             setDrawerOpen(true);
             fetchNotifications();
           }}
@@ -427,20 +429,20 @@ function NotificationCenter({ collapsed = false, hideTrigger = false }) {
 
             <div className="notif-drawer-tabs">
               <button
-                id="notif-tab-all-btn"
-                type="button"
-                className={`notif-filter-tab ${filterTab === 'all' ? 'active' : ''}`}
-                onClick={() => setFilterTab('all')}
-              >
-                All ({notifications.length})
-              </button>
-              <button
                 id="notif-tab-unread-btn"
                 type="button"
                 className={`notif-filter-tab ${filterTab === 'unread' ? 'active' : ''}`}
                 onClick={() => setFilterTab('unread')}
               >
                 Unread ({unreadCount})
+              </button>
+              <button
+                id="notif-tab-all-btn"
+                type="button"
+                className={`notif-filter-tab ${filterTab === 'all' ? 'active' : ''}`}
+                onClick={() => setFilterTab('all')}
+              >
+                All ({notifications.length})
               </button>
             </div>
 
