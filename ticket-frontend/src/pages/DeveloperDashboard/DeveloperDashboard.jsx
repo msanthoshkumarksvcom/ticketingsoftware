@@ -184,7 +184,17 @@ export default function DeveloperDashboard() {
 
   const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'Developer');
 
-  const assignedProjects = stats?.projects || [];
+  const assignedProjects = useMemo(() => {
+    const raw = stats?.projects || [];
+    const seen = new Set();
+    return raw.filter((p) => {
+      if (!p) return false;
+      const key = p.id != null ? `id-${p.id}` : `code-${String(p.project_code || '').toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [stats]);
 
   const getTicketProjectKey = (ticket) => {
     if (ticket.project_id) return `id-${ticket.project_id}`;
@@ -265,11 +275,9 @@ export default function DeveloperDashboard() {
     reopenedTickets: tickets.filter((t) => t.status === 'Reopened').length
   };
 
-  const totalAssignedProjectsCount =
-    summary.totalAssignedProjects ??
-    summary.assignedProjectsCount ??
-    assignedProjects.length ??
-    0;
+  const totalAssignedProjectsCount = stats?.projects
+    ? assignedProjects.length
+    : (summary.totalAssignedProjects ?? summary.assignedProjectsCount ?? 0);
 
   return (
     <div className="admin-layout">
