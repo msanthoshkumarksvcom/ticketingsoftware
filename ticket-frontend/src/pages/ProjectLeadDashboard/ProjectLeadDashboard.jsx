@@ -398,7 +398,15 @@ export default function ProjectLeadDashboard() {
                   </thead>
                   <tbody>
                     {projects.map((proj) => (
-                      <tr key={proj.id}>
+                      <tr
+                        key={proj.id}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e) => {
+                          if (!e.target.closest('button, a')) {
+                            navigate(getRolePath(`/projects/${proj.id}`), { state: { project: proj } });
+                          }
+                        }}
+                      >
                         <td>
                           <div className="pld-proj-col">
                             <strong>{proj.name}</strong>

@@ -297,6 +297,7 @@ function AdminProjects() {
   const isProjectLead = currentUserRole === 'Project Lead';
   const canManageProjects = !isQAMember && !isDeveloper;
   const canCreateProject = !isQAMember && !isDeveloper && !isProjectLead;
+  const hideCardQuickActions = isDeveloper || isProjectLead;
 
   // Fetch projects from backend
   const fetchProjects = useCallback(async ({ silent = false } = {}) => {
@@ -1015,10 +1016,41 @@ function AdminProjects() {
                 <article
                   id={`pj-card-${project.id || project.project_code}`}
                   key={project.id || project.project_code}
-                  className="pj-card"
-                  onDoubleClick={(event) => {
-                    if (!event.target.closest('button')) openProjectWorkspace(project);
-                  }}
+                  className={`pj-card${hideCardQuickActions ? ' pj-card-clickable' : ''}`}
+                  role={hideCardQuickActions ? 'button' : undefined}
+                  tabIndex={hideCardQuickActions ? 0 : undefined}
+                  aria-label={hideCardQuickActions ? `Open ${project.name} workspace` : undefined}
+                  onClick={
+                    hideCardQuickActions
+                      ? (event) => {
+                          if (!event.target.closest('button, a, .pj-card-menu-wrap')) {
+                            openProjectWorkspace(project);
+                          }
+                        }
+                      : undefined
+                  }
+                  onKeyDown={
+                    hideCardQuickActions
+                      ? (event) => {
+                          if (
+                            (event.key === 'Enter' || event.key === ' ') &&
+                            !event.target.closest('button, a, .pj-card-menu-wrap')
+                          ) {
+                            event.preventDefault();
+                            openProjectWorkspace(project);
+                          }
+                        }
+                      : undefined
+                  }
+                  onDoubleClick={
+                    !hideCardQuickActions
+                      ? (event) => {
+                          if (!event.target.closest('button, a, .pj-card-menu-wrap')) {
+                            openProjectWorkspace(project);
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   {/* Top: Folder Graphic + Status Badge + Actions */}
                   <div className="pj-card-top">
@@ -1036,13 +1068,14 @@ function AdminProjects() {
 
                       {/* Three-dots menu */}
                       {canManageProjects && (
-                        <div className="pj-card-menu-wrap">
+                        <div className="pj-card-menu-wrap" onClick={(e) => e.stopPropagation()}>
                           <button
                             id={`pj-card-more-btn-${project.id}`}
                             className="pj-btn-more"
-                            onClick={() =>
-                              setActiveMenuId(activeMenuId === project.id ? null : project.id)
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(activeMenuId === project.id ? null : project.id);
+                            }}
                             aria-label="Project actions"
                           >
                             <MoreVertical size={18} />
@@ -1053,7 +1086,10 @@ function AdminProjects() {
                               <button
                                 id={`pj-card-edit-btn-${project.id}`}
                                 className="pj-dropdown-item"
-                                onClick={() => openEditModal(project)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(project);
+                                }}
                               >
                                 <Edit2 size={14} />
                                 <span>Edit</span>
@@ -1061,7 +1097,10 @@ function AdminProjects() {
                               <button
                                 id={`pj-card-delete-btn-${project.id}`}
                                 className="pj-dropdown-item danger"
-                                onClick={() => handleDeleteProject(project.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteProject(project.id);
+                                }}
                               >
                                 <Trash2 size={14} />
                                 <span>Delete</span>
@@ -1143,32 +1182,34 @@ function AdminProjects() {
                   </div>
 
                   {/* Card Quick Actions Bar */}
-                  <div className="pj-card-actions-bar">
-                    <button
-                      id={`pj-card-sheet-btn-${project.id || project.project_code}`}
-                      type="button"
-                      className="pj-card-action-btn sheet"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(getRolePath(`/projects/${project.id}/sheet`));
-                      }}
-                    >
-                      <FileSpreadsheet size={14} />
-                      <span>Test Sheet</span>
-                    </button>
-                    <button
-                      id={`pj-card-workspace-btn-${project.id || project.project_code}`}
-                      type="button"
-                      className="pj-card-action-btn workspace"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openProjectWorkspace(project);
-                      }}
-                    >
-                      <Folder size={14} />
-                      <span>Workspace</span>
-                    </button>
-                  </div>
+                  {!hideCardQuickActions && (
+                    <div className="pj-card-actions-bar">
+                      <button
+                        id={`pj-card-sheet-btn-${project.id || project.project_code}`}
+                        type="button"
+                        className="pj-card-action-btn sheet"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(getRolePath(`/projects/${project.id}/sheet`));
+                        }}
+                      >
+                        <FileSpreadsheet size={14} />
+                        <span>Test Sheet</span>
+                      </button>
+                      <button
+                        id={`pj-card-workspace-btn-${project.id || project.project_code}`}
+                        type="button"
+                        className="pj-card-action-btn workspace"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openProjectWorkspace(project);
+                        }}
+                      >
+                        <Folder size={14} />
+                        <span>Workspace</span>
+                      </button>
+                    </div>
+                  )}
                 </article>
               ))}
             </section>
@@ -1189,7 +1230,7 @@ function AdminProjects() {
                       <th>Test Cases</th>
                       <th>Documents</th>
                       <th>Tickets</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
+                      {!isDeveloper && <th style={{ textAlign: 'right' }}>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1197,9 +1238,25 @@ function AdminProjects() {
                       <tr
                         id={`pj-list-row-${project.id || project.project_code}`}
                         key={project.id || project.project_code}
-                        onDoubleClick={(event) => {
-                          if (!event.target.closest('button')) openProjectWorkspace(project);
-                        }}
+                        className={hideCardQuickActions ? 'pj-row-clickable' : undefined}
+                        onClick={
+                          hideCardQuickActions
+                            ? (event) => {
+                                if (!event.target.closest('button, a')) {
+                                  openProjectWorkspace(project);
+                                }
+                              }
+                            : undefined
+                        }
+                        onDoubleClick={
+                          !hideCardQuickActions
+                            ? (event) => {
+                                if (!event.target.closest('button, a')) {
+                                  openProjectWorkspace(project);
+                                }
+                              }
+                            : undefined
+                        }
                       >
                         <td>
                           <strong>{project.project_code}</strong>
@@ -1222,28 +1279,38 @@ function AdminProjects() {
                         <td style={{ fontWeight: 700 }}>{project.test_cases ?? 0}</td>
                         <td style={{ fontWeight: 700 }}>{project.documents ?? 0}</td>
                         <td style={{ fontWeight: 700 }}>{project.tickets_count ?? 0}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button
-                            id={`pj-list-sheet-btn-${project.id || project.project_code}`}
-                            className="pj-btn-more"
-                            style={{ display: 'inline-flex', marginRight: '6px' }}
-                            onClick={() => navigate(getRolePath(`/projects/${project.id}/sheet`))}
-                            aria-label="Open Project Sheet Workspace"
-                          >
-                            <FileSpreadsheet size={15} />
-                          </button>
-                          {canManageProjects && (
-                            <button
-                              id={`pj-list-edit-btn-${project.id || project.project_code}`}
-                              className="pj-btn-more"
-                              style={{ display: 'inline-flex' }}
-                              onClick={() => openEditModal(project)}
-                              aria-label="Edit project"
-                            >
-                              <Edit2 size={15} />
-                            </button>
-                          )}
-                        </td>
+                        {!isDeveloper && (
+                          <td style={{ textAlign: 'right' }}>
+                            {!hideCardQuickActions && (
+                              <button
+                                id={`pj-list-sheet-btn-${project.id || project.project_code}`}
+                                className="pj-btn-more"
+                                style={{ display: 'inline-flex', marginRight: '6px' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(getRolePath(`/projects/${project.id}/sheet`));
+                                }}
+                                aria-label="Open Project Sheet Workspace"
+                              >
+                                <FileSpreadsheet size={15} />
+                              </button>
+                            )}
+                            {canManageProjects && (
+                              <button
+                                id={`pj-list-edit-btn-${project.id || project.project_code}`}
+                                className="pj-btn-more"
+                                style={{ display: 'inline-flex' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(project);
+                                }}
+                                aria-label="Edit project"
+                              >
+                                <Edit2 size={15} />
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

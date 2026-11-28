@@ -18,7 +18,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { registerWorkflowRoutes, getUserFromReq, invalidateUserAuthCache, sendInAppNotification } from './services/leadDevWorkflow.js';
+import { registerWorkflowRoutes, getUserFromReq, invalidateUserAuthCache, sendInAppNotification, saveBase64Media } from './services/leadDevWorkflow.js';
 import { countWrittenTestCasesByProject, syncProjectTestCasesCount } from './services/sheetMetrics.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -3009,7 +3009,26 @@ app.post('/api/admin/tickets', async (req, res) => {
 
   try {
     const ticket_code = await generateTicketCode();
-    const safeAttachments = Array.isArray(attachments) ? attachments : [];
+    const rawAttachments = Array.isArray(attachments) ? attachments : [];
+    const safeAttachments = rawAttachments
+      .map((item) => {
+        if (typeof item === 'string') {
+          return saveBase64Media(item, 'ticket-attachment.png') || item;
+        }
+        if (item && typeof item === 'object' && item.url) {
+          const persistedUrl = saveBase64Media(item.url, item.name || 'ticket-attachment.png') || item.url;
+          const mediaType =
+            item.mediaType ||
+            (item.type?.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v|avi|mkv)$/i.test(persistedUrl) ? 'video' : 'image');
+          return {
+            ...item,
+            url: persistedUrl,
+            mediaType
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
 
     // Resolve matching project record so ticket always links to its project folder
     let matchedProject = null;

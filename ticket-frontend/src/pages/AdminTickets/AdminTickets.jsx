@@ -15,6 +15,8 @@ import {
   LayoutGrid,
   List,
   LogOut,
+  Maximize2,
+  Play,
   Plus,
   RefreshCw,
   Search,
@@ -30,6 +32,12 @@ import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import { getRolePath } from '../../utils/roleRoutes';
+import { API_BASE } from '../../utils/apiConfig';
+import {
+  normalizeMediaItem,
+  validateMediaFile,
+  readFileAsDataUrl
+} from '../../utils/mediaPreview';
 import FolderEmblem from '../AdminProjects/FolderEmblem';
 import { getValidToken, clearAuthSession } from '../../utils/auth';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -194,6 +202,8 @@ function AdminTickets() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(initialTicketForm);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
   const [formError, setFormError] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
@@ -295,34 +305,59 @@ function AdminTickets() {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
 
-    const readers = files.map(
-      (file) =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            resolve({
-              name: file.name,
-              type: file.type,
-              size: file.size,
-              url: reader.result,
-              mediaType: file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : 'file'
-            });
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        })
-    );
+    setFormError('');
+    setUploadingAttachments(true);
 
     try {
-      const uploadedFiles = await Promise.all(readers);
-      setFormData((prev) => ({
-        ...prev,
-        attachments: [...(prev.attachments || []), ...uploadedFiles]
-      }));
+      const token = localStorage.getItem('token');
+      const uploadedFiles = [];
+
+      for (const file of files) {
+        const validationMsg = validateMediaFile(file, 25 * 1024 * 1024);
+        if (validationMsg) {
+          setFormError(validationMsg);
+          continue;
+        }
+
+        const dataUrl = await readFileAsDataUrl(file);
+        const fallbackMediaType = file.type?.startsWith('video/') ? 'video' : 'image';
+
+        try {
+          const uploadRes = await axios.post(
+            `${API_BASE}/api/admin/tickets/upload-image`,
+            { imageBase64: dataUrl, filename: file.name, fileType: file.type },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          uploadedFiles.push({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            url: uploadRes.data.url,
+            mediaType: uploadRes.data.mediaType || fallbackMediaType
+          });
+        } catch {
+          uploadedFiles.push({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            url: dataUrl,
+            mediaType: fallbackMediaType
+          });
+        }
+      }
+
+      if (uploadedFiles.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          attachments: [...(prev.attachments || []), ...uploadedFiles]
+        }));
+      }
       event.target.value = '';
     } catch (error) {
       console.error('Error attaching files:', error);
       setFormError('One or more files could not be attached. Please try again.');
+    } finally {
+      setUploadingAttachments(false);
     }
   };
 
@@ -1383,24 +1418,85 @@ function AdminTickets() {
                 </div>
 
                 <div className="form-group-user">
-                  <label htmlFor="raise-ticket-attachments">Attachments</label>
+                  <label htmlFor="raise-ticket-attachments">Attachments (Image or Video)</label>
                   <label className="ticket-upload-box" htmlFor="raise-ticket-attachments">
                     <Upload size={16} />
-                    <span>Upload image or video</span>
-                    <input id="raise-ticket-attachments" type="file" accept="image/*,video/*" multiple onChange={handleAttachmentChange} />
+                    <span>{uploadingAttachments ? 'Uploading media...' : 'Upload image or video (PNG, JPG, WEBP, MP4, WEBM, MOV)'}</span>
+                    <input
+                      id="raise-ticket-attachments"
+                      type="file"
+                      accept="image/*,video/*"
+                      multiple
+                      disabled={uploadingAttachments}
+                      onChange={handleAttachmentChange}
+                    />
                   </label>
 
                   {(formData.attachments || []).length > 0 && (
-                    <div className="attachment-list">
-                      {(formData.attachments || []).map((attachment, index) => (
-                        <div className="attachment-chip" key={`${attachment.name}-${index}`}>
-                          {attachment.mediaType === 'image' ? <ImageIcon size={14} /> : attachment.mediaType === 'video' ? <Video size={14} /> : <FileText size={14} />}
-                          <span>{attachment.name}</span>
-                          <button id={`raise-ticket-remove-att-${index}`} type="button" aria-label={`Remove ${attachment.name}`} onClick={() => removeAttachment(index)}>
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
+                    <div className="ticket-upload-preview-grid">
+                      {(formData.attachments || []).map((attachment, index) => {
+                        const media = normalizeMediaItem(attachment, index, 'Attachment');
+                        const isVideo = media.mediaType === 'video';
+                        return (
+                          <div className="ticket-upload-preview-card" key={`${media.name}-${index}`}>
+                            <div
+                              className="ticket-upload-preview-media-wrap"
+                              onClick={() => setPreviewAttachment(media)}
+                              title={isVideo ? 'Click to preview video' : 'Click to preview image'}
+                            >
+                              {isVideo ? (
+                                <>
+                                  <video
+                                    src={media.url}
+                                    muted
+                                    playsInline
+                                    preload="metadata"
+                                    className="ticket-upload-preview-media"
+                                  />
+                                  <span className="ticket-upload-type-badge">VIDEO</span>
+                                </>
+                              ) : (
+                                <img
+                                  src={media.url}
+                                  alt={media.name}
+                                  className="ticket-upload-preview-media"
+                                />
+                              )}
+                              <div className="ticket-upload-preview-overlay">
+                                {isVideo ? <Play size={16} /> : <Maximize2 size={15} />}
+                                <span>Preview</span>
+                              </div>
+                            </div>
+                            <div className="ticket-upload-preview-footer">
+                              <span className="ticket-upload-preview-name" title={media.name}>
+                                {isVideo ? <Video size={12} /> : <ImageIcon size={12} />}
+                                <span>{media.name}</span>
+                              </span>
+                              <div className="ticket-upload-preview-actions">
+                                <button
+                                  id={`raise-ticket-preview-att-${index}`}
+                                  type="button"
+                                  className="ticket-upload-icon-btn"
+                                  onClick={() => setPreviewAttachment(media)}
+                                  title={isVideo ? 'Preview video' : 'Preview image'}
+                                >
+                                  {isVideo ? <Play size={12} /> : <Eye size={12} />}
+                                </button>
+                                <button
+                                  id={`raise-ticket-remove-att-${index}`}
+                                  type="button"
+                                  className="ticket-upload-icon-btn danger"
+                                  aria-label={`Remove ${media.name}`}
+                                  onClick={() => removeAttachment(index)}
+                                  title="Remove attachment"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1419,12 +1515,53 @@ function AdminTickets() {
                   id="raise-ticket-submit-btn"
                   type="submit"
                   className="btn-primary-action"
-                  disabled={submitting}
+                  disabled={submitting || uploadingAttachments}
                 >
                   {submitting ? 'Creating...' : 'Create Ticket'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {previewAttachment && (
+        <div
+          id="raise-ticket-media-lightbox"
+          className="ticket-media-lightbox"
+          onClick={() => setPreviewAttachment(null)}
+        >
+          <div className="ticket-media-lightbox-box" onClick={(e) => e.stopPropagation()}>
+            <div className="ticket-media-lightbox-header">
+              <span title={previewAttachment.name}>{previewAttachment.name}</span>
+              <button
+                id="raise-ticket-media-lightbox-close"
+                type="button"
+                className="ticket-media-lightbox-close"
+                onClick={() => setPreviewAttachment(null)}
+                aria-label="Close preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="ticket-media-lightbox-body">
+              {previewAttachment.mediaType === 'video' ? (
+                <video
+                  key={previewAttachment.url}
+                  src={previewAttachment.url}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="ticket-media-lightbox-content"
+                />
+              ) : (
+                <img
+                  src={previewAttachment.url}
+                  alt={previewAttachment.name}
+                  className="ticket-media-lightbox-content"
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

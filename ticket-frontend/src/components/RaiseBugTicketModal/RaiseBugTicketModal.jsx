@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
+  Play,
   Trash2,
   ShieldAlert,
   FolderKanban,
@@ -20,6 +21,12 @@ import {
 import CustomSelect from '../CustomSelect/CustomSelect';
 import { formatIndianDate } from '../../utils/dateFormat';
 import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
+import { API_BASE } from '../../utils/apiConfig';
+import {
+  normalizeMediaItem,
+  validateMediaFile,
+  readFileAsDataUrl
+} from '../../utils/mediaPreview';
 import './RaiseBugTicketModal.css';
 
 const SEVERITY_OPTIONS = ['Critical', 'Block', 'High', 'Medium', 'Low'];
@@ -58,7 +65,7 @@ export default function RaiseBugTicketModal({
   // Preview Mode
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [zoomImage, setZoomImage] = useState(null);
+  const [zoomMedia, setZoomMedia] = useState(null);
 
   // Duplicate Check Warning
   const [existingWarning, setExistingWarning] = useState(null);
@@ -118,53 +125,53 @@ export default function RaiseBugTicketModal({
     }
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
     setUploadError('');
     setIsUploading(true);
 
-    files.forEach((file) => {
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        setUploadError('Invalid format. Please upload JPG, PNG, or WEBP images.');
-        setIsUploading(false);
-        return;
-      }
-      // Validate file size (max 8MB)
-      if (file.size > 8 * 1024 * 1024) {
-        setUploadError(`File ${file.name} is too large. Max allowed size is 8MB.`);
-        setIsUploading(false);
-        return;
-      }
+    try {
+      for (const file of files) {
+        const validationMsg = validateMediaFile(file, 25 * 1024 * 1024);
+        if (validationMsg) {
+          setUploadError(validationMsg);
+          continue;
+        }
 
-      const reader = new FileReader();
-      reader.onload = async () => {
+        const dataUrl = await readFileAsDataUrl(file);
+        const fallbackType = file.type?.startsWith('video/') ? 'video' : 'image';
         try {
           const token = localStorage.getItem('token');
           const res = await axios.post(
-            'http://localhost:5000/api/admin/tickets/upload-image',
-            { imageBase64: reader.result, filename: file.name, fileType: file.type },
+            `${API_BASE}/api/admin/tickets/upload-image`,
+            { imageBase64: dataUrl, filename: file.name, fileType: file.type },
             { headers: { Authorization: `Bearer ${token}` } }
           );
-          setAttachments((prev) => [...prev, { url: res.data.url, name: file.name }]);
-        } catch (err) {
+          setAttachments((prev) => [
+            ...prev,
+            {
+              url: res.data.url,
+              name: file.name,
+              type: file.type,
+              mediaType: res.data.mediaType || fallbackType
+            }
+          ]);
+        } catch {
           // If backend upload fails, fall back to base64 data URL
-          setAttachments((prev) => [...prev, { url: reader.result, name: file.name }]);
-        } finally {
-          setIsUploading(false);
+          setAttachments((prev) => [
+            ...prev,
+            { url: dataUrl, name: file.name, type: file.type, mediaType: fallbackType }
+          ]);
         }
-      };
-      reader.onerror = () => {
-        setUploadError('Failed to read image file.');
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
-    });
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      setUploadError(err?.message || 'Failed to read media file.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const removeAttachment = (index) => {
@@ -402,14 +409,14 @@ export default function RaiseBugTicketModal({
                   />
                 </div>
 
-                {/* 3. Image Attachments Section */}
+                {/* 3. Image & Video Attachments Section */}
                 <div className="rbt-field-group rbt-field-full">
                   <div className="rbt-attach-header">
                     <label className="rbt-label" htmlFor="rbt-attachments-input">
-                      Screenshot & Evidence Attachments
+                      Screenshot &amp; Video Evidence Attachments
                       <span className="rbt-badge-count">{attachments.length}</span>
                     </label>
-                    <span className="rbt-sublabel">PNG, JPG, WEBP up to 8MB each</span>
+                    <span className="rbt-sublabel">PNG, JPG, WEBP, GIF or MP4, WEBM, MOV up to 25MB each</span>
                   </div>
 
                   {uploadError && <div className="rbt-error-inline">{uploadError}</div>}
@@ -420,7 +427,7 @@ export default function RaiseBugTicketModal({
                       type="file"
                       ref={fileInputRef}
                       multiple
-                      accept="image/png, image/jpeg, image/jpg, image/webp"
+                      accept="image/*,video/*"
                       style={{ display: 'none' }}
                       onChange={handleFileUpload}
                     />
@@ -432,7 +439,7 @@ export default function RaiseBugTicketModal({
                       disabled={isUploading}
                     >
                       <Upload size={16} />
-                      <span>{isUploading ? 'Processing Image...' : 'Upload Screenshots'}</span>
+                      <span>{isUploading ? 'Processing Media...' : 'Upload Image or Video'}</span>
                     </button>
                     <span className="rbt-drop-hint">or paste screenshot directly</span>
                   </div>
@@ -440,38 +447,57 @@ export default function RaiseBugTicketModal({
                   {/* Thumbnail Strip */}
                   {attachments.length > 0 && (
                     <div className="rbt-thumbs-grid">
-                      {attachments.map((att, idx) => (
-                        <div id={`rbt-thumb-card-${idx}`} key={idx} className="rbt-thumb-card">
-                          <img
-                            id={`rbt-thumb-img-${idx}`}
-                            src={att.url}
-                            alt={att.name || `Screenshot ${idx + 1}`}
-                            className="rbt-thumb-img"
-                            onClick={() => setZoomImage(att.url)}
-                          />
-                          <div className="rbt-thumb-overlay">
-                            <button
-                              id={`rbt-thumb-zoom-btn-${idx}`}
-                              type="button"
-                              className="rbt-thumb-zoom-btn"
-                              onClick={() => setZoomImage(att.url)}
-                              title="Enlarge preview"
-                            >
-                              <Maximize2 size={12} />
-                            </button>
-                            <button
-                              id={`rbt-thumb-remove-btn-${idx}`}
-                              type="button"
-                              className="rbt-thumb-remove-btn"
-                              onClick={() => removeAttachment(idx)}
-                              title="Remove image"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                      {attachments.map((att, idx) => {
+                        const media = normalizeMediaItem(att, idx, 'Attachment');
+                        const isVideo = media.mediaType === 'video';
+                        return (
+                          <div id={`rbt-thumb-card-${idx}`} key={idx} className="rbt-thumb-card">
+                            {isVideo ? (
+                              <>
+                                <video
+                                  id={`rbt-thumb-img-${idx}`}
+                                  src={media.url}
+                                  muted
+                                  playsInline
+                                  preload="metadata"
+                                  className="rbt-thumb-img"
+                                  onClick={() => setZoomMedia(media)}
+                                />
+                                <span className="rbt-thumb-video-badge">VIDEO</span>
+                              </>
+                            ) : (
+                              <img
+                                id={`rbt-thumb-img-${idx}`}
+                                src={media.url}
+                                alt={media.name || `Screenshot ${idx + 1}`}
+                                className="rbt-thumb-img"
+                                onClick={() => setZoomMedia(media)}
+                              />
+                            )}
+                            <div className="rbt-thumb-overlay">
+                              <button
+                                id={`rbt-thumb-zoom-btn-${idx}`}
+                                type="button"
+                                className="rbt-thumb-zoom-btn"
+                                onClick={() => setZoomMedia(media)}
+                                title={isVideo ? 'Play video preview' : 'Enlarge preview'}
+                              >
+                                {isVideo ? <Play size={12} /> : <Maximize2 size={12} />}
+                              </button>
+                              <button
+                                id={`rbt-thumb-remove-btn-${idx}`}
+                                type="button"
+                                className="rbt-thumb-remove-btn"
+                                onClick={() => removeAttachment(idx)}
+                                title="Remove attachment"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                            <span className="rbt-thumb-name" title={media.name}>{media.name}</span>
                           </div>
-                          <span className="rbt-thumb-name" title={att.name}>{att.name || `Image-${idx + 1}`}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -548,53 +574,84 @@ export default function RaiseBugTicketModal({
                   <div className="rbt-doc-no-evidence">No screenshot attachments uploaded.</div>
                 ) : (
                   <div className="rbt-doc-evidence-gallery">
-                    <div className="rbt-gallery-main-view">
-                      <img
-                        id="rbt-gallery-main-img"
-                        src={attachments[activeImageIndex]?.url}
-                        alt="Evidence Full View"
-                        className="rbt-gallery-main-img"
-                        onClick={() => setZoomImage(attachments[activeImageIndex]?.url)}
-                      />
-                      {attachments.length > 1 && (
-                        <>
-                          <button
-                            id="rbt-gallery-prev-btn"
-                            type="button"
-                            className="rbt-gallery-nav prev"
-                            onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : attachments.length - 1))}
-                            title="Previous image"
-                          >
-                            <ChevronLeft size={18} />
-                          </button>
-                          <button
-                            id="rbt-gallery-next-btn"
-                            type="button"
-                            className="rbt-gallery-nav next"
-                            onClick={() => setActiveImageIndex((prev) => (prev < attachments.length - 1 ? prev + 1 : 0))}
-                            title="Next image"
-                          >
-                            <ChevronRight size={18} />
-                          </button>
-                        </>
-                      )}
-                      <span className="rbt-gallery-counter">
-                        {activeImageIndex + 1} of {attachments.length} &bull; Click to zoom
-                      </span>
-                    </div>
+                    {(() => {
+                      const activeMedia = normalizeMediaItem(attachments[activeImageIndex], activeImageIndex, 'Evidence');
+                      const isActiveVideo = activeMedia.mediaType === 'video';
+                      return (
+                        <div className="rbt-gallery-main-view">
+                          {isActiveVideo ? (
+                            <video
+                              id="rbt-gallery-main-img"
+                              key={activeMedia.url}
+                              src={activeMedia.url}
+                              controls
+                              playsInline
+                              className="rbt-gallery-main-img"
+                            />
+                          ) : (
+                            <img
+                              id="rbt-gallery-main-img"
+                              src={activeMedia.url}
+                              alt={activeMedia.name || 'Evidence Full View'}
+                              className="rbt-gallery-main-img"
+                              onClick={() => setZoomMedia(activeMedia)}
+                            />
+                          )}
+                          {attachments.length > 1 && (
+                            <>
+                              <button
+                                id="rbt-gallery-prev-btn"
+                                type="button"
+                                className="rbt-gallery-nav prev"
+                                onClick={() => setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : attachments.length - 1))}
+                                title="Previous attachment"
+                              >
+                                <ChevronLeft size={18} />
+                              </button>
+                              <button
+                                id="rbt-gallery-next-btn"
+                                type="button"
+                                className="rbt-gallery-nav next"
+                                onClick={() => setActiveImageIndex((prev) => (prev < attachments.length - 1 ? prev + 1 : 0))}
+                                title="Next attachment"
+                              >
+                                <ChevronRight size={18} />
+                              </button>
+                            </>
+                          )}
+                          <span className="rbt-gallery-counter">
+                            {activeImageIndex + 1} of {attachments.length} &bull; {isActiveVideo ? 'Click Zoom to enlarge' : 'Click to zoom'}
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     {attachments.length > 1 && (
                       <div className="rbt-gallery-strip">
-                        {attachments.map((att, idx) => (
-                          <img
-                            id={`rbt-gallery-thumb-${idx}`}
-                            key={idx}
-                            src={att.url}
-                            alt="thumb"
-                            className={`rbt-gallery-thumb ${idx === activeImageIndex ? 'active' : ''}`}
-                            onClick={() => setActiveImageIndex(idx)}
-                          />
-                        ))}
+                        {attachments.map((att, idx) => {
+                          const thumbMedia = normalizeMediaItem(att, idx, 'Thumb');
+                          return thumbMedia.mediaType === 'video' ? (
+                            <video
+                              id={`rbt-gallery-thumb-${idx}`}
+                              key={idx}
+                              src={thumbMedia.url}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className={`rbt-gallery-thumb ${idx === activeImageIndex ? 'active' : ''}`}
+                              onClick={() => setActiveImageIndex(idx)}
+                            />
+                          ) : (
+                            <img
+                              id={`rbt-gallery-thumb-${idx}`}
+                              key={idx}
+                              src={thumbMedia.url}
+                              alt="thumb"
+                              className={`rbt-gallery-thumb ${idx === activeImageIndex ? 'active' : ''}`}
+                              onClick={() => setActiveImageIndex(idx)}
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -667,11 +724,22 @@ export default function RaiseBugTicketModal({
       </div>
 
       {/* Lightbox Full Zoom View */}
-      {zoomImage && (
-        <div id="rbt-zoom-lightbox" className="rbt-zoom-lightbox" onClick={() => setZoomImage(null)}>
+      {zoomMedia && (
+        <div id="rbt-zoom-lightbox" className="rbt-zoom-lightbox" onClick={() => setZoomMedia(null)}>
           <div id="rbt-zoom-content" className="rbt-zoom-content" onClick={(e) => e.stopPropagation()}>
-            <img src={zoomImage} alt="Full Resolution" className="rbt-zoom-img" />
-            <button id="rbt-zoom-close-btn" type="button" className="rbt-zoom-close" onClick={() => setZoomImage(null)}>
+            {zoomMedia.mediaType === 'video' ? (
+              <video
+                key={zoomMedia.url}
+                src={zoomMedia.url}
+                controls
+                autoPlay
+                playsInline
+                className="rbt-zoom-img"
+              />
+            ) : (
+              <img src={zoomMedia.url} alt={zoomMedia.name || 'Full Resolution'} className="rbt-zoom-img" />
+            )}
+            <button id="rbt-zoom-close-btn" type="button" className="rbt-zoom-close" onClick={() => setZoomMedia(null)}>
               <X size={20} />
             </button>
           </div>

@@ -629,6 +629,24 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
 }
 
+.pj-card.pj-card-clickable,
+.admin-layout .pj-page-container .pj-card.pj-card-clickable {
+  cursor: pointer;
+}
+
+.pj-card.pj-card-clickable:hover,
+.admin-layout .pj-page-container .pj-card.pj-card-clickable:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.1);
+}
+
+.pj-card.pj-card-clickable:focus-visible,
+.admin-layout .pj-page-container .pj-card.pj-card-clickable:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-color: #2563eb;
+}
+
 /* Card Header: Folder Emblem + Status + Actions */
 .pj-card-top {
   display: flex;
@@ -1017,6 +1035,14 @@
 
 .pj-table tr:hover td {
   background-color: #f8fafc;
+}
+
+.pj-table tbody tr.pj-row-clickable {
+  cursor: pointer;
+}
+
+.pj-table tbody tr.pj-row-clickable:hover td {
+  background-color: #eff6ff;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
