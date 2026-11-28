@@ -11,7 +11,9 @@ import { getRolePath } from '../../utils/roleRoutes';
 
 function NotificationDrawerPortal({ isOpen, onClose, children }) {
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -43,6 +45,7 @@ function NotificationDrawerPortal({ isOpen, onClose, children }) {
 const TYPE_META = {
   info: { label: 'Info', className: 'notif-type-info' },
   success: { label: 'Success', className: 'notif-type-success' },
+  project_assigned: { label: 'Project Assigned', className: 'notif-type-success' },
   warning: { label: 'Warning', className: 'notif-type-warning' },
   urgent: { label: 'Urgent', className: 'notif-type-urgent' }
 };
@@ -61,14 +64,20 @@ function NotificationCenter({ collapsed = false, hideTrigger = false }) {
 
   // Check and proactively request OS desktop notification permission
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setOsPermission(Notification.permission);
+    if (typeof window === 'undefined' || !('Notification' in window)) return undefined;
+    const askPermission = () => {
       if (Notification.permission === 'default') {
         Notification.requestPermission()
           .then((perm) => setOsPermission(perm))
           .catch(() => {});
       }
+    };
+    askPermission();
+    if (Notification.permission === 'default') {
+      window.addEventListener('click', askPermission, { once: true });
+      return () => window.removeEventListener('click', askPermission);
     }
+    return undefined;
   }, []);
 
   // Helper to trigger real OS Desktop Notification outside of browser/site
@@ -284,7 +293,19 @@ function NotificationCenter({ collapsed = false, hideTrigger = false }) {
       )}
 
       {liveToast && (
-        <div id="notif-toast" className="notif-toast" role="status" aria-live="polite">
+        <div
+          id="notif-toast"
+          className="notif-toast"
+          role="status"
+          aria-live="polite"
+          style={liveToast.link ? { cursor: 'pointer' } : undefined}
+          onClick={() => {
+            if (liveToast.link) {
+              window.location.hash = `#${getRolePath(liveToast.link)}`;
+              setLiveToast(null);
+            }
+          }}
+        >
           <div className="notif-toast-icon">
             <Bell size={16} />
           </div>
