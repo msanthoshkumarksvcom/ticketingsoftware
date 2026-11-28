@@ -23,6 +23,7 @@ import {
   ExternalLink,
   Download,
   Eye,
+  Play,
   RefreshCw,
   Trash2
 } from 'lucide-react';
@@ -30,21 +31,18 @@ import { io } from 'socket.io-client';
 import CustomSelect from '../CustomSelect/CustomSelect';
 import { INPUT_LIMITS, validateFields, validateMeaningfulText } from '../../utils/inputValidation';
 import { formatIndianDate, formatIndianDateTime, formatIndianTime } from '../../utils/dateFormat';
+import {
+  getFullMediaUrl,
+  normalizeMediaItem,
+  validateMediaFile,
+  readFileAsDataUrl
+} from '../../utils/mediaPreview';
 import SkeletonLoader from '../SkeletonLoader/SkeletonLoader';
 import './TicketDetailModal.css';
 import { API_BASE, SOCKET_URL } from '../../utils/apiConfig';
 
-// Prepend backend host for relative image uploads so they never break
-export const getFullImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return '';
-  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
-    return url;
-  }
-  if (url.startsWith('/')) {
-    return `${API_BASE}${url}`;
-  }
-  return `${API_BASE}/uploads/tickets/${url}`;
-};
+// Prepend backend host for relative media uploads so they never break
+export const getFullImageUrl = getFullMediaUrl;
 
 export default function TicketDetailModal({
   isOpen,
@@ -73,6 +71,8 @@ export default function TicketDetailModal({
   const [filesChanged, setFilesChanged] = useState('');
   const [resRemarks, setResRemarks] = useState('');
   const [resAttachments, setResAttachments] = useState([]);
+  const [uploadingResMedia, setUploadingResMedia] = useState(false);
+  const [uploadResError, setUploadResError] = useState('');
   const [submittingResolution, setSubmittingResolution] = useState(false);
 
   // QA Verification Form
@@ -80,8 +80,8 @@ export default function TicketDetailModal({
   const [reopenComments, setReopenComments] = useState('');
   const [verifyingQA, setVerifyingQA] = useState(false);
 
-  // Image Lightbox
-  const [zoomImage, setZoomImage] = useState(null);
+  // Media Lightbox ({ url, mediaType, name })
+  const [zoomMedia, setZoomMedia] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const [otherDeveloperTyping, setOtherDeveloperTyping] = useState(null);
@@ -289,26 +289,62 @@ export default function TicketDetailModal({
     }
   };
 
-  // 3. Resolution File Upload
-  const handleResFileUpload = (e) => {
+  // 3. Resolution Image / Video Upload with live preview support
+  const handleResFileUpload = async (e) => {
     const files = Array.from(e.target.files || []);
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = async () => {
+    if (files.length === 0) return;
+
+    setUploadResError('');
+    setUploadingResMedia(true);
+
+    try {
+      for (const file of files) {
+        const validationMsg = validateMediaFile(file, 25 * 1024 * 1024);
+        if (validationMsg) {
+          setUploadResError(validationMsg);
+          continue;
+        }
+
+        const dataUrl = await readFileAsDataUrl(file);
+        const fallbackType = file.type?.startsWith('video/') ? 'video' : 'image';
         try {
           const token = localStorage.getItem('token');
           const res = await axios.post(
-            'http://localhost:5000/api/admin/tickets/upload-image',
-            { imageBase64: reader.result, filename: file.name, fileType: file.type },
+            `${API_BASE}/api/admin/tickets/upload-image`,
+            { imageBase64: dataUrl, filename: file.name, fileType: file.type },
             { headers: { Authorization: `Bearer ${token}` } }
           );
-          setResAttachments((prev) => [...prev, res.data.url]);
-        } catch (err) {
-          setResAttachments((prev) => [...prev, reader.result]);
+          setResAttachments((prev) => [
+            ...prev,
+            {
+              url: res.data.url,
+              name: file.name,
+              type: file.type,
+              mediaType: res.data.mediaType || fallbackType
+            }
+          ]);
+        } catch {
+          setResAttachments((prev) => [
+            ...prev,
+            {
+              url: dataUrl,
+              name: file.name,
+              type: file.type,
+              mediaType: fallbackType
+            }
+          ]);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    } catch (err) {
+      setUploadResError(err?.message || 'Failed to read selected file.');
+    } finally {
+      setUploadingResMedia(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemoveResAttachment = (index) => {
+    setResAttachments((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   // 4. Developer Submits Resolution
@@ -574,47 +610,68 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {/* Screenshots & Evidence Attachments */}
+                {/* Screenshots & Video Evidence Attachments */}
                 <div className="tdm-section-card">
                   <div className="tdm-section-title">
                     <Maximize2 size={15} color="#475569" />
-                    <span>Screenshots & Defect Proof ({attachmentsList.length})</span>
+                    <span>Defect Media &amp; Proof ({attachmentsList.length})</span>
                   </div>
                   {attachmentsList.length === 0 ? (
-                    <div className="tdm-empty-attachments">No screenshots attached to this ticket.</div>
+                    <div className="tdm-empty-attachments">No images or videos attached to this ticket.</div>
                   ) : (
                     <div className="tdm-evidence-grid">
-                      {attachmentsList.map((url, idx) => {
-                        const fullUrl = getFullImageUrl(url);
+                      {attachmentsList.map((item, idx) => {
+                        const media = normalizeMediaItem(item, idx, 'Defect Proof');
+                        if (!media.url) return null;
+                        const isVideo = media.mediaType === 'video';
                         return (
                           <div id={`tdm-evidence-card-${idx}`} key={idx} className="tdm-evidence-card">
-                            <div id={`tdm-evidence-preview-${idx}`} className="tdm-evidence-preview-wrap" onClick={() => setZoomImage(fullUrl)}>
-                              <img src={fullUrl} alt={`Evidence ${idx + 1}`} className="tdm-evidence-img" />
+                            <div
+                              id={`tdm-evidence-preview-${idx}`}
+                              className="tdm-evidence-preview-wrap"
+                              onClick={() => setZoomMedia(media)}
+                            >
+                              {isVideo ? (
+                                <>
+                                  <video
+                                    src={media.url}
+                                    muted
+                                    playsInline
+                                    preload="metadata"
+                                    className="tdm-evidence-video"
+                                  />
+                                  <span className="tdm-media-type-badge">VIDEO</span>
+                                </>
+                              ) : (
+                                <img src={media.url} alt={media.name} className="tdm-evidence-img" />
+                              )}
                               <div className="tdm-evidence-overlay">
-                                <Maximize2 size={16} />
-                                <span>Click to Enlarge</span>
+                                {isVideo ? <Play size={18} /> : <Maximize2 size={16} />}
+                                <span>{isVideo ? 'Click to Play' : 'Click to Enlarge'}</span>
                               </div>
                             </div>
                             <div className="tdm-evidence-card-footer">
-                              <span className="tdm-evidence-label">Proof Screenshot #{idx + 1}</span>
+                              <span className="tdm-evidence-label" title={media.name}>
+                                {media.name || `${isVideo ? 'Video' : 'Screenshot'} #${idx + 1}`}
+                              </span>
                               <div className="tdm-evidence-actions">
                                 <button
                                   id={`tdm-evidence-view-btn-${idx}`}
                                   type="button"
                                   className="tdm-evidence-view-btn"
-                                  onClick={() => setZoomImage(fullUrl)}
-                                  title="View full resolution image"
+                                  onClick={() => setZoomMedia(media)}
+                                  title={isVideo ? 'Play video in full view' : 'View full resolution image'}
                                 >
-                                  <Eye size={12} />
-                                  <span>View</span>
+                                  {isVideo ? <Play size={12} /> : <Eye size={12} />}
+                                  <span>{isVideo ? 'Play' : 'View'}</span>
                                 </button>
                                 <a
                                   id={`tdm-evidence-open-link-${idx}`}
-                                  href={fullUrl}
+                                  href={media.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="tdm-evidence-download-btn"
-                                  title="Open original image in new tab"
+                                  title={`Open ${isVideo ? 'video' : 'image'} in new tab`}
                                 >
                                   <ExternalLink size={12} />
                                 </a>
@@ -656,39 +713,60 @@ export default function TicketDetailModal({
                       )}
                       {resolutionAttachmentsList.length > 0 && (
                         <div className="tdm-res-field">
-                          <label>Resolution Evidence / Proof Screenshots ({resolutionAttachmentsList.length})</label>
+                          <label>Resolution Evidence / Proof Media ({resolutionAttachmentsList.length})</label>
                           <div className="tdm-evidence-grid">
-                            {resolutionAttachmentsList.map((url, idx) => {
-                              const fullUrl = getFullImageUrl(url);
+                            {resolutionAttachmentsList.map((item, idx) => {
+                              const media = normalizeMediaItem(item, idx, 'Fix Evidence');
+                              if (!media.url) return null;
+                              const isVideo = media.mediaType === 'video';
                               return (
                                 <div id={`tdm-res-evidence-card-${idx}`} key={idx} className="tdm-evidence-card">
-                                  <div id={`tdm-res-evidence-preview-${idx}`} className="tdm-evidence-preview-wrap" onClick={() => setZoomImage(fullUrl)}>
-                                    <img src={fullUrl} alt="Fix Evidence" className="tdm-evidence-img" />
+                                  <div
+                                    id={`tdm-res-evidence-preview-${idx}`}
+                                    className="tdm-evidence-preview-wrap"
+                                    onClick={() => setZoomMedia(media)}
+                                  >
+                                    {isVideo ? (
+                                      <>
+                                        <video
+                                          src={media.url}
+                                          muted
+                                          playsInline
+                                          preload="metadata"
+                                          className="tdm-evidence-video"
+                                        />
+                                        <span className="tdm-media-type-badge">VIDEO</span>
+                                      </>
+                                    ) : (
+                                      <img src={media.url} alt={media.name} className="tdm-evidence-img" />
+                                    )}
                                     <div className="tdm-evidence-overlay">
-                                      <Maximize2 size={16} />
-                                      <span>Click to Enlarge</span>
+                                      {isVideo ? <Play size={18} /> : <Maximize2 size={16} />}
+                                      <span>{isVideo ? 'Click to Play' : 'Click to Enlarge'}</span>
                                     </div>
                                   </div>
                                   <div className="tdm-evidence-card-footer">
-                                    <span className="tdm-evidence-label">Fix Evidence #{idx + 1}</span>
+                                    <span className="tdm-evidence-label" title={media.name}>
+                                      {media.name || `Fix Evidence #${idx + 1}`}
+                                    </span>
                                     <div className="tdm-evidence-actions">
                                       <button
                                         id={`tdm-res-evidence-view-btn-${idx}`}
                                         type="button"
                                         className="tdm-evidence-view-btn"
-                                        onClick={() => setZoomImage(fullUrl)}
-                                        title="View full resolution image"
+                                        onClick={() => setZoomMedia(media)}
+                                        title={isVideo ? 'Play video in full view' : 'View full resolution image'}
                                       >
-                                        <Eye size={12} />
-                                        <span>View</span>
+                                        {isVideo ? <Play size={12} /> : <Eye size={12} />}
+                                        <span>{isVideo ? 'Play' : 'View'}</span>
                                       </button>
                                       <a
                                         id={`tdm-res-evidence-open-link-${idx}`}
-                                        href={fullUrl}
+                                        href={media.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="tdm-evidence-download-btn"
-                                        title="Open image in new tab"
+                                        title={`Open ${isVideo ? 'video' : 'image'} in new tab`}
                                       >
                                         <ExternalLink size={12} />
                                       </a>
@@ -805,13 +883,16 @@ export default function TicketDetailModal({
                         />
                       </div>
                       <div className="tdm-form-group">
-                        <label htmlFor="tdm-res-screenshot-input">Resolution Screenshot (Optional)</label>
+                        <div className="tdm-res-upload-header">
+                          <label htmlFor="tdm-res-screenshot-input">Resolution Image or Video Proof (Optional)</label>
+                          <span className="tdm-upload-hint">PNG, JPG, WEBP, GIF or MP4, WEBM, MOV up to 25MB</span>
+                        </div>
                         <input
                           id="tdm-res-screenshot-input"
                           type="file"
                           ref={resFileInputRef}
                           multiple
-                          accept="image/*"
+                          accept="image/*,video/*"
                           style={{ display: 'none' }}
                           onChange={handleResFileUpload}
                         />
@@ -820,15 +901,76 @@ export default function TicketDetailModal({
                           type="button"
                           className="tdm-upload-proof-btn"
                           onClick={() => resFileInputRef.current?.click()}
+                          disabled={uploadingResMedia}
                         >
                           <Upload size={14} />
-                          <span>Attach Fix Screenshot</span>
+                          <span>{uploadingResMedia ? 'Uploading Media...' : 'Attach Fix Image or Video'}</span>
                         </button>
+                        {uploadResError && (
+                          <div className="tdm-alert-box error" style={{ marginTop: 6 }}>
+                            <AlertCircle size={14} />
+                            <span>{uploadResError}</span>
+                          </div>
+                        )}
                         {resAttachments.length > 0 && (
-                          <div className="tdm-evidence-strip" style={{ marginTop: 8 }}>
-                            {resAttachments.map((url, i) => (
-                              <img key={i} src={getFullImageUrl(url)} alt="proof" className="tdm-evidence-thumb" />
-                            ))}
+                          <div className="tdm-res-preview-grid" style={{ marginTop: 10 }}>
+                            {resAttachments.map((item, i) => {
+                              const media = normalizeMediaItem(item, i, 'Fix Proof');
+                              const isVideo = media.mediaType === 'video';
+                              return (
+                                <div key={`${media.name}-${i}`} id={`tdm-res-upload-card-${i}`} className="tdm-res-preview-card">
+                                  <div
+                                    className="tdm-res-preview-media-wrap"
+                                    onClick={() => setZoomMedia(media)}
+                                    title={isVideo ? 'Click to play video preview' : 'Click to preview image'}
+                                  >
+                                    {isVideo ? (
+                                      <>
+                                        <video
+                                          src={media.url}
+                                          muted
+                                          playsInline
+                                          preload="metadata"
+                                          className="tdm-res-preview-media"
+                                        />
+                                        <span className="tdm-media-type-badge">VIDEO</span>
+                                      </>
+                                    ) : (
+                                      <img src={media.url} alt={media.name} className="tdm-res-preview-media" />
+                                    )}
+                                    <div className="tdm-evidence-overlay">
+                                      {isVideo ? <Play size={16} /> : <Maximize2 size={14} />}
+                                      <span>Preview</span>
+                                    </div>
+                                  </div>
+                                  <div className="tdm-res-preview-footer">
+                                    <span className="tdm-res-preview-name" title={media.name}>
+                                      {media.name}
+                                    </span>
+                                    <div className="tdm-res-preview-actions">
+                                      <button
+                                        id={`tdm-res-preview-btn-${i}`}
+                                        type="button"
+                                        className="tdm-res-preview-icon-btn"
+                                        onClick={() => setZoomMedia(media)}
+                                        title={isVideo ? 'Preview video' : 'Preview image'}
+                                      >
+                                        {isVideo ? <Play size={12} /> : <Eye size={12} />}
+                                      </button>
+                                      <button
+                                        id={`tdm-res-remove-btn-${i}`}
+                                        type="button"
+                                        className="tdm-res-preview-icon-btn danger"
+                                        onClick={() => handleRemoveResAttachment(i)}
+                                        title="Remove attachment"
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -1118,27 +1260,27 @@ export default function TicketDetailModal({
         </div>
       </div>
 
-      {/* High-Resolution Evidence Lightbox */}
-      {zoomImage && (
-        <div id="tdm-zoom-lightbox" className="tdm-zoom-lightbox" onClick={() => setZoomImage(null)}>
+      {/* High-Resolution Image & Video Lightbox */}
+      {zoomMedia && (
+        <div id="tdm-zoom-lightbox" className="tdm-zoom-lightbox" onClick={() => setZoomMedia(null)}>
           <div id="tdm-zoom-content" className="tdm-zoom-content" onClick={(e) => e.stopPropagation()}>
             <div className="tdm-zoom-toolbar">
               <a
                 id="tdm-zoom-open-link"
-                href={zoomImage}
+                href={zoomMedia.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="tdm-zoom-tool-btn"
-                title="Open high-resolution image in new tab"
+                title={`Open ${zoomMedia.mediaType === 'video' ? 'video' : 'image'} in new tab`}
               >
                 <ExternalLink size={16} />
               </a>
               <a
                 id="tdm-zoom-download-link"
-                href={zoomImage}
-                download="defect-screenshot.png"
+                href={zoomMedia.url}
+                download={zoomMedia.name || (zoomMedia.mediaType === 'video' ? 'ticket-video.mp4' : 'defect-screenshot.png')}
                 className="tdm-zoom-tool-btn"
-                title="Download original screenshot"
+                title="Download original file"
               >
                 <Download size={16} />
               </a>
@@ -1146,13 +1288,24 @@ export default function TicketDetailModal({
                 id="tdm-zoom-close-btn"
                 type="button"
                 className="tdm-zoom-tool-btn tdm-zoom-close"
-                onClick={() => setZoomImage(null)}
-                title="Close Lightbox (Esc)"
+                onClick={() => setZoomMedia(null)}
+                title="Close Preview (Esc)"
               >
                 <X size={18} />
               </button>
             </div>
-            <img src={zoomImage} alt="Enlarged defect screenshot" className="tdm-zoom-img" />
+            {zoomMedia.mediaType === 'video' ? (
+              <video
+                key={zoomMedia.url}
+                src={zoomMedia.url}
+                controls
+                autoPlay
+                playsInline
+                className="tdm-zoom-video"
+              />
+            ) : (
+              <img src={zoomMedia.url} alt={zoomMedia.name || 'Enlarged defect screenshot'} className="tdm-zoom-img" />
+            )}
           </div>
         </div>
       )}

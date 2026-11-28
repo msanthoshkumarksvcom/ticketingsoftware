@@ -58,35 +58,76 @@ export const getUserFromReq = async (req) => {
   }
 };
 
-// Helper: Save Base64 Image to disk
-export const saveBase64Image = (base64Str, originalName = 'screenshot.png') => {
+// Helper: Save Base64 Image or Video to disk
+const IMAGE_EXT_MAP = {
+  png: 'png',
+  jpg: 'jpg',
+  jpeg: 'jpg',
+  webp: 'webp',
+  gif: 'gif'
+};
+
+const VIDEO_EXT_MAP = {
+  mp4: 'mp4',
+  webm: 'webm',
+  ogg: 'ogg',
+  quicktime: 'mov',
+  mov: 'mov',
+  m4v: 'm4v',
+  'x-msvideo': 'avi',
+  avi: 'avi',
+  'x-matroska': 'mkv',
+  mkv: 'mkv',
+  '3gpp': '3gp',
+  mpeg: 'mpeg'
+};
+
+export const saveBase64Media = (base64Str, originalName = 'evidence.png') => {
   if (!base64Str || typeof base64Str !== 'string') return null;
-  
-  // If already an HTTP or relative upload URL, keep as is
-  if (base64Str.startsWith('http://') || base64Str.startsWith('https://') || base64Str.startsWith('/uploads/')) {
+
+  // If already an HTTP, relative upload URL, or blob URL, keep as is
+  if (
+    base64Str.startsWith('http://') ||
+    base64Str.startsWith('https://') ||
+    base64Str.startsWith('/uploads/')
+  ) {
     return base64Str;
   }
 
-  const matches = base64Str.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
-  let ext = 'png';
-  let buffer;
-  if (matches) {
-    ext = matches[1].replace('jpeg', 'jpg');
-    buffer = Buffer.from(matches[2], 'base64');
+  let ext = null;
+  let base64Payload = null;
+
+  const dataMatch = base64Str.match(/^data:(image|video)\/([a-zA-Z0-9.+_-]+)(?:;[^,]*)?;base64,(.+)$/);
+  if (dataMatch) {
+    const kind = dataMatch[1].toLowerCase();
+    const subtype = dataMatch[2].toLowerCase();
+    ext = kind === 'video' ? VIDEO_EXT_MAP[subtype] : IMAGE_EXT_MAP[subtype];
+    if (!ext) return null;
+    base64Payload = dataMatch[3];
+  } else if (base64Str.startsWith('data:')) {
+    // Reject non-image/video data URIs
+    return null;
   } else {
-    try {
-      buffer = Buffer.from(base64Str, 'base64');
-    } catch (e) {
-      return null;
-    }
+    const nameExt = path.extname(originalName || '').replace('.', '').toLowerCase();
+    ext = IMAGE_EXT_MAP[nameExt] || VIDEO_EXT_MAP[nameExt] || 'png';
+    base64Payload = base64Str;
   }
 
-  const sanitizedExt = ['png', 'jpg', 'jpeg', 'webp'].includes(ext.toLowerCase()) ? ext.toLowerCase() : 'png';
-  const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${sanitizedExt}`;
+  let buffer;
+  try {
+    buffer = Buffer.from(base64Payload, 'base64');
+  } catch (e) {
+    return null;
+  }
+  if (!buffer || buffer.length === 0) return null;
+
+  const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
   const filePath = path.join(ticketsUploadsDir, cleanName);
   fs.writeFileSync(filePath, buffer);
   return `/uploads/tickets/${cleanName}`;
 };
+
+export const saveBase64Image = saveBase64Media;
 
 // Helper: Generate unique project bug ticket code: e.g. [PROJ_CODE]-BUG-001
 export const generateBugTicketCode = async (projectCode) => {
@@ -148,26 +189,37 @@ export const sendInAppNotification = async (userId, title, message, type = 'info
 export function registerWorkflowRoutes(app, io) {
   _workflowIo = io;
   // ==========================================
-  // 1. IMAGE UPLOAD
+  // 1. IMAGE & VIDEO MEDIA UPLOAD
   // ==========================================
   app.post('/api/admin/tickets/upload-image', async (req, res) => {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-    const { imageBase64, filename, fileType } = req.body;
-    if (!imageBase64) {
-      return res.status(400).json({ error: 'No image data provided' });
+    const { imageBase64, fileBase64, dataUrl, filename, fileType } = req.body;
+    const rawMedia = imageBase64 || fileBase64 || dataUrl;
+    if (!rawMedia) {
+      return res.status(400).json({ error: 'No media data provided' });
     }
 
     try {
-      const url = saveBase64Image(imageBase64, filename || 'screenshot.png');
+      const url = saveBase64Media(rawMedia, filename || 'evidence.png');
       if (!url) {
-        return res.status(400).json({ error: 'Invalid image format. Supported: PNG, JPG, JPEG, WEBP' });
+        return res.status(400).json({
+          error: 'Invalid format. Supported images (PNG, JPG, WEBP, GIF) and videos (MP4, WEBM, MOV, OGG).'
+        });
       }
-      res.json({ url, filename: filename || path.basename(url) });
+      const isVideo =
+        (typeof fileType === 'string' && fileType.startsWith('video/')) ||
+        (typeof rawMedia === 'string' && rawMedia.startsWith('data:video/')) ||
+        /\.(mp4|webm|ogg|mov|m4v|avi|mkv|3gp|mpeg)$/i.test(url);
+      res.json({
+        url,
+        filename: filename || path.basename(url),
+        mediaType: isVideo ? 'video' : 'image'
+      });
     } catch (err) {
-      console.error('Image upload error:', err);
-      res.status(500).json({ error: 'Failed to process and store image.' });
+      console.error('Media upload error:', err);
+      res.status(500).json({ error: 'Failed to process and store media file.' });
     }
   });
 
@@ -1396,16 +1448,26 @@ export function registerWorkflowRoutes(app, io) {
         });
       }
 
-      // Save resolution attachments if any
+      // Save resolution attachments (images or videos) if any
       let processedResAttachments = [];
       if (Array.isArray(resolution_attachments)) {
         for (const item of resolution_attachments) {
           if (typeof item === 'string') {
-            const savedUrl = saveBase64Image(item, 'fix-evidence.png');
+            const savedUrl = saveBase64Media(item, 'fix-evidence.png');
             if (savedUrl) processedResAttachments.push(savedUrl);
           } else if (item?.url) {
-            const savedUrl = saveBase64Image(item.url, item.name || 'fix-evidence.png');
-            if (savedUrl) processedResAttachments.push(savedUrl);
+            const savedUrl = saveBase64Media(item.url, item.name || 'fix-evidence.png');
+            if (savedUrl) {
+              const mediaType =
+                item.mediaType ||
+                (item.type?.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v|avi|mkv)$/i.test(savedUrl) ? 'video' : 'image');
+              processedResAttachments.push({
+                url: savedUrl,
+                name: item.name || path.basename(savedUrl),
+                type: item.type || '',
+                mediaType
+              });
+            }
           }
         }
       }
