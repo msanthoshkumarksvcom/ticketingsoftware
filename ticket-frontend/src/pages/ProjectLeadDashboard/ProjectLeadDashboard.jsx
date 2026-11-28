@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { getRolePath } from '../../utils/roleRoutes';
 import {
   FolderKanban,
   FileSpreadsheet,
@@ -446,7 +447,7 @@ export default function ProjectLeadDashboard() {
                               id={`pld-proj-sheet-btn-${proj.id}`}
                               type="button"
                               className="pld-btn-action sheet"
-                              onClick={() => navigate(`/admin/projects/${proj.id}/sheet`, { state: { project: proj } })}
+                              onClick={() => navigate(getRolePath(`/projects/${proj.id}/sheet`), { state: { project: proj } })}
                               title="Open complete Google Sheets-style test execution matrix"
                             >
                               <FileSpreadsheet size={13} />
@@ -466,7 +467,7 @@ export default function ProjectLeadDashboard() {
                               id={`pld-proj-details-btn-${proj.id}`}
                               type="button"
                               className="pld-btn-action details"
-                              onClick={() => navigate(`/admin/projects/${proj.id}`, { state: { project: proj } })}
+                              onClick={() => navigate(getRolePath(`/projects/${proj.id}`), { state: { project: proj } })}
                               title="Open Project Workspace Details"
                             >
                               <ExternalLink size={13} />

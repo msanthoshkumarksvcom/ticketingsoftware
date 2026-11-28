@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import Login from './pages/Login/Login';
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
@@ -15,7 +15,10 @@ import AdminApprovals from './pages/AdminApprovals/AdminApprovals';
 import AdminDeployments from './pages/AdminDeployments/AdminDeployments';
 import AdminWorkspacePage from './pages/AdminWorkspacePage/AdminWorkspacePage';
 import { getValidToken } from './utils/auth';
+import { getRoleHomeRoute } from './utils/roleRoutes';
 import './styles/design-system.css';
+
+const ROLE_PREFIXES = ['/admin', '/manager', '/qa-lead', '/qa-member', '/project-lead', '/developer'];
 
 function RoleRoute({ allowedRoles, fallback = '/', children }) {
   const token = getValidToken();
@@ -26,11 +29,7 @@ function RoleRoute({ allowedRoles, fallback = '/', children }) {
   }
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    if (userRole === 'Admin' || userRole === 'Super Admin') return <Navigate to="/admin/users" replace />;
-    if (userRole === 'QA Member') return <Navigate to="/qa-member" replace />;
-    if (userRole === 'Developer') return <Navigate to="/developer" replace />;
-    if (userRole === 'Project Lead') return <Navigate to="/project-lead" replace />;
-    return <Navigate to={fallback} replace />;
+    return <Navigate to={getRoleHomeRoute(userRole) || fallback} replace />;
   }
 
   return children;
@@ -38,7 +37,7 @@ function RoleRoute({ allowedRoles, fallback = '/', children }) {
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Login />} />
 
@@ -67,107 +66,117 @@ function App() {
             </RoleRoute>
           }
         />
+        {['/admin', '/manager', '/qa-lead'].map((prefix) => (
+          <Route
+            key={`${prefix}-dashboard`}
+            path={prefix}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
+                <AdminDashboard />
+              </RoleRoute>
+            }
+          />
+        ))}
 
-        {/* Admin & Management Console Routes */}
-        <Route
-          path="/admin"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
-              <AdminDashboard />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <RoleRoute allowedRoles={['Admin', 'Super Admin', 'Manager', 'QA Lead']}>
-              <AdminUsers />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/employees"
-          element={
-            <RoleRoute allowedRoles={['Admin', 'Super Admin', 'Manager', 'QA Lead']}>
-              <AdminUsers />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/projects"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
-              <AdminProjects />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/projects/:projectId"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
-              <AdminProjectWorkspace />
-            </RoleRoute>
-          }
-        />
-        
-        {/* Test Case Sheet - Developers have read-only access */}
-        <Route
-          path="/admin/projects/:projectId/sheet"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']} fallback="/developer">
-              <AdminProjectSheet />
-            </RoleRoute>
-          }
-        />
+        {/* Shared Module Routes across all role prefixes (/manager/*, /qa-lead/*, /admin/*, etc.) */}
+        {ROLE_PREFIXES.flatMap((prefix) => [
+          <Route
+            key={`${prefix}-users`}
+            path={`${prefix}/users`}
+            element={
+              <RoleRoute allowedRoles={['Admin', 'Super Admin', 'Manager', 'QA Lead']}>
+                <AdminUsers />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-employees`}
+            path={`${prefix}/employees`}
+            element={
+              <RoleRoute allowedRoles={['Admin', 'Super Admin', 'Manager', 'QA Lead']}>
+                <AdminUsers />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-projects`}
+            path={`${prefix}/projects`}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
+                <AdminProjects />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-project-workspace`}
+            path={`${prefix}/projects/:projectId`}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
+                <AdminProjectWorkspace />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-project-sheet`}
+            path={`${prefix}/projects/:projectId/sheet`}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']} fallback="/developer">
+                <AdminProjectSheet />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-tickets`}
+            path={`${prefix}/tickets`}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
+                <AdminTickets />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-reports`}
+            path={`${prefix}/reports`}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
+                <AdminReports />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-approvals`}
+            path={`${prefix}/approvals`}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
+                <AdminApprovals />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-deployment-approval`}
+            path={`${prefix}/deployment-approval`}
+            element={
+              <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
+                <AdminDeployments />
+              </RoleRoute>
+            }
+          />,
+          <Route
+            key={`${prefix}-settings`}
+            path={`${prefix}/settings`}
+            element={
+              <RoleRoute allowedRoles={['Admin', 'Super Admin', 'Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
+                <AdminWorkspacePage section="settings" />
+              </RoleRoute>
+            }
+          />,
+        ])}
 
-        <Route
-          path="/admin/roles-permissions"
-          element={<Navigate to="/admin" replace />}
-        />
-        <Route
-          path="/admin/tickets"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
-              <AdminTickets />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/reports"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
-              <AdminReports />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/approvals"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
-              <AdminApprovals />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/deployment-approval"
-          element={
-            <RoleRoute allowedRoles={['Manager', 'QA Lead']}>
-              <AdminDeployments />
-            </RoleRoute>
-          }
-        />
-        <Route
-          path="/admin/settings"
-          element={
-            <RoleRoute allowedRoles={['Admin', 'Super Admin', 'Manager', 'QA Lead', 'QA Member', 'Project Lead', 'Developer']}>
-              <AdminWorkspacePage section="settings" />
-            </RoleRoute>
-          }
-        />
+        <Route path="/admin/roles-permissions" element={<Navigate to="/admin" replace />} />
         {/* Redirect unknown routes to login */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

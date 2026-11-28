@@ -5,6 +5,7 @@ import AdminSidebar, {
   PROJECT_LEAD_NAV,
   DEVELOPER_NAV
 } from '../AdminSidebar/AdminSidebar';
+import { getRoleHomeRoute, getRolePath } from '../../utils/roleRoutes';
 
 export default function RoleSidebar({ roleName, homeRoute, onLogout, navItems }) {
   const currentRole = roleName || (typeof window !== 'undefined' ? window.localStorage.getItem('userRole') : '');
@@ -15,16 +16,10 @@ export default function RoleSidebar({ roleName, homeRoute, onLogout, navItems })
   const isQALead = roleLower === 'qa lead';
   const isManager = roleLower === 'manager';
 
-  let defaultHome = '/admin';
-  if (isQAMember) defaultHome = '/qa-member';
-  else if (isProjectLead) defaultHome = '/project-lead';
-  else if (isDeveloper) defaultHome = '/developer';
-  else if (isQALead || isManager) defaultHome = '/admin';
-
-  const effectiveHome = homeRoute || defaultHome;
+  const effectiveHome = homeRoute || getRoleHomeRoute(currentRole);
 
   // IMPORTANT FIX: QA Lead, Manager, Admin, and Super Admin MUST receive MAIN_ADMIN_NAV
-  // containing "Approvals & Requests" (/admin/approvals) and "Deployment Approval" (/admin/deployment-approval).
+  // containing "Approvals & Requests" and "Deployment Approval".
   // Only QA Member, Developer, and Project Lead receive their respective scoped navigation menus.
   let defaultNav = MAIN_ADMIN_NAV;
   if (isProjectLead) defaultNav = PROJECT_LEAD_NAV;
@@ -32,7 +27,10 @@ export default function RoleSidebar({ roleName, homeRoute, onLogout, navItems })
   else if (isQAMember) defaultNav = QA_MEMBER_NAV;
   else if (isQALead || isManager) defaultNav = MAIN_ADMIN_NAV;
 
-  const effectiveNav = navItems || defaultNav;
+  const effectiveNav = (navItems || defaultNav).map((item) => ({
+    ...item,
+    to: getRolePath(item.to, currentRole),
+  }));
 
   return (
     <AdminSidebar

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
 import { INPUT_LIMITS, validateMeaningfulText } from '../../utils/inputValidation';
+import { getRolePath } from '../../utils/roleRoutes';
 import {
   AlertTriangle,
   Building2,
@@ -342,7 +343,7 @@ function AdminProjects() {
   const formatDate = (dateStr) => formatIndianDate(dateStr, 'Not set');
 
   const openProjectWorkspace = (project) => {
-    navigate(`/admin/projects/${project.id}`, { state: { project } });
+    navigate(getRolePath(`/projects/${project.id}`), { state: { project } });
   };
 
   // Status badge class
@@ -1149,7 +1150,7 @@ function AdminProjects() {
                       className="pj-card-action-btn sheet"
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/admin/projects/${project.id}/sheet`);
+                        navigate(getRolePath(`/projects/${project.id}/sheet`));
                       }}
                     >
                       <FileSpreadsheet size={14} />
@@ -1226,7 +1227,7 @@ function AdminProjects() {
                             id={`pj-list-sheet-btn-${project.id || project.project_code}`}
                             className="pj-btn-more"
                             style={{ display: 'inline-flex', marginRight: '6px' }}
-                            onClick={() => navigate(`/admin/projects/${project.id}/sheet`)}
+                            onClick={() => navigate(getRolePath(`/projects/${project.id}/sheet`))}
                             aria-label="Open Project Sheet Workspace"
                           >
                             <FileSpreadsheet size={15} />

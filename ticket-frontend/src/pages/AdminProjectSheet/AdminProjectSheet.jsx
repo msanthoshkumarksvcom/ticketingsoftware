@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { INPUT_LIMITS, validateMeaningfulText } from '../../utils/inputValidation';
+import { getRolePath } from '../../utils/roleRoutes';
 import {
   FileSpreadsheet,
   ArrowLeft,
@@ -2063,7 +2064,7 @@ export default function AdminProjectSheet() {
         <TopNavbar
           pageTitle={project?.name ? `${project.name} - Test Execution Matrix` : 'Test Execution Matrix'}
           breadcrumbs={[
-            { label: 'Projects', to: '/admin/projects' },
+            { label: 'Projects', to: getRolePath('/projects') },
             ...(projectId ? [{ label: project?.name || 'Project Workspace', to: `/admin/projects/${projectId}` }] : [])
           ]}
         />
@@ -2074,7 +2075,7 @@ export default function AdminProjectSheet() {
             <button
               id="pjs-back-projects-btn"
               className="pjs-back-btn"
-              onClick={() => navigate('/admin/projects')}
+              onClick={() => navigate(getRolePath('/projects'))}
               title="Return to Projects Catalog"
             >
               <ArrowLeft size={16} />
@@ -2144,7 +2145,7 @@ export default function AdminProjectSheet() {
                         <Printer size={14} /> Print Sheet
                       </button>
                       <div className="pjs-dropdown-divider" />
-                      <button id="pjs-menu-file-close-projects-btn" className="pjs-dropdown-opt" onClick={() => navigate('/admin/projects')}>
+                      <button id="pjs-menu-file-close-projects-btn" className="pjs-dropdown-opt" onClick={() => navigate(getRolePath('/projects'))}>
                         <ArrowLeft size={14} /> Close to Projects Catalog
                       </button>
                       <button id="pjs-menu-file-close-workspace-btn" className="pjs-dropdown-opt" onClick={() => navigate(`/admin/projects/${projectId}`, { state: { project } })}>

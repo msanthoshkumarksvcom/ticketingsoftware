@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE } from '../../utils/apiConfig';
 import { INPUT_LIMITS, validateFields, validateMeaningfulText } from '../../utils/inputValidation';
+import { getRolePath } from '../../utils/roleRoutes';
 import {
   ArrowLeft,
   CalendarDays,
@@ -139,13 +140,10 @@ export default function AdminProjectWorkspace() {
   const [devAssignMsg, setDevAssignMsg] = useState({ text: '', type: '' });
   const [showDevHistory, setShowDevHistory] = useState(false);
 
-  // Filter team members assignable: for Project Lead, show only Developers
+  // Filter team members assignable in Add Team Member modal: show only Developers (not QA Members)
   const assignableTeamMembers = useMemo(() => {
-    if (isProjectLead) {
-      return availableDevs.filter((dev) => dev.role === 'Developer');
-    }
-    return availableDevs;
-  }, [availableDevs, isProjectLead]);
+    return availableDevs.filter((dev) => (dev.role || '').trim().toLowerCase() === 'developer');
+  }, [availableDevs]);
 
   // Documents & Application Links State
   const [documents, setDocuments] = useState([]);
@@ -696,7 +694,7 @@ export default function AdminProjectWorkspace() {
 
   const openFolder = (folderId) => {
     if (folderId === 'sheet') {
-      navigate(`/admin/projects/${projectId}/sheet`, { state: { project: project || { id: projectId, project_code: `PRJ-${projectId}` } } });
+      navigate(getRolePath(`/projects/${projectId}/sheet`), { state: { project: project || { id: projectId, project_code: `PRJ-${projectId}` } } });
       return;
     }
     if (folderId === 'members') {
@@ -864,11 +862,11 @@ export default function AdminProjectWorkspace() {
       <div className="main-content">
         <TopNavbar
           pageTitle={activeProject?.name || 'Project Workspace'}
-          breadcrumbs={[{ label: 'Projects', to: '/admin/projects' }]}
+          breadcrumbs={[{ label: 'Projects', to: getRolePath('/projects') }]}
         />
         <main id="pw-main-content" className="project-workspace">
           <header id="pw-header" className="project-workspace-header">
-            <button id="pw-back-btn" className="project-workspace-back" onClick={() => navigate(isDeveloper ? '/developer' : isProjectLead ? '/project-lead' : '/admin/projects')}>
+            <button id="pw-back-btn" className="project-workspace-back" onClick={() => navigate(isDeveloper ? '/developer' : isProjectLead ? '/project-lead' : getRolePath('/projects'))}>
               <ArrowLeft size={16} /> Back
             </button>
             <div className="project-workspace-title">
@@ -909,7 +907,7 @@ export default function AdminProjectWorkspace() {
                   <button
                     id="pw-open-sheets-header-btn"
                     className="pj-btn-primary"
-                    onClick={() => navigate(`/admin/projects/${projectId}/sheet`, { state: { project: activeProject } })}
+                    onClick={() => navigate(getRolePath(`/projects/${projectId}/sheet`), { state: { project: activeProject } })}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#0F9D58', color: '#fff', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
                   >
                     <FileSpreadsheet size={16} />
@@ -926,7 +924,7 @@ export default function AdminProjectWorkspace() {
                 {!isDeveloper ? (
                   <button
                     id="pw-launch-sheets-btn"
-                    onClick={() => navigate(`/admin/projects/${projectId}/sheet`, { state: { project: activeProject } })}
+                    onClick={() => navigate(getRolePath(`/projects/${projectId}/sheet`), { state: { project: activeProject } })}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', background: '#0F9D58', color: '#fff', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '14px' }}
                   >
                     <ExternalLink size={16} />
@@ -1837,12 +1835,12 @@ export default function AdminProjectWorkspace() {
                   </div>
                 )}
                 <label style={{ fontSize: 13, fontWeight: 700, color: '#1E293B' }}>
-                  {isProjectLead ? 'Select Developers' : 'Select Team Members (Developers & QA)'}
+                  Select Developers
                 </label>
                 <div className="pw-dev-select-grid">
                   {assignableTeamMembers.length === 0 ? (
                     <p style={{ fontSize: 13, color: '#64748B', padding: '12px 0' }}>
-                      {isProjectLead ? 'No available developers found.' : 'No available team members found.'}
+                      No available developers found.
                     </p>
                   ) : (
                     assignableTeamMembers.map((dev) => {

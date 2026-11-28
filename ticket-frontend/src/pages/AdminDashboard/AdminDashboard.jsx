@@ -16,6 +16,7 @@ import {
 import AdminSidebar, { SmallCubeLogo } from '../../components/AdminSidebar/AdminSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import { formatIndianDate } from '../../utils/dateFormat';
+import { getRolePath } from '../../utils/roleRoutes';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
 import '../../styles/admin.css';
@@ -112,7 +113,7 @@ function AdminDashboard() {
       value: stats.totalProjects,
       icon: FolderKanban,
       tone: 'blue',
-      path: '/admin/projects'
+      path: getRolePath('/projects')
     },
     {
       key: 'totalTickets',
@@ -121,7 +122,7 @@ function AdminDashboard() {
       value: stats.totalTickets,
       icon: Ticket,
       tone: 'violet',
-      path: '/admin/tickets'
+      path: getRolePath('/tickets')
     },
     {
       key: 'totalUsers',
@@ -130,7 +131,7 @@ function AdminDashboard() {
       value: stats.totalUsers,
       icon: UsersRound,
       tone: 'mint',
-      path: '/admin/users'
+      path: getRolePath('/users')
     },
     {
       key: 'pendingApprovals',
@@ -139,7 +140,7 @@ function AdminDashboard() {
       value: stats.pendingApprovals,
       icon: Clock3,
       tone: 'amber',
-      path: '/admin/approvals'
+      path: getRolePath('/approvals')
     }
   ];
   const chartData = metricCards.map(({ label, value }) => ({
@@ -314,7 +315,7 @@ function AdminDashboard() {
                 id="dash-view-approvals-btn"
                 type="button"
                 className="queue-button"
-                onClick={() => navigate('/admin/approvals')}
+                onClick={() => navigate(getRolePath('/approvals'))}
                 title="Go to Pending Approvals"
                 aria-label="Go to Pending Approvals"
               >

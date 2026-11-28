@@ -11,6 +11,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { getSavedTheme, applyTheme } from '../../utils/theme';
+import { getRolePath } from '../../utils/roleRoutes';
 import NotificationCenter from '../NotificationCenter/NotificationCenter';
 import './TopNavbar.css';
 
@@ -312,7 +313,7 @@ export default function TopNavbar({
               <div className="dropdown-menu-list">
                 <Link
                   id="top-nav-dropdown-settings-link"
-                  to="/admin/settings"
+                  to={getRolePath('/settings')}
                   className="dropdown-menu-item"
                   role="menuitem"
                   onClick={() => setDropdownOpen(false)}
