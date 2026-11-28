@@ -110,7 +110,8 @@ export default function TopNavbar({
   };
 
   const handleRequestLogout = () => {
-    confirmLogout();
+    setDropdownOpen(false);
+    setShowLogoutModal(true);
   };
 
   // Sync theme changes
