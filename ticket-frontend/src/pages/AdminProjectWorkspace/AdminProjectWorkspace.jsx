@@ -32,6 +32,8 @@ import {
   Unlock,
   Globe,
   GitBranch,
+  Link2,
+  Plus,
   Save,
   Send
 } from 'lucide-react';
@@ -154,6 +156,11 @@ export default function AdminProjectWorkspace() {
   const [previewDoc, setPreviewDoc] = useState(null);
   const [applicationUrl, setApplicationUrl] = useState('');
   const [applicationGithubLink, setApplicationGithubLink] = useState('');
+  const [customLinks, setCustomLinks] = useState([]);
+  const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
+  const [docTitleInput, setDocTitleInput] = useState('');
+  const [selectedDocFile, setSelectedDocFile] = useState(null);
+  const [docUploadModalError, setDocUploadModalError] = useState('');
   const [linksMeta, setLinksMeta] = useState({
     application_url: '',
     application_github_link: '',
@@ -380,6 +387,7 @@ export default function AdminProjectWorkspace() {
       });
       setApplicationUrl(data.application_url || '');
       setApplicationGithubLink(data.application_github_link || '');
+      setCustomLinks(Array.isArray(data.custom_links) ? data.custom_links : []);
     } catch (err) {
       console.warn('Could not load project links:', err.message);
     }
@@ -421,16 +429,49 @@ export default function AdminProjectWorkspace() {
       return;
     }
 
+    const sanitizedCustomLinks = [];
+    for (let i = 0; i < customLinks.length; i += 1) {
+      const row = customLinks[i] || {};
+      const rowName = String(row.name || '').trim();
+      const rowUrl = String(row.url || '').trim();
+      const rowDetails = String(row.details || '').trim();
+      if (!rowName && !rowUrl && !rowDetails) continue;
+      if (!rowName) {
+        setDocError(`Additional Link #${i + 1}: Link Name is required.`);
+        return;
+      }
+      if (!rowUrl) {
+        setDocError(`Link "${rowName}": Link URL is required.`);
+        return;
+      }
+      const rowErr = validateFields([
+        { value: rowName, options: { label: `Link #${i + 1} Name`, required: true, maxLength: 120 } },
+        { value: rowUrl, options: { label: `Link "${rowName}" URL`, required: true, isUrl: true, maxLength: INPUT_LIMITS.URL } },
+        { value: rowDetails, options: { label: `Link "${rowName}" Details`, required: false, maxLength: 300 } }
+      ]);
+      if (rowErr) {
+        setDocError(rowErr);
+        return;
+      }
+      sanitizedCustomLinks.push({
+        id: row.id || `link-${Date.now()}-${i}`,
+        name: rowName,
+        url: rowUrl,
+        details: rowDetails
+      });
+    }
+
     const token = localStorage.getItem('token');
     setLinksSaving(true);
     setDocError('');
     setDocSuccess('');
     try {
       const { data } = await axios.put(
-        `http://localhost:5000/api/admin/projects/${projectId}/links`,
+        `${API_BASE}/api/admin/projects/${projectId}/links`,
         {
           application_url: applicationUrl,
-          application_github_link: applicationGithubLink
+          application_github_link: applicationGithubLink,
+          custom_links: sanitizedCustomLinks
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -438,14 +479,32 @@ export default function AdminProjectWorkspace() {
         setLinksMeta((prev) => ({ ...prev, ...data.links }));
         setApplicationUrl(data.links.application_url || '');
         setApplicationGithubLink(data.links.application_github_link || '');
+        setCustomLinks(Array.isArray(data.links.custom_links) ? data.links.custom_links : []);
       }
-      setDocSuccess('Application URL and GitHub link saved successfully!');
+      setDocSuccess('Project links saved successfully!');
       setTimeout(() => setDocSuccess(''), 4000);
     } catch (err) {
       setDocError(err.response?.data?.error || 'Failed to save application links.');
     } finally {
       setLinksSaving(false);
     }
+  };
+
+  const handleAddCustomLink = () => {
+    setCustomLinks((prev) => [
+      ...prev,
+      { id: `link-${Date.now()}-${prev.length}`, name: '', url: '', details: '' }
+    ]);
+  };
+
+  const handleUpdateCustomLink = (index, field, value) => {
+    setCustomLinks((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const handleRemoveCustomLink = (index) => {
+    setCustomLinks((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleToggleSectionLock = async (target, nextLocked) => {
@@ -463,10 +522,11 @@ export default function AdminProjectWorkspace() {
       if ((target === 'links' || target === 'all') && nextLocked && !linksMeta.links_locked) {
         payload.application_url = applicationUrl;
         payload.application_github_link = applicationGithubLink;
+        payload.custom_links = customLinks;
       }
 
       const { data } = await axios.put(
-        `http://localhost:5000/api/admin/projects/${projectId}/locks`,
+        `${API_BASE}/api/admin/projects/${projectId}/locks`,
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -474,6 +534,7 @@ export default function AdminProjectWorkspace() {
         setLinksMeta((prev) => ({ ...prev, ...data.links }));
         setApplicationUrl(data.links.application_url || '');
         setApplicationGithubLink(data.links.application_github_link || '');
+        setCustomLinks(Array.isArray(data.links.custom_links) ? data.links.custom_links : []);
       }
       if (target === 'documents' || target === 'all') {
         fetchDocuments();
@@ -561,44 +622,81 @@ export default function AdminProjectWorkspace() {
     }
   };
 
-  const handleFileUpload = async (event) => {
+  const openUploadDocModal = () => {
+    if (!canEditDocsAndLinks) {
+      setDocError('Access Denied: QA Members are not permitted to upload project documents.');
+      return;
+    }
+    if (linksMeta.documents_locked) {
+      setDocError('Uploaded documents are locked (read-only) by Project Lead or Manager.');
+      return;
+    }
+    setDocTitleInput('');
+    setSelectedDocFile(null);
+    setDocUploadModalError('');
+    setIsUploadDocModalOpen(true);
+  };
+
+  const handleSelectDocFile = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!canEditDocsAndLinks) {
-      setDocError('Access Denied: QA Members are not permitted to upload project documents.');
-      event.target.value = '';
-      return;
-    }
-
-    if (linksMeta.documents_locked) {
-      setDocError('Uploaded documents are locked (read-only) by Project Lead or Manager.');
-      event.target.value = '';
-      return;
-    }
-
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     if (!fileExt || !ALLOWED_DOCUMENT_EXTENSIONS.includes(fileExt)) {
-      setDocError('Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX, APK.');
+      setDocUploadModalError('Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX, APK.');
       event.target.value = '';
       return;
     }
 
     const maxSizeMb = fileExt === 'apk' ? 100 : 25;
     if (file.size === 0) {
-      setDocError('Cannot upload an empty (0 B) file. Please select a valid non-empty file.');
+      setDocUploadModalError('Cannot upload an empty (0 B) file. Please select a valid non-empty file.');
       event.target.value = '';
       return;
     }
 
     if (file.size > maxSizeMb * 1024 * 1024) {
-      setDocError(`File is too large. Maximum allowed size is ${maxSizeMb} MB.`);
+      setDocUploadModalError(`File is too large. Maximum allowed size is ${maxSizeMb} MB.`);
       event.target.value = '';
       return;
     }
 
+    setDocUploadModalError('');
+    setSelectedDocFile(file);
+    if (!docTitleInput.trim()) {
+      const baseName = file.name.replace(/\.[^/.]+$/, '');
+      setDocTitleInput(baseName);
+    }
+    event.target.value = '';
+  };
+
+  const handleConfirmDocUpload = async (event) => {
+    if (event) event.preventDefault();
+    const cleanTitle = docTitleInput.trim();
+    if (!cleanTitle) {
+      setDocUploadModalError('Please enter a Document Title before uploading.');
+      return;
+    }
+    const titleErr = validateMeaningfulText(cleanTitle, {
+      label: 'Document Title',
+      required: true,
+      maxLength: 200
+    });
+    if (titleErr) {
+      setDocUploadModalError(titleErr);
+      return;
+    }
+    if (!selectedDocFile) {
+      setDocUploadModalError('Please select a document file to upload.');
+      return;
+    }
+
+    const file = selectedDocFile;
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'file';
+
     setDocError('');
     setDocSuccess('');
+    setDocUploadModalError('');
     setDocUploadLoading(true);
 
     const fileSizeStr = file.size > 1024 * 1024
@@ -610,12 +708,13 @@ export default function AdminProjectWorkspace() {
     const token = localStorage.getItem('token');
     try {
       const res = await axios.post(
-        `http://localhost:5000/api/admin/projects/${projectId}/documents/upload`,
+        `${API_BASE}/api/admin/projects/${projectId}/documents/upload`,
         file,
         {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/octet-stream',
+            'X-Document-Title': encodeURIComponent(cleanTitle),
             'X-File-Name': encodeURIComponent(file.name),
             'X-File-Size': fileSizeStr,
             'X-File-Type': fileExt.toUpperCase()
@@ -626,14 +725,16 @@ export default function AdminProjectWorkspace() {
         }
       );
       setDocuments((prev) => [res.data, ...prev]);
-      setDocSuccess(`Document "${file.name}" uploaded successfully!`);
+      setDocSuccess(`Document "${cleanTitle}" uploaded successfully!`);
+      setIsUploadDocModalOpen(false);
+      setDocTitleInput('');
+      setSelectedDocFile(null);
       fetchProjectData();
       setTimeout(() => setDocSuccess(''), 4000);
     } catch (apiErr) {
-      setDocError(apiErr.response?.data?.error || 'Failed to upload document. Please try again.');
+      setDocUploadModalError(apiErr.response?.data?.error || 'Failed to upload document. Please try again.');
     } finally {
       setDocUploadLoading(false);
-      event.target.value = '';
     }
   };
 
@@ -1380,6 +1481,119 @@ export default function AdminProjectWorkspace() {
                   </div>
                 </div>
 
+                {/* Additional Named Project Links (Multiple links with name, URL & details) */}
+                <div className="pw-custom-links-section">
+                  <div className="pw-custom-links-header">
+                    <div className="pw-custom-links-title">
+                      <Link2 size={14} color="#2563EB" />
+                      <span>Additional Project Links</span>
+                      <span className="pw-custom-links-count">{customLinks.length}</span>
+                    </div>
+                    {canEditDocsAndLinks && !linksMeta.links_locked && (
+                      <button
+                        id="pw-add-custom-link-btn"
+                        type="button"
+                        className="pw-btn-add-link"
+                        onClick={handleAddCustomLink}
+                      >
+                        <Plus size={14} />
+                        <span>Add Link</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {customLinks.length === 0 ? (
+                    <div className="pw-custom-links-empty">
+                      {canEditDocsAndLinks && !linksMeta.links_locked
+                        ? 'Add multiple named links (e.g. Staging Server, Figma Design, API Docs) with details.'
+                        : 'No additional project links added yet.'}
+                    </div>
+                  ) : (
+                    <div className="pw-custom-links-list">
+                      {customLinks.map((linkItem, idx) => {
+                        const isReadOnlyLink = !canEditDocsAndLinks || linksMeta.links_locked;
+                        const safeHref = linkItem.url?.trim() && !/^(javascript|vbscript|data):/i.test(linkItem.url.trim())
+                          ? (/^https?:\/\//i.test(linkItem.url.trim()) ? linkItem.url.trim() : `https://${linkItem.url.trim()}`)
+                          : '';
+                        return (
+                          <div key={linkItem.id || idx} id={`pw-custom-link-row-${idx}`} className="pw-custom-link-row">
+                            <div className="pw-form-group">
+                              <label htmlFor={`pw-custom-link-name-${idx}`}>Link Name *</label>
+                              <input
+                                id={`pw-custom-link-name-${idx}`}
+                                type="text"
+                                className={`pw-input${isReadOnlyLink ? ' pw-input-readonly' : ''}`}
+                                placeholder="e.g. Staging Environment, Figma Design"
+                                maxLength={120}
+                                value={linkItem.name || ''}
+                                onChange={(e) => handleUpdateCustomLink(idx, 'name', e.target.value)}
+                                readOnly={isReadOnlyLink}
+                              />
+                            </div>
+
+                            <div className="pw-form-group">
+                              <label htmlFor={`pw-custom-link-url-${idx}`}>Link / URL *</label>
+                              <div className="pw-link-input-wrap">
+                                <input
+                                  id={`pw-custom-link-url-${idx}`}
+                                  type="url"
+                                  className={`pw-input${isReadOnlyLink ? ' pw-input-readonly' : ''}`}
+                                  placeholder="https://example.com"
+                                  maxLength={INPUT_LIMITS.URL}
+                                  value={linkItem.url || ''}
+                                  onChange={(e) => handleUpdateCustomLink(idx, 'url', e.target.value)}
+                                  readOnly={isReadOnlyLink}
+                                />
+                                {safeHref && (
+                                  <a
+                                    id={`pw-custom-link-open-${idx}`}
+                                    href={safeHref}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="pw-link-open-btn"
+                                    title={`Open ${linkItem.name || 'Link'}`}
+                                  >
+                                    <ExternalLink size={14} />
+                                    <span>Open</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="pw-form-group">
+                              <label htmlFor={`pw-custom-link-details-${idx}`}>Details / Notes</label>
+                              <div className="pw-link-input-wrap">
+                                <input
+                                  id={`pw-custom-link-details-${idx}`}
+                                  type="text"
+                                  className={`pw-input${isReadOnlyLink ? ' pw-input-readonly' : ''}`}
+                                  placeholder="Optional description, environment, or access note"
+                                  maxLength={300}
+                                  value={linkItem.details || ''}
+                                  onChange={(e) => handleUpdateCustomLink(idx, 'details', e.target.value)}
+                                  readOnly={isReadOnlyLink}
+                                />
+                                {!isReadOnlyLink && (
+                                  <button
+                                    id={`pw-custom-link-remove-${idx}`}
+                                    type="button"
+                                    className="pw-btn-doc-delete"
+                                    onClick={() => handleRemoveCustomLink(idx)}
+                                    title="Remove link"
+                                    aria-label={`Remove ${linkItem.name || `link ${idx + 1}`}`}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {canEditDocsAndLinks && !linksMeta.links_locked && (
                   <div className="pw-links-footer">
                     <button
@@ -1448,18 +1662,17 @@ export default function AdminProjectWorkspace() {
 
                   {/* Document upload allowed for everyone except QA Members, unless locked */}
                   {canEditDocsAndLinks && !linksMeta.documents_locked && (
-                    <label className="pw-btn-upload-doc" htmlFor="pw-doc-upload-primary">
+                    <button
+                      id="pw-doc-upload-primary-btn"
+                      type="button"
+                      className="pw-btn-upload-doc"
+                      onClick={openUploadDocModal}
+                      disabled={docUploadLoading}
+                      style={{ border: 'none' }}
+                    >
                       <Upload size={16} color="#FFFFFF" />
-                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Documents'}</span>
-                      <input
-                        id="pw-doc-upload-primary"
-                        type="file"
-                        onChange={handleFileUpload}
-                        disabled={docUploadLoading}
-                        style={{ display: 'none' }}
-                        accept={ALLOWED_DOCUMENT_ACCEPT}
-                      />
-                    </label>
+                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Document'}</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -1486,22 +1699,21 @@ export default function AdminProjectWorkspace() {
                       : linksMeta.documents_locked
                       ? 'Document uploads are currently locked (read-only) by Manager or QA Lead.'
                       : canEditDocsAndLinks
-                      ? 'Upload product specifications, test plans, architecture diagrams, or contract files for this project.'
+                      ? 'Add a document title and upload specifications, test plans, architecture diagrams, or build files for this project.'
                       : 'No documents have been uploaded for this project yet.'}
                   </p>
                   {canEditDocsAndLinks && !linksMeta.documents_locked && (
-                    <label className="pw-btn-upload-doc" htmlFor="pw-doc-upload-empty">
+                    <button
+                      id="pw-doc-upload-empty-btn"
+                      type="button"
+                      className="pw-btn-upload-doc"
+                      onClick={openUploadDocModal}
+                      disabled={docUploadLoading}
+                      style={{ border: 'none' }}
+                    >
                       <Upload size={16} color="#FFFFFF" />
-                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Documents'}</span>
-                      <input
-                        id="pw-doc-upload-empty"
-                        type="file"
-                        onChange={handleFileUpload}
-                        disabled={docUploadLoading}
-                        style={{ display: 'none' }}
-                        accept={ALLOWED_DOCUMENT_ACCEPT}
-                      />
-                    </label>
+                      <span style={{ color: '#FFFFFF' }}>{docUploadLoading ? 'Uploading...' : 'Upload Document'}</span>
+                    </button>
                   )}
                 </div>
               ) : (
@@ -1509,7 +1721,7 @@ export default function AdminProjectWorkspace() {
                   <table id="pw-documents-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
                     <thead>
                       <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', textAlign: 'left' }}>
-                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Document Name</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Document Title &amp; File</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Type</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Size</th>
                         <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Uploaded By</th>
@@ -1520,12 +1732,19 @@ export default function AdminProjectWorkspace() {
                     <tbody>
                       {documents.map((doc) => {
                         const rowLocked = Boolean(linksMeta.documents_locked || doc.is_locked);
+                        const docTitle = doc.title || doc.name;
+                        const hasDistinctFilename = Boolean(doc.title && doc.title !== doc.name);
                         return (
                           <tr key={doc.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                                 <FileText size={18} color="#2563EB" />
-                                <span style={{ fontWeight: 600, color: '#0F172A' }}>{doc.name}</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                  <span style={{ fontWeight: 600, color: '#0F172A' }}>{docTitle}</span>
+                                  {hasDistinctFilename && (
+                                    <span style={{ fontSize: '11.5px', color: '#64748B' }}>{doc.name}</span>
+                                  )}
+                                </div>
                                 {isDocumentEmpty(doc) && (
                                   <span style={{ background: '#FEF3C7', color: '#B45309', padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
                                     Empty (0 B)
@@ -1595,7 +1814,7 @@ export default function AdminProjectWorkspace() {
                                   <button
                                     id={`pw-doc-delete-btn-${doc.id}`}
                                     type="button"
-                                    onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                                    onClick={() => handleDeleteDocument(doc.id, docTitle)}
                                     className="pw-btn-doc-delete"
                                     title="Delete document"
                                   >
@@ -1885,6 +2104,109 @@ export default function AdminProjectWorkspace() {
         </div>
       )}
 
+      {/* Modal: Upload Project Document with Title */}
+      {isUploadDocModalOpen && (
+        <div
+          id="pw-upload-doc-modal-overlay"
+          className="modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !docUploadLoading) setIsUploadDocModalOpen(false);
+          }}
+        >
+          <div id="pw-upload-doc-modal" className="pw-modal-box">
+            <div className="pw-modal-header">
+              <div>
+                <h3 id="pw-upload-doc-modal-title">Upload Project Document</h3>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748B' }}>
+                  Enter a clear document title and attach the file for this project.
+                </p>
+              </div>
+              <button
+                id="pw-upload-doc-close-btn"
+                type="button"
+                className="pw-modal-close"
+                onClick={() => setIsUploadDocModalOpen(false)}
+                disabled={docUploadLoading}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form id="pw-upload-doc-form" onSubmit={handleConfirmDocUpload}>
+              <div className="pw-modal-body">
+                {docUploadModalError && (
+                  <div className="pw-alert error">
+                    <AlertCircle size={15} />
+                    <span>{docUploadModalError}</span>
+                  </div>
+                )}
+
+                <div className="pw-form-group">
+                  <label htmlFor="pw-upload-doc-title-input">Document Title *</label>
+                  <input
+                    id="pw-upload-doc-title-input"
+                    type="text"
+                    className="pw-input"
+                    placeholder="e.g. API Specification v2.0, QA Test Plan, Android Build"
+                    maxLength={200}
+                    value={docTitleInput}
+                    onChange={(e) => setDocTitleInput(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="pw-form-group">
+                  <label htmlFor="pw-upload-doc-file-input">Document File *</label>
+                  <label className="pw-doc-file-dropzone" htmlFor="pw-upload-doc-file-input">
+                    <Upload size={18} color="#2563EB" />
+                    <div className="pw-doc-file-drop-text">
+                      <strong>{selectedDocFile ? selectedDocFile.name : 'Choose a file to upload'}</strong>
+                      <span>
+                        {selectedDocFile
+                          ? `${(selectedDocFile.size > 1024 * 1024 ? `${(selectedDocFile.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(selectedDocFile.size / 1024))} KB`)} • Click to replace`
+                          : 'PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG, PPT/PPTX (25MB) or APK (100MB)'}
+                      </span>
+                    </div>
+                    <input
+                      id="pw-upload-doc-file-input"
+                      type="file"
+                      accept={ALLOWED_DOCUMENT_ACCEPT}
+                      onChange={handleSelectDocFile}
+                      disabled={docUploadLoading}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="pw-modal-footer">
+                <button
+                  id="pw-upload-doc-cancel-btn"
+                  type="button"
+                  className="pw-btn-secondary"
+                  onClick={() => setIsUploadDocModalOpen(false)}
+                  disabled={docUploadLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  id="pw-upload-doc-submit-btn"
+                  type="submit"
+                  className="pw-btn-primary"
+                  disabled={docUploadLoading || !docTitleInput.trim() || !selectedDocFile}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Upload size={14} />
+                  <span>{docUploadLoading ? 'Uploading...' : 'Upload Document'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal: Document Preview / View */}
       {previewDoc && (
         <div id="pw-doc-preview-modal-overlay" className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closePreviewModal()}>
@@ -1894,9 +2216,10 @@ export default function AdminProjectWorkspace() {
                 <FileText size={22} color="#2563EB" />
                 <div style={{ minWidth: 0 }}>
                   <h3 id="pw-doc-preview-modal-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {previewDoc.name}
+                    {previewDoc.title || previewDoc.name}
                   </h3>
                   <span style={{ fontSize: '12px', color: '#64748B' }}>
+                    {previewDoc.title && previewDoc.title !== previewDoc.name ? `${previewDoc.name} • ` : ''}
                     {previewDoc.file_size} &bull; Uploaded by {previewDoc.uploaded_by || 'Admin'} on {formatIndianDate(previewDoc.uploaded_at, 'Recent')}
                   </span>
                 </div>

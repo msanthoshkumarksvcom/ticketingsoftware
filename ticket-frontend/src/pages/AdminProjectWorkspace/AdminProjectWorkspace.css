@@ -1010,6 +1010,135 @@
   justify-content: flex-end;
 }
 
+/* Additional Named Links */
+.pw-custom-links-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #CBD5E1;
+}
+
+.pw-custom-links-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.pw-custom-links-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1E3A8A;
+}
+
+.pw-custom-links-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  color: #2563EB;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pw-btn-add-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #BFDBFE;
+  background: #EFF6FF;
+  color: #2563EB;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pw-btn-add-link:hover {
+  background: #DBEAFE;
+  border-color: #2563EB;
+  color: #1D4ED8;
+}
+
+.pw-custom-links-empty {
+  padding: 12px 14px;
+  border-radius: 9px;
+  border: 1px dashed #CBD5E1;
+  background: #FFFFFF;
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+.pw-custom-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pw-custom-link-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(200px, 1.35fr) minmax(180px, 1.2fr);
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+}
+
+/* Document Title + File Modal Dropzone */
+.pw-doc-file-dropzone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1.5px dashed #CBD5E1;
+  background: #F8FAFC;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pw-doc-file-dropzone:hover {
+  border-color: #2563EB;
+  background: #EFF6FF;
+}
+
+.pw-doc-file-drop-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pw-doc-file-drop-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F172A;
+  word-break: break-word;
+}
+
+.pw-doc-file-drop-text span {
+  font-size: 11.5px;
+  color: #64748B;
+}
+
+@media (max-width: 900px) {
+  .pw-custom-link-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .pw-docs-section-bar {
   display: flex;
   align-items: center;

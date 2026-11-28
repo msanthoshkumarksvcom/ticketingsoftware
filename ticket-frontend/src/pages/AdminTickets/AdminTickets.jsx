@@ -1237,7 +1237,7 @@ function AdminTickets() {
                             <div className="ticket-title-cell">
                               <span className="ticket-title-text">{t.title}</span>
                               {t.description && (
-                                <span className="ticket-desc-sub" title={t.description}>
+                                <span className="ticket-desc-sub">
                                   {t.description}
                                 </span>
                               )}
