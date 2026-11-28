@@ -3699,3 +3699,48 @@ html[data-theme='dark'] .stat-card:hover .stat-quick-nav-btn {
   border-color: #3b82f6 !important;
   color: #ffffff !important;
 }
+
+/* Dark mode for Empty State Hero Cards (Projects, Tickets, Reports, Approvals, Deployments, Users) */
+html[data-theme='dark'] .pj-empty-state-card,
+html[data-theme='dark'] .um-empty-state-card {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(2, 6, 23, 0.42) !important;
+}
+
+html[data-theme='dark'] .pj-empty-icon-wrap,
+html[data-theme='dark'] .um-empty-icon-wrap {
+  background: rgba(37, 99, 235, 0.14) !important;
+  border-color: rgba(59, 130, 246, 0.28) !important;
+  color: #60a5fa !important;
+  box-shadow: 0 4px 14px rgba(2, 6, 23, 0.35) !important;
+}
+
+html[data-theme='dark'] .pj-empty-heading,
+html[data-theme='dark'] .um-empty-heading,
+html[data-theme='dark'] .pj-empty-state-card h3,
+html[data-theme='dark'] .um-empty-state-card h3 {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .pj-empty-description,
+html[data-theme='dark'] .um-empty-description,
+html[data-theme='dark'] .pj-empty-state-card p,
+html[data-theme='dark'] .um-empty-state-card p {
+  color: #94a3b8 !important;
+}
+
+html[data-theme='dark'] .pj-btn-reset-filters,
+html[data-theme='dark'] .um-btn-reset-filters {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+html[data-theme='dark'] .pj-btn-reset-filters:hover,
+html[data-theme='dark'] .um-btn-reset-filters:hover {
+  background: #334155 !important;
+  border-color: #475569 !important;
+  color: #ffffff !important;
+}
