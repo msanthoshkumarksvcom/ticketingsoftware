@@ -8,12 +8,10 @@ import {
   Moon,
   Bell,
   ChevronDown,
-  Settings,
   LogOut,
   X
 } from 'lucide-react';
 import { getSavedTheme, applyTheme } from '../../utils/theme';
-import { getRolePath } from '../../utils/roleRoutes';
 import NotificationCenter from '../NotificationCenter/NotificationCenter';
 import './TopNavbar.css';
 
@@ -326,21 +324,6 @@ export default function TopNavbar({
                     {profile.role || 'QA Lead'}
                   </span>
                 </div>
-              </div>
-
-              <div className="dropdown-divider" />
-
-              <div className="dropdown-menu-list">
-                <Link
-                  id="top-nav-dropdown-settings-link"
-                  to={getRolePath('/settings')}
-                  className="dropdown-menu-item"
-                  role="menuitem"
-                  onClick={() => setDropdownOpen(false)}
-                >
-                  <Settings size={16} className="dropdown-item-icon" />
-                  <span>Account Settings</span>
-                </Link>
               </div>
 
               <div className="dropdown-divider" />
