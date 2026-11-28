@@ -164,6 +164,7 @@
 .hero-title-accent {
   background: linear-gradient(135deg, #60A5FA 0%, #93C5FD 50%, #FFFFFF 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
