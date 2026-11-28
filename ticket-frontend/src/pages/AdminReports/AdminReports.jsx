@@ -1095,39 +1095,35 @@ export default function AdminReports() {
                         </div>
                       </div>
 
-                      <div className="today-banner-chips" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span className="today-chip tested">
-                          <CheckCheck size={12} />{' '}
-                          {userRole.toLowerCase() === 'qa member'
-                            ? filteredQAMembers[0]?.today_tested || 0
-                            : qaOverall?.today_tests_executed || 0}{' '}
-                          Cases Executed Today
-                        </span>
-                        <span className="today-chip passed">
-                          <CheckCircle2 size={12} />{' '}
-                          {userRole.toLowerCase() === 'qa member'
-                            ? filteredQAMembers[0]?.today_passed || 0
-                            : qaOverall?.today_passed || 0}{' '}
-                          Passed Today
-                        </span>
-                        <span className="today-chip bugs">
-                          <Bug size={12} />{' '}
-                          {userRole.toLowerCase() === 'qa member'
-                            ? filteredQAMembers[0]?.today_bugs || 0
-                            : qaOverall?.today_bugs_raised || 0}{' '}
-                          Bugs Raised Today
-                        </span>
-                        <button
-                          id="reports-export-qa-csv-btn"
-                          type="button"
-                          className="um-btn-create"
-                          style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem' }}
-                          onClick={handleExportQACSV}
-                        >
-                          <Download size={14} />
-                          <span>Export QA Work CSV ({selectedPeriod})</span>
-                        </button>
-                      </div>
+                      {userRole.toLowerCase() !== 'qa member' && (
+                        <div className="today-banner-chips" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span className="today-chip tested">
+                            <CheckCheck size={12} />{' '}
+                            {qaOverall?.today_tests_executed || 0}{' '}
+                            Cases Executed Today
+                          </span>
+                          <span className="today-chip passed">
+                            <CheckCircle2 size={12} />{' '}
+                            {qaOverall?.today_passed || 0}{' '}
+                            Passed Today
+                          </span>
+                          <span className="today-chip bugs">
+                            <Bug size={12} />{' '}
+                            {qaOverall?.today_bugs_raised || 0}{' '}
+                            Bugs Raised Today
+                          </span>
+                          <button
+                            id="reports-export-qa-csv-btn"
+                            type="button"
+                            className="um-btn-create"
+                            style={{ height: '32px', padding: '0 12px', fontSize: '0.78rem' }}
+                            onClick={handleExportQACSV}
+                          >
+                            <Download size={14} />
+                            <span>Export QA Work CSV ({selectedPeriod})</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Modern QA Members Performance Table with Daily Work */}
