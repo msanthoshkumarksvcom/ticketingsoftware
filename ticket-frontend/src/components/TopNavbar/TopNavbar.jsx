@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Calendar,
@@ -7,8 +8,8 @@ import {
   Moon,
   Bell,
   ChevronDown,
-  Settings,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 import { getSavedTheme, applyTheme } from '../../utils/theme';
 import { getRolePath } from '../../utils/roleRoutes';
@@ -30,6 +31,7 @@ export default function TopNavbar({
   const [theme, setTheme] = useState(() => getSavedTheme());
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -82,7 +84,25 @@ export default function TopNavbar({
     };
   }, [dropdownOpen]);
 
-  const handleLogout = () => {
+  // Close logout confirmation modal on Escape
+  useEffect(() => {
+    if (!showLogoutModal) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowLogoutModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showLogoutModal]);
+
+  const handleRequestLogout = () => {
+    setDropdownOpen(false);
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
     setDropdownOpen(false);
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
@@ -324,14 +344,13 @@ export default function TopNavbar({
               </div>
 
               <div className="dropdown-divider" />
-
               <div className="dropdown-menu-footer">
                 <button
                   id="top-nav-dropdown-logout-btn"
                   type="button"
                   className="dropdown-menu-item logout-item"
                   role="menuitem"
-                  onClick={handleLogout}
+                  onClick={handleRequestLogout}
                 >
                   <LogOut size={16} className="dropdown-item-icon logout-icon" />
                   <span>Sign out</span>
@@ -343,6 +362,92 @@ export default function TopNavbar({
       </div>
     </header>
     <NotificationCenter hideTrigger />
+    {showLogoutModal && typeof document !== 'undefined' && createPortal(
+      <div
+        id="top-nav-logout-modal-overlay"
+        className="topnav-logout-overlay"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowLogoutModal(false);
+        }}
+      >
+        <section
+          id="top-nav-logout-modal"
+          className="topnav-logout-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="top-nav-logout-title"
+        >
+          <header className="topnav-logout-header">
+            <div className="topnav-logout-header-left">
+              <div className="topnav-logout-icon">
+                <LogOut size={19} />
+              </div>
+              <div className="topnav-logout-titles">
+                <h3 id="top-nav-logout-title" className="topnav-logout-title">
+                  Confirm Sign Out
+                </h3>
+                <p className="topnav-logout-subtitle">
+                  End your active workspace session
+                </p>
+              </div>
+            </div>
+            <button
+              id="top-nav-logout-close-btn"
+              type="button"
+              className="topnav-logout-close"
+              onClick={() => setShowLogoutModal(false)}
+              aria-label="Close sign out confirmation"
+            >
+              <X size={18} />
+            </button>
+          </header>
+
+          <div className="topnav-logout-body">
+            <p className="topnav-logout-text">
+              Are you sure you want to sign out of <strong>QA Software</strong>? Any unsaved changes on this page may be lost.
+            </p>
+
+            <div className="topnav-logout-account-card">
+              <div className="topnav-logout-avatar">
+                {profile.avatar && !avatarFailed ? (
+                  <img src={profile.avatar} alt={displayName} />
+                ) : (
+                  <span>{initials}</span>
+                )}
+              </div>
+              <div className="topnav-logout-account-meta">
+                <strong>{displayName}</strong>
+                <span>{profile.email || 'Signed-in workspace account'}</span>
+              </div>
+              {profile.role && (
+                <span className="topnav-logout-role-pill">{profile.role}</span>
+              )}
+            </div>
+          </div>
+
+          <footer className="topnav-logout-footer">
+            <button
+              id="top-nav-logout-cancel-btn"
+              type="button"
+              className="topnav-logout-btn cancel"
+              onClick={() => setShowLogoutModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              id="top-nav-logout-confirm-btn"
+              type="button"
+              className="topnav-logout-btn confirm"
+              onClick={confirmLogout}
+            >
+              <LogOut size={15} />
+              <span>Sign Out</span>
+            </button>
+          </footer>
+        </section>
+      </div>,
+      document.body
+    )}
   </div>
   );
 }

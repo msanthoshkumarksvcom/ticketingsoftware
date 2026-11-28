@@ -68,11 +68,6 @@ export default function DeveloperDashboard() {
   // Selected Ticket for detail / resolution modal
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-  useRealtimeSync(['tickets', 'projects', 'dashboard'], () => {
-    fetchStats();
-    fetchTickets();
-  });
-
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -88,9 +83,9 @@ export default function DeveloperDashboard() {
     }
   };
 
-  const fetchTickets = async () => {
+  const fetchTickets = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const token = localStorage.getItem('token');
       if (!token) return;
       const res = await axios.get('http://localhost:5000/api/admin/tickets', {
@@ -100,9 +95,14 @@ export default function DeveloperDashboard() {
     } catch (err) {
       console.error('Failed to fetch assigned tickets:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  useRealtimeSync(['tickets', 'projects', 'dashboard'], () => {
+    fetchStats();
+    fetchTickets({ silent: true });
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -259,6 +259,12 @@ export default function DeveloperDashboard() {
     reopenedTickets: tickets.filter((t) => t.status === 'Reopened').length
   };
 
+  const totalAssignedProjectsCount =
+    summary.totalAssignedProjects ??
+    summary.assignedProjectsCount ??
+    assignedProjects.length ??
+    0;
+
   return (
     <div className="admin-layout">
       {/* Sign Out Modal */}
@@ -305,7 +311,7 @@ export default function DeveloperDashboard() {
                 <span className="dev-meta-pill live">
                   <span className="dev-live-dot" /> Online
                 </span>
-                <span className="dev-meta-pill">Assigned Projects: {summary.totalAssignedProjects}</span>
+                <span className="dev-meta-pill">Assigned Projects: {totalAssignedProjectsCount}</span>
                 <span className="dev-meta-pill">Active Tickets: {summary.openTickets + summary.inProgressTickets + summary.reopenedTickets}</span>
               </div>
             </div>
@@ -318,7 +324,7 @@ export default function DeveloperDashboard() {
                 <span className="dev-mc-label">Assigned Projects</span>
                 <div className="dev-mc-icon"><FolderKanban size={18} color="#2563EB" /></div>
               </div>
-              <div className="dev-mc-val">{summary.totalAssignedProjects}</div>
+              <div className="dev-mc-val">{totalAssignedProjectsCount}</div>
               <div className="dev-mc-sub">Assigned by Project Leads</div>
             </div>
 
