@@ -232,6 +232,7 @@ function AdminUsers() {
   const [successToast, setSuccessToast] = useState(null);
 
   const userEmail = (localStorage.getItem('userEmail') || '').toLowerCase().trim();
+  const currentUserId = localStorage.getItem('userId') || '';
   const currentUserRole = localStorage.getItem('userRole') || '';
   const normalizedUserRole = currentUserRole.toLowerCase().trim();
   const isAdmin =
@@ -241,6 +242,7 @@ function AdminUsers() {
     normalizedUserRole === 'administrator' ||
     userEmail === 'admin@gmail.com';
   const isManager = normalizedUserRole === 'manager';
+  const isQALead = normalizedUserRole === 'qa lead';
   const isQAMember = normalizedUserRole === 'qa member';
   const [formError, setFormError] = useState('');
 
@@ -252,46 +254,65 @@ function AdminUsers() {
   const [permsErrorMsg, setPermsErrorMsg] = useState('');
 
   const modalRoleOptions = useMemo(() => {
-    // If Admin: can assign Manager, Project Lead, QA Lead, QA Member, Developer, Admin
-    // If Manager: can only assign Project Lead, QA Lead, QA Member, Developer
+    // Admin: can assign all roles
+    // Manager: can assign Project Lead, QA Lead, QA Member, Developer
+    // QA Lead: cannot create/assign another QA Lead (only Project Lead, QA Member, Developer)
     const roles = isAdmin
       ? ['Manager', 'Project Lead', 'QA Lead', 'QA Member', 'Developer', 'Admin']
-      : ['Project Lead', 'QA Lead', 'QA Member', 'Developer'];
+      : isManager
+      ? ['Project Lead', 'QA Lead', 'QA Member', 'Developer']
+      : ['Project Lead', 'QA Member', 'Developer'];
 
     return roles.map((role) => ({
       value: role,
       label: role === 'Project Lead' ? 'Project Lead (Project Manager)' : role,
       icon: <ShieldCheck size={15} color="#64748b" />
     }));
-  }, [isAdmin]);
+  }, [isAdmin, isManager]);
+
+  const isCurrentUserRecord = useCallback((user) => {
+    if (!user) return false;
+    const matchByEmail = Boolean(userEmail && user.email?.toLowerCase().trim() === userEmail);
+    const matchById = Boolean(currentUserId && user.id !== undefined && String(user.id) === String(currentUserId));
+    return matchByEmail || matchById;
+  }, [currentUserId, userEmail]);
 
   const canEditUser = useCallback((user) => {
     if (!user) return false;
     if (isQAMember) return false;
     if (isAdmin) return true;
-    if (userEmail && user.email?.toLowerCase() === userEmail) {
+    if (isCurrentUserRecord(user)) {
       return true;
     }
     if (isManager && user.email?.toLowerCase() !== 'admin@gmail.com') {
       return true;
     }
+    const targetRoleLower = String(user.role || '').trim().toLowerCase();
+    if (isQALead && targetRoleLower === 'qa lead') {
+      return false;
+    }
     if (user.role === 'Manager' || user.role === 'Admin' || user.role === 'Super Admin' || PROTECTED_EMAILS.includes(user.email?.toLowerCase())) {
       return false;
     }
     return true;
-  }, [isAdmin, isManager, isQAMember, userEmail]);
+  }, [isAdmin, isCurrentUserRecord, isManager, isQALead, isQAMember]);
 
   const canDeleteUser = useCallback((user) => {
     if (!user) return false;
     if (isQAMember) return false;
+    if (isCurrentUserRecord(user)) return false;
     if (isAdmin) {
       return user.email?.toLowerCase() !== 'admin@gmail.com';
+    }
+    const targetRoleLower = String(user.role || '').trim().toLowerCase();
+    if (isQALead && targetRoleLower === 'qa lead') {
+      return false;
     }
     if (user.role === 'Manager' || user.role === 'Admin' || user.role === 'Super Admin' || PROTECTED_EMAILS.includes(user.email?.toLowerCase())) {
       return false;
     }
     return true;
-  }, [isAdmin, isQAMember]);
+  }, [isAdmin, isCurrentUserRecord, isQALead, isQAMember]);
 
   const handleOpenPermissionsModal = async () => {
     setPermsSuccessMsg('');
@@ -1555,7 +1576,7 @@ function AdminUsers() {
                               <button
                                 className="um-card-action-btn delete disabled"
                                 disabled
-                                title="Protected account cannot be deleted"
+                                title={isCurrentUserRecord(user) ? 'You cannot delete your own account' : 'Protected account cannot be deleted'}
                               >
                                 <Lock size={14} />
                               </button>
@@ -1780,7 +1801,15 @@ function AdminUsers() {
                                       id={`um-delete-locked-btn-${user.id}`}
                                       className="um-btn-icon is-locked"
                                       disabled
-                                      title={user.email?.toLowerCase() === 'admin@gmail.com' ? "Primary Administrator account cannot be deleted" : "Manager & Admin accounts can only be managed by System Administrator"}
+                                      title={
+                                        isCurrentUserRecord(user)
+                                          ? 'You cannot delete your own account'
+                                          : user.email?.toLowerCase() === 'admin@gmail.com'
+                                          ? 'Primary Administrator account cannot be deleted'
+                                          : isQALead && String(user.role || '').trim().toLowerCase() === 'qa lead'
+                                          ? 'QA Lead accounts can only be deleted by Manager or System Administrator'
+                                          : 'Manager & Admin accounts can only be managed by System Administrator'
+                                      }
                                     >
                                       <Lock size={14} />
                                     </button>
@@ -2316,23 +2345,38 @@ function AdminUsers() {
                     <label htmlFor="edit-role">
                       Role <span className="req-star">*</span>
                     </label>
-                    <CustomSelect
-                      id="edit-role"
-                      value={editFormData.role}
-                      onChange={(val) => {
-                        setEditFormData((prev) => ({ ...prev, role: val }));
-                        setEditFieldErrors((prev) => ({
-                          ...prev,
-                          role: validateRole(val)
-                        }));
-                        if (formError) setFormError('');
-                      }}
-                      options={modalRoleOptions}
-                      placeholder="Select Role"
-                      icon={<ShieldCheck size={16} color="#64748b" />}
-                      variant="form"
-                      error={editFieldErrors.role}
-                    />
+                    {isQALead && isCurrentUserRecord(editFormData) ? (
+                      <div className="um-input-box um-input-box-disabled" title="Your QA Lead role cannot be modified here">
+                        <ShieldCheck size={16} className="um-field-icon" />
+                        <input
+                          id="edit-role"
+                          type="text"
+                          value={editFormData.role || 'QA Lead'}
+                          readOnly
+                          disabled
+                          tabIndex={-1}
+                        />
+                        <Lock size={14} className="um-field-lock" />
+                      </div>
+                    ) : (
+                      <CustomSelect
+                        id="edit-role"
+                        value={editFormData.role}
+                        onChange={(val) => {
+                          setEditFormData((prev) => ({ ...prev, role: val }));
+                          setEditFieldErrors((prev) => ({
+                            ...prev,
+                            role: validateRole(val)
+                          }));
+                          if (formError) setFormError('');
+                        }}
+                        options={modalRoleOptions}
+                        placeholder="Select Role"
+                        icon={<ShieldCheck size={16} color="#64748b" />}
+                        variant="form"
+                        error={editFieldErrors.role}
+                      />
+                    )}
                     {editFieldErrors.role && (
                       <span className="um-field-error">
                         <AlertCircle size={12} /> {editFieldErrors.role}

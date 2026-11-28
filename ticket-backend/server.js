@@ -722,6 +722,12 @@ app.post('/api/admin/users', async (req, res) => {
     });
   }
 
+  if (requesterRoleLower === 'qa lead' && cleanRole.toLowerCase() === 'qa lead') {
+    return res.status(403).json({
+      error: 'A QA Lead cannot create another QA Lead account.'
+    });
+  }
+
   try {
     // Single query checks existing email + fetches existing EMP-XXX IDs simultaneously
     const requestedEmpId = emp_id && String(emp_id).trim() ? String(emp_id).trim() : null;
@@ -948,6 +954,8 @@ app.put('/api/admin/users/:id', async (req, res) => {
 
     const existingUser = userCheck.rows[0];
     const requester = await getUserFromReq(req);
+    const requesterRoleLower = String(requester?.role || '').trim().toLowerCase();
+    const isSelf = Boolean(requester && Number(requester.id) === Number(existingUser.id));
 
     // Non-Admin users (including QA Lead, Manager, Project Lead, Developer) cannot modify Manager or Admin accounts
     if (requester?.role !== 'Admin' && requester?.role !== 'Super Admin') {
@@ -959,6 +967,25 @@ app.put('/api/admin/users/:id', async (req, res) => {
       if (role === 'Manager' || role === 'Admin' || role === 'Super Admin') {
         return res.status(403).json({
           error: 'Only a System Administrator can grant Manager or Admin access.'
+        });
+      }
+    }
+
+    // QA Lead cannot modify other QA Lead accounts, promote users to QA Lead, or change their own role
+    if (requesterRoleLower === 'qa lead') {
+      if (!isSelf && String(existingUser.role || '').trim().toLowerCase() === 'qa lead') {
+        return res.status(403).json({
+          error: 'A QA Lead cannot modify another QA Lead account.'
+        });
+      }
+      if (!isSelf && role && String(role).trim().toLowerCase() === 'qa lead') {
+        return res.status(403).json({
+          error: 'A QA Lead cannot assign the QA Lead role to another user.'
+        });
+      }
+      if (isSelf && role && String(role).trim().toLowerCase() !== 'qa lead') {
+        return res.status(403).json({
+          error: 'You cannot change your own QA Lead role.'
         });
       }
     }
@@ -1047,6 +1074,21 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 
     const targetUser = userCheck.rows[0];
     const requester = await getUserFromReq(req);
+    const requesterRoleLower = String(requester?.role || '').trim().toLowerCase();
+
+    // Prevent any user (including QA Lead) from deleting their own account
+    if (requester && Number(requester.id) === Number(targetUser.id)) {
+      return res.status(403).json({
+        error: 'You cannot delete your own account.'
+      });
+    }
+
+    // QA Lead cannot delete another QA Lead account
+    if (requesterRoleLower === 'qa lead' && String(targetUser.role || '').trim().toLowerCase() === 'qa lead') {
+      return res.status(403).json({
+        error: 'A QA Lead cannot delete another QA Lead account.'
+      });
+    }
 
     // Non-Admin users (including QA Lead, Manager, Project Lead, Developer) cannot delete Manager or Admin accounts
     if (requester?.role !== 'Admin' && requester?.role !== 'Super Admin') {
