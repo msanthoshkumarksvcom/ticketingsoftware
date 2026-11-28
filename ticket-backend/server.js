@@ -2180,30 +2180,36 @@ const buildStoredDocumentFilename = (originalName, ext) => {
 
 const enrichDocumentRow = (row) => {
   if (!row) return row;
-  const diskPath = resolveDiskDocPath(row.file_url);
+  const { db_byte_size, ...cleanRow } = row;
+  const dbSize = Number(db_byte_size) || 0;
+  if (dbSize > 0) {
+    return { ...cleanRow, byte_size: dbSize, is_empty: false };
+  }
+  const diskPath = resolveDiskDocPath(cleanRow.file_url);
   if (diskPath) {
     try {
       const stat = fs.statSync(diskPath);
-      return { ...row, byte_size: stat.size, is_empty: stat.size === 0 };
+      return { ...cleanRow, byte_size: stat.size, is_empty: stat.size === 0 };
     } catch {
-      return { ...row, byte_size: 0, is_empty: true };
+      return { ...cleanRow, byte_size: 0, is_empty: true };
     }
   }
-  if (typeof row.file_url === 'string' && row.file_url.startsWith('data:')) {
-    const commaIdx = row.file_url.indexOf(',');
-    const payloadLen = commaIdx === -1 ? 0 : row.file_url.slice(commaIdx + 1).trim().length;
-    return { ...row, is_empty: payloadLen === 0 };
+  if (typeof cleanRow.file_url === 'string' && cleanRow.file_url.startsWith('data:')) {
+    const commaIdx = cleanRow.file_url.indexOf(',');
+    const payloadLen = commaIdx === -1 ? 0 : cleanRow.file_url.slice(commaIdx + 1).trim().length;
+    return { ...cleanRow, is_empty: payloadLen === 0 };
   }
-  return { ...row, is_empty: !row.file_url };
+  return { ...cleanRow, is_empty: !cleanRow.file_url };
 };
 
-const insertProjectDocumentRecord = async ({ projId, title, name, fileUrl, fileSize, fileType, user }) => {
+const insertProjectDocumentRecord = async ({ projId, title, name, fileUrl, fileSize, fileType, fileBuffer = null, user }) => {
   const cleanName = name.trim();
   const cleanTitle = (typeof title === 'string' && title.trim()) ? title.trim() : cleanName;
+  const byteSize = Buffer.isBuffer(fileBuffer) ? fileBuffer.length : null;
   const result = await pool.query(
-    `INSERT INTO project_documents (project_id, title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING id, project_id, COALESCE(NULLIF(title, ''), name) as title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at, COALESCE(is_locked, FALSE) as is_locked, locked_by, locked_at`,
+    `INSERT INTO project_documents (project_id, title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, file_data, byte_size)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING id, project_id, COALESCE(NULLIF(title, ''), name) as title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at, COALESCE(is_locked, FALSE) as is_locked, locked_by, locked_at, COALESCE(octet_length(file_data), byte_size, 0)::bigint as db_byte_size`,
     [
       projId,
       cleanTitle,
@@ -2212,7 +2218,9 @@ const insertProjectDocumentRecord = async ({ projId, title, name, fileUrl, fileS
       fileSize || 'Unknown',
       fileType,
       user.full_name || 'Admin',
-      user.id
+      user.id,
+      fileBuffer,
+      byteSize
     ]
   );
 
@@ -2225,68 +2233,6 @@ const insertProjectDocumentRecord = async ({ projId, title, name, fileUrl, fileS
 
   return enrichDocumentRow(result.rows[0]);
 };
-
-const streamRequestToDisk = (req, destPath, maxBytes, maxSizeMb) =>
-  new Promise((resolve, reject) => {
-    const writeStream = fs.createWriteStream(destPath);
-    let totalBytes = 0;
-    let settled = false;
-
-    const cleanupFile = () => {
-      try {
-        if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
-      } catch {
-        // ignore cleanup errors
-      }
-    };
-
-    const fail = (statusCode, message) => {
-      if (settled) return;
-      settled = true;
-      writeStream.destroy();
-      cleanupFile();
-      req.resume();
-      const err = new Error(message);
-      err.statusCode = statusCode;
-      reject(err);
-    };
-
-    req.on('data', (chunk) => {
-      if (settled) return;
-      totalBytes += chunk.length;
-      if (totalBytes > maxBytes) {
-        fail(413, `File is too large. Maximum allowed size is ${maxSizeMb} MB.`);
-        return;
-      }
-      if (!writeStream.write(chunk)) {
-        req.pause();
-      }
-    });
-
-    writeStream.on('drain', () => {
-      if (!settled) req.resume();
-    });
-
-    req.on('aborted', () => fail(499, 'Upload aborted by client.'));
-    req.on('error', (err) => fail(500, err.message || 'Upload stream failed.'));
-    writeStream.on('error', (err) => fail(500, err.message || 'Failed to save uploaded file.'));
-
-    req.on('end', () => {
-      if (!settled) writeStream.end();
-    });
-
-    writeStream.on('finish', () => {
-      if (settled) return;
-      if (totalBytes === 0) {
-        fail(400, 'Cannot upload an empty (0 B) file. Please select a valid non-empty file.');
-        return;
-      }
-      settled = true;
-      resolve(totalBytes);
-    });
-
-    req.resume();
-  });
 
 // GET /api/admin/projects/:id/documents - Get project documents
 app.get('/api/admin/projects/:id/documents', async (req, res) => {
@@ -2315,12 +2261,14 @@ app.get('/api/admin/projects/:id/documents', async (req, res) => {
 
     const docsRes = await pool.query(
       `SELECT id, project_id, COALESCE(NULLIF(title, ''), name) as title, name, file_url, file_size, file_type, uploaded_by, uploaded_by_id, uploaded_at,
-              COALESCE(is_locked, FALSE) as is_locked, locked_by, locked_at
+              COALESCE(is_locked, FALSE) as is_locked, locked_by, locked_at,
+              COALESCE(octet_length(file_data), 0)::bigint as db_byte_size
        FROM project_documents 
        WHERE project_id = $1 
        ORDER BY uploaded_at DESC`,
       [projId]
     );
+    res.setHeader('Cache-Control', 'no-store');
     res.json(docsRes.rows.map(enrichDocumentRow));
   } catch (error) {
     console.error('Error fetching project documents:', error);
@@ -2348,7 +2296,7 @@ app.get('/api/admin/projects/:id/documents/:docId/download', async (req, res) =>
     const projId = projRes.rows[0].id;
 
     const docRes = await pool.query(
-      'SELECT id, project_id, name, file_url, file_type FROM project_documents WHERE id = $1 AND project_id = $2',
+      'SELECT id, project_id, name, file_url, file_type, file_data FROM project_documents WHERE id = $1 AND project_id = $2',
       [docId, projId]
     );
     if (docRes.rows.length === 0) {
@@ -2361,20 +2309,32 @@ app.get('/api/admin/projects/:id/documents/:docId/download', async (req, res) =>
     const fallbackName = (doc.name || 'download').replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
 
     const diskPath = resolveDiskDocPath(doc.file_url);
-    if (diskPath) {
-      if (!fs.existsSync(diskPath)) {
-        return res.status(404).json({ error: 'Stored file could not be found on server.' });
-      }
+    if (diskPath && fs.existsSync(diskPath)) {
       const stat = fs.statSync(diskPath);
-      if (stat.size === 0) {
-        return res.status(422).json({ error: `Document "${doc.name}" is empty (0 bytes). Please delete and re-upload a valid file.` });
+      if (stat.size > 0) {
+        const mimeType = DOCUMENT_MIME_TYPES[ext] || 'application/octet-stream';
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', stat.size);
+        res.setHeader('Content-Disposition', `${dispositionType}; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(doc.name || 'download')}`);
+        res.setHeader('Cache-Control', 'no-store');
+        return fs.createReadStream(diskPath).pipe(res);
+      }
+    }
+
+    if (Buffer.isBuffer(doc.file_data) && doc.file_data.length > 0) {
+      if (diskPath) {
+        try {
+          fs.writeFileSync(diskPath, doc.file_data);
+        } catch {
+          // ignore disk cache restore errors
+        }
       }
       const mimeType = DOCUMENT_MIME_TYPES[ext] || 'application/octet-stream';
       res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Length', stat.size);
+      res.setHeader('Content-Length', doc.file_data.length);
       res.setHeader('Content-Disposition', `${dispositionType}; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(doc.name || 'download')}`);
       res.setHeader('Cache-Control', 'no-store');
-      return fs.createReadStream(diskPath).pipe(res);
+      return res.send(doc.file_data);
     }
 
     if (typeof doc.file_url === 'string' && doc.file_url.startsWith('data:')) {
@@ -2390,6 +2350,10 @@ app.get('/api/admin/projects/:id/documents/:docId/download', async (req, res) =>
       return res.send(decoded.buffer);
     }
 
+    if (diskPath) {
+      return res.status(422).json({ error: `Document "${doc.name}" is empty (0 bytes) or missing from storage. Please delete and re-upload a valid file.` });
+    }
+
     return res.status(400).json({ error: 'Direct download is only available for uploaded files.' });
   } catch (error) {
     console.error('Error downloading document:', error);
@@ -2399,84 +2363,95 @@ app.get('/api/admin/projects/:id/documents/:docId/download', async (req, res) =>
   }
 });
 
-// POST /api/admin/projects/:id/documents/upload - Stream binary document upload to disk (supports large APKs)
-app.post('/api/admin/projects/:id/documents/upload', async (req, res) => {
-  req.pause();
-  const user = await getUserFromReq(req);
-  if (!user) {
-    req.resume();
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  const { id } = req.params;
-  const rawNameHeader = req.headers['x-file-name'] || req.query.filename || '';
-  let fileName = '';
-  try {
-    fileName = decodeURIComponent(String(rawNameHeader)).trim();
-  } catch {
-    fileName = String(rawNameHeader).trim();
-  }
-
-  const rawTitleHeader = req.headers['x-document-title'] || req.query.title || '';
-  let docTitle = '';
-  try {
-    docTitle = decodeURIComponent(String(rawTitleHeader)).trim();
-  } catch {
-    docTitle = String(rawTitleHeader).trim();
-  }
-
-  if (!fileName) {
-    req.resume();
-    return res.status(400).json({ error: 'File name is required.' });
-  }
-
-  const fileExt = fileName.split('.').pop()?.toLowerCase();
-  if (!fileExt || !ALLOWED_DOCUMENT_EXTENSIONS.includes(fileExt)) {
-    req.resume();
-    return res.status(400).json({ error: DOCUMENT_ALLOWED_MESSAGE });
-  }
-
-  try {
-    const ctx = await findProjectWithRoles(id, user);
-    if (!ctx) {
-      req.resume();
-      return res.status(404).json({ error: 'Project not found.' });
-    }
-    if (!ctx.canEditDocsAndLinks) {
-      req.resume();
-      return res.status(403).json({ error: 'Access denied. You do not have permission to upload project documents.' });
-    }
-    if (ctx.proj.documents_locked) {
-      req.resume();
-      return res.status(423).json({ error: 'Uploaded documents are locked (read-only). Ask a Project Lead or Manager to unlock them first.' });
+// POST /api/admin/projects/:id/documents/upload - Binary document upload persisted to PostgreSQL + disk cache
+app.post(
+  '/api/admin/projects/:id/documents/upload',
+  express.raw({ type: '*/*', limit: '105mb' }),
+  async (req, res) => {
+    const user = await getUserFromReq(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const maxBytes = getDocumentMaxBytes(fileExt);
-    const maxSizeMb = Math.round(maxBytes / (1024 * 1024));
-    const storedFilename = buildStoredDocumentFilename(fileName, fileExt);
-    const destPath = path.join(documentsUploadsDir, storedFilename);
+    const { id } = req.params;
+    const rawNameHeader = req.headers['x-file-name'] || req.query.filename || '';
+    let fileName = '';
+    try {
+      fileName = decodeURIComponent(String(rawNameHeader)).trim();
+    } catch {
+      fileName = String(rawNameHeader).trim();
+    }
 
-    const totalBytes = await streamRequestToDisk(req, destPath, maxBytes, maxSizeMb);
-    const fileUrl = `/uploads/documents/${storedFilename}`;
-    const fileSize = String(req.headers['x-file-size'] || '').trim() || formatDocumentByteSize(totalBytes);
-    const fileType = String(req.headers['x-file-type'] || '').trim() || fileExt.toUpperCase();
+    const rawTitleHeader = req.headers['x-document-title'] || req.query.title || '';
+    let docTitle = '';
+    try {
+      docTitle = decodeURIComponent(String(rawTitleHeader)).trim();
+    } catch {
+      docTitle = String(rawTitleHeader).trim();
+    }
 
-    const doc = await insertProjectDocumentRecord({
-      projId: ctx.proj.id,
-      title: docTitle || fileName,
-      name: fileName,
-      fileUrl,
-      fileSize,
-      fileType,
-      user
-    });
+    if (!fileName) {
+      return res.status(400).json({ error: 'File name is required.' });
+    }
 
-    res.status(201).json(doc);
-  } catch (error) {
-    console.error('Error streaming document upload:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to upload document.' });
+    const fileExt = fileName.split('.').pop()?.toLowerCase();
+    if (!fileExt || !ALLOWED_DOCUMENT_EXTENSIONS.includes(fileExt)) {
+      return res.status(400).json({ error: DOCUMENT_ALLOWED_MESSAGE });
+    }
+
+    try {
+      const ctx = await findProjectWithRoles(id, user);
+      if (!ctx) {
+        return res.status(404).json({ error: 'Project not found.' });
+      }
+      if (!ctx.canEditDocsAndLinks) {
+        return res.status(403).json({ error: 'Access denied. You do not have permission to upload project documents.' });
+      }
+      if (ctx.proj.documents_locked) {
+        return res.status(423).json({ error: 'Uploaded documents are locked (read-only). Ask a Project Lead or Manager to unlock them first.' });
+      }
+
+      const fileBuffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+      if (fileBuffer.length === 0) {
+        return res.status(400).json({ error: 'Cannot upload an empty (0 B) file. Please select a valid non-empty file.' });
+      }
+
+      const maxBytes = getDocumentMaxBytes(fileExt);
+      const maxSizeMb = Math.round(maxBytes / (1024 * 1024));
+      if (fileBuffer.length > maxBytes) {
+        return res.status(413).json({ error: `File is too large. Maximum allowed size is ${maxSizeMb} MB.` });
+      }
+
+      const storedFilename = buildStoredDocumentFilename(fileName, fileExt);
+      const destPath = path.join(documentsUploadsDir, storedFilename);
+      try {
+        fs.writeFileSync(destPath, fileBuffer);
+      } catch (diskErr) {
+        console.warn('Could not write local disk cache for document:', diskErr.message);
+      }
+
+      const fileUrl = `/uploads/documents/${storedFilename}`;
+      const fileSize = String(req.headers['x-file-size'] || '').trim() || formatDocumentByteSize(fileBuffer.length);
+      const fileType = String(req.headers['x-file-type'] || '').trim() || fileExt.toUpperCase();
+
+      const doc = await insertProjectDocumentRecord({
+        projId: ctx.proj.id,
+        title: docTitle || fileName,
+        name: fileName,
+        fileUrl,
+        fileSize,
+        fileType,
+        fileBuffer,
+        user
+      });
+
+      res.status(201).json(doc);
+    } catch (error) {
+      console.error('Error saving document upload:', error);
+      res.status(error.statusCode || 500).json({ error: error.message || 'Failed to upload document.' });
+    }
   }
-});
+);
 
 // POST /api/admin/projects/:id/documents - Upload document via JSON (All roles except QA Member, unless locked)
 app.post('/api/admin/projects/:id/documents', async (req, res) => {
@@ -2513,6 +2488,7 @@ app.post('/api/admin/projects/:id/documents', async (req, res) => {
 
     let finalFileUrl = file_url;
     let finalFileSize = file_size;
+    let fileBuffer = null;
 
     if (typeof file_url === 'string' && file_url.startsWith('data:')) {
       const decoded = extractDataUrlBuffer(file_url);
@@ -2523,8 +2499,13 @@ app.post('/api/admin/projects/:id/documents', async (req, res) => {
       if (decoded.buffer.length > maxBytes) {
         return res.status(413).json({ error: `File is too large. Maximum allowed size is ${Math.round(maxBytes / (1024 * 1024))} MB.` });
       }
+      fileBuffer = decoded.buffer;
       const storedFilename = buildStoredDocumentFilename(name, fileExt);
-      fs.writeFileSync(path.join(documentsUploadsDir, storedFilename), decoded.buffer);
+      try {
+        fs.writeFileSync(path.join(documentsUploadsDir, storedFilename), decoded.buffer);
+      } catch (diskErr) {
+        console.warn('Could not write local disk cache for document:', diskErr.message);
+      }
       finalFileUrl = `/uploads/documents/${storedFilename}`;
       finalFileSize = file_size || formatDocumentByteSize(decoded.buffer.length);
     }
@@ -2536,6 +2517,7 @@ app.post('/api/admin/projects/:id/documents', async (req, res) => {
       fileUrl: finalFileUrl,
       fileSize: finalFileSize,
       fileType: file_type || fileExt.toUpperCase(),
+      fileBuffer,
       user
     });
 
