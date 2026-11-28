@@ -260,15 +260,8 @@ app.post(['/api/forgot-password/send-code', '/api/auth/forgot-password/send-code
 
     return res.json({
       success: true,
-      message: emailResult.success
-        ? `Verification code sent to ${user.email}. Please check your inbox.`
-        : (emailResult.error
-          ? `Verification code generated, but email delivery failed (${emailResult.error}). For convenience, your code is shown below:`
-          : 'Verification code generated! (Logged to console in dev mode)'),
-      email: user.email,
-      simulatedCode: !emailResult.success ? code : null,
-      isSimulated: !emailResult.success,
-      previewUrl: emailResult.previewUrl || null
+      message: `Verification code sent to ${user.email}. Please check your inbox.`,
+      email: user.email
     });
   } catch (error) {
     console.error('Send verification code error:', error);
@@ -300,6 +293,43 @@ function validateStrongPassword(password, label = 'New password') {
   }
   return '';
 }
+
+// 1b. Verify OTP Code Only (before Set New Password step)
+app.post(['/api/forgot-password/verify-code', '/api/auth/forgot-password/verify-code'], async (req, res) => {
+  const { email, code } = req.body || {};
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Please enter your registered email address.' });
+  }
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanCode = String(code || '').trim();
+  if (!cleanCode || cleanCode.length !== 6) {
+    return res.status(400).json({ error: 'Please enter the 6-digit verification code.' });
+  }
+
+  let isCodeValid = false;
+  const inMemoryRecord = resetCodeStore.get(cleanEmail);
+  if (inMemoryRecord && inMemoryRecord.code === cleanCode && inMemoryRecord.expiresAt > Date.now()) {
+    isCodeValid = true;
+  } else {
+    try {
+      const dbCheck = await pool.query(
+        `SELECT id FROM password_reset_codes
+         WHERE LOWER(email) = $1 AND code = $2 AND expires_at > NOW()
+         ORDER BY created_at DESC LIMIT 1`,
+        [cleanEmail, cleanCode]
+      );
+      if (dbCheck.rows.length > 0) {
+        isCodeValid = true;
+      }
+    } catch (e) {}
+  }
+
+  if (!isCodeValid) {
+    return res.status(400).json({ error: 'Invalid or expired verification code. Please request a new code.' });
+  }
+
+  return res.json({ verified: true, message: 'OTP verified successfully.' });
+});
 
 // 2. Verify Code & Change Password Endpoint
 app.post(['/api/forgot-password/verify', '/api/auth/forgot-password/verify'], async (req, res) => {
