@@ -32,6 +32,6 @@ Whenever performing **any** frontend development work—including:
 6. **Verification**: Always run `npm run build` in `ticket-frontend` to confirm zero compilation errors before completing a task.
 
 ## Git Branch Workflow
-- Active development/deployment updates must be reflected in **both** `Production` and `Developement` branches (`origin/Production` and `origin/Developement`).
-- When committing or pushing changes, ensure both `Production` and `Developement` point to the updated commit.
+- Active development updates must reflect **only in the `Developement` branch** (`origin/Developement`).
+- Do **not** push or sync upcoming changes to `Production` unless explicitly requested.
 
