@@ -188,69 +188,6 @@ export default function AdminReports() {
     );
   }, [qaMembersReport, qaSearch]);
 
-  // CSV Export for Project Report
-  const handleExportProjectCSV = () => {
-    const dateStr = new Date().toISOString().split('T')[0];
-    const headers = [
-      'Project Code',
-      'Project Name',
-      'Project Lead',
-      'Status',
-      'Total Test Cases',
-      'Passed',
-      'Failed',
-      'Recommendations',
-      'Untested',
-      'Pass Rate %',
-      'Total Defect Tickets',
-      'Open Defects',
-      'In Progress',
-      'Resolved Defects',
-      'Closed Defects',
-      'Resolved By (Developers)',
-      'Closed By (QA)'
-    ];
-
-    const rows = filteredProjects.map((p) => {
-      const resolvedByStr = (p.tickets.resolved_by_breakdown || [])
-        .map((d) => `${d.developer_name} (${d.count})`)
-        .join('; ');
-      const closedByStr = (p.tickets.closed_by_breakdown || [])
-        .map((q) => `${q.qa_name} (${q.count})`)
-        .join('; ');
-
-      return [
-        `"${p.project_code || ''}"`,
-        `"${(p.name || '').replace(/"/g, '""')}"`,
-        `"${p.lead_name || 'Unassigned'}"`,
-        `"${p.status || 'Active'}"`,
-        p.test_cases.total,
-        p.test_cases.pass,
-        p.test_cases.fail,
-        p.test_cases.recommendation,
-        p.test_cases.untested,
-        `${p.test_cases.pass_rate}%`,
-        p.tickets.total,
-        p.tickets.open,
-        p.tickets.in_progress,
-        p.tickets.resolved,
-        p.tickets.closed,
-        `"${resolvedByStr}"`,
-        `"${closedByStr}"`
-      ];
-    });
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Project_Quality_Report_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // CSV Export for QA Member Report (Includes Daily & Period Metrics)
   const handleExportQACSV = () => {
     const dateStr = new Date().toISOString().split('T')[0];
@@ -716,18 +653,6 @@ export default function AdminReports() {
                           <X size={14} />
                         </button>
                       )}
-                    </div>
-
-                    <div className="um-filter-selects">
-                      <button
-                        id="reports-export-projects-csv-btn"
-                        type="button"
-                        className="um-btn-create"
-                        onClick={handleExportProjectCSV}
-                      >
-                        <Download size={15} />
-                        <span>Export Projects CSV</span>
-                      </button>
                     </div>
                   </div>
 

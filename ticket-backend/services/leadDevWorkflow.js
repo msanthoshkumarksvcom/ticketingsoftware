@@ -2098,21 +2098,39 @@ export function registerWorkflowRoutes(app, io) {
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
     try {
-      // 1. Projects assigned to developer (via project_developer_assignments by id/name/email OR tickets assigned to developer)
+      // 1. Projects assigned to developer (strictly 1 row per project id)
       const projectsRes = await pool.query(
-        `SELECT DISTINCT p.id, p.project_code, p.name, p.status, p.progress, p.lead_name, p.lead_name as project_lead_name,
-                COALESCE(pda.assigned_at, p.created_at) as assigned_at
+        `SELECT p.id, p.project_code, p.name, p.status, p.progress, p.lead_name, p.lead_name as project_lead_name,
+                COALESCE(
+                  (SELECT MAX(pda.assigned_at)
+                   FROM project_developer_assignments pda
+                   WHERE pda.project_id = p.id
+                     AND pda.status = 'Active'
+                     AND (
+                       pda.developer_id = $1
+                       OR (NULLIF(TRIM($3), '') IS NOT NULL AND LOWER(TRIM(pda.developer_email)) = LOWER(TRIM($3)))
+                     )),
+                  p.created_at
+                ) as assigned_at
          FROM projects p
-         LEFT JOIN project_developer_assignments pda ON pda.project_id = p.id 
-           AND (pda.developer_id = $1 OR LOWER(TRIM(pda.developer_email)) = LOWER(TRIM($3)) OR LOWER(TRIM(pda.developer_name)) = LOWER(TRIM($2))) 
-           AND pda.status = 'Active'
-         WHERE (
-            pda.id IS NOT NULL
-            OR p.id IN (
-              SELECT project_id FROM tickets 
-              WHERE (assigned_developer_id = $1 OR LOWER(TRIM(assigned_to)) = LOWER(TRIM($2)) OR LOWER(TRIM(assigned_to)) = LOWER(TRIM($3)))
-              AND project_id IS NOT NULL
-            )
+         WHERE EXISTS (
+           SELECT 1
+           FROM project_developer_assignments pda
+           WHERE pda.project_id = p.id
+             AND pda.status = 'Active'
+             AND (
+               pda.developer_id = $1
+               OR (NULLIF(TRIM($3), '') IS NOT NULL AND LOWER(TRIM(pda.developer_email)) = LOWER(TRIM($3)))
+             )
+         )
+         OR p.id IN (
+           SELECT project_id FROM tickets
+           WHERE (
+             assigned_developer_id = $1
+             OR LOWER(TRIM(assigned_to)) = LOWER(TRIM($2))
+             OR (NULLIF(TRIM($3), '') IS NOT NULL AND LOWER(TRIM(assigned_to)) = LOWER(TRIM($3)))
+           )
+           AND project_id IS NOT NULL
          )
          ORDER BY assigned_at DESC`,
         [user.id, user.full_name || '', user.email || '']

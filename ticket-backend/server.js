@@ -2065,25 +2065,70 @@ const findProjectWithRoles = async (projectIdOrCode, user) => {
   };
 };
 
-const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx', 'apk'];
-const DOCUMENT_ALLOWED_MESSAGE = 'Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX, APK.';
+const VIDEO_DOCUMENT_EXTENSIONS = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv', 'mkv', 'avi'];
+const ALLOWED_DOCUMENT_EXTENSIONS = [
+  'pdf',
+  'doc', 'docx', 'odt', 'rtf',
+  'xls', 'xlsx', 'csv', 'tsv', 'ods',
+  'ppt', 'pptx', 'odp',
+  'txt', 'md', 'json', 'xml', 'log', 'yaml', 'yml', 'html', 'css', 'js',
+  'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp',
+  ...VIDEO_DOCUMENT_EXTENSIONS,
+  'mp3', 'wav', 'm4a', 'aac',
+  'apk', 'zip'
+];
+const DOCUMENT_ALLOWED_MESSAGE = 'Invalid file type. Allowed formats: Images, Video, Audio, PDF, Word, Excel/CSV, PowerPoint, Text/Code, ZIP, and APK.';
 const DOCUMENT_MIME_TYPES = {
   pdf: 'application/pdf',
   doc: 'application/msword',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  odt: 'application/vnd.oasis.opendocument.text',
+  rtf: 'application/rtf',
   xls: 'application/vnd.ms-excel',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   csv: 'text/csv',
+  tsv: 'text/tab-separated-values',
+  ods: 'application/vnd.oasis.opendocument.spreadsheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  odp: 'application/vnd.oasis.opendocument.presentation',
   txt: 'text/plain',
+  md: 'text/markdown',
+  json: 'application/json',
+  xml: 'application/xml',
+  log: 'text/plain',
+  yaml: 'text/yaml',
+  yml: 'text/yaml',
+  html: 'text/html',
+  css: 'text/css',
+  js: 'text/javascript',
   png: 'image/png',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
-  ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  apk: 'application/vnd.android.package-archive'
+  webp: 'image/webp',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  bmp: 'image/bmp',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  m4v: 'video/x-m4v',
+  ogg: 'video/ogg',
+  ogv: 'video/ogg',
+  mkv: 'video/x-matroska',
+  avi: 'video/x-msvideo',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  apk: 'application/vnd.android.package-archive',
+  zip: 'application/zip'
 };
 
-const getDocumentMaxBytes = (ext) => (ext === 'apk' ? 100 * 1024 * 1024 : 25 * 1024 * 1024);
+const getDocumentMaxBytes = (ext) =>
+  (ext === 'apk' || ext === 'zip' || VIDEO_DOCUMENT_EXTENSIONS.includes(ext))
+    ? 100 * 1024 * 1024
+    : 25 * 1024 * 1024;
 
 const formatDocumentByteSize = (bytes) => {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';

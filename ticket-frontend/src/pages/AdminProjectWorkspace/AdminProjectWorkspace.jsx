@@ -35,7 +35,13 @@ import {
   Link2,
   Plus,
   Save,
-  Send
+  Send,
+  Image as ImageIcon,
+  Video,
+  Music,
+  Presentation,
+  Code2,
+  Package
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar/AdminSidebar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
@@ -50,8 +56,15 @@ const TESTING_PRIORITY_OPTIONS = [
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
+import UniversalFileViewer from '../../components/UniversalFileViewer/UniversalFileViewer';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
+import {
+  ALL_DOCUMENT_EXTENSIONS,
+  ALL_DOCUMENT_ACCEPT,
+  getDocumentMaxBytes,
+  detectFileCategory
+} from '../../utils/filePreviewParsers';
 import './AdminProjectWorkspace.css';
 
 const WORKSPACE_FOLDERS = [
@@ -63,8 +76,8 @@ const WORKSPACE_FOLDERS = [
   { id: 'details', label: 'Details', detail: 'Project information', icon: Folder }
 ];
 
-const ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'png', 'jpg', 'jpeg', 'ppt', 'pptx', 'apk'];
-const ALLOWED_DOCUMENT_ACCEPT = ALLOWED_DOCUMENT_EXTENSIONS.map((ext) => `.${ext}`).join(',');
+const ALLOWED_DOCUMENT_EXTENSIONS = ALL_DOCUMENT_EXTENSIONS;
+const ALLOWED_DOCUMENT_ACCEPT = ALL_DOCUMENT_ACCEPT;
 
 export default function AdminProjectWorkspace() {
   const { projectId } = useParams();
@@ -184,9 +197,20 @@ export default function AdminProjectWorkspace() {
   const [testingMsg, setTestingMsg] = useState({ text: '', type: '' });
 
   const [docDownloadingId, setDocDownloadingId] = useState(null);
+  const [previewDocIndex, setPreviewDocIndex] = useState(-1);
 
-  const isImage = (filename = '') => /\.(png|jpe?g|gif|webp|svg)$/i.test(filename);
-  const isPdf = (filename = '') => /\.pdf$/i.test(filename);
+  const renderDocCategoryIcon = (doc) => {
+    const cat = detectFileCategory(doc);
+    if (cat === 'excel') return <FileSpreadsheet size={18} color="#16A34A" />;
+    if (cat === 'ppt') return <Presentation size={18} color="#EA580C" />;
+    if (cat === 'video') return <Video size={18} color="#7C3AED" />;
+    if (cat === 'image') return <ImageIcon size={18} color="#2563EB" />;
+    if (cat === 'audio') return <Music size={18} color="#0284C7" />;
+    if (cat === 'pdf') return <FileText size={18} color="#DC2626" />;
+    if (cat === 'text') return <Code2 size={18} color="#475569" />;
+    if (cat === 'archive') return <Package size={18} color="#6366F1" />;
+    return <FileText size={18} color="#2563EB" />;
+  };
 
   const isDocumentEmpty = (doc) => {
     if (!doc) return true;
@@ -203,6 +227,57 @@ export default function AdminProjectWorkspace() {
       URL.revokeObjectURL(previewDoc.blobUrl);
     }
     setPreviewDoc(null);
+    setPreviewDocIndex(-1);
+  };
+
+  const fetchDocumentArrayBuffer = async (doc) => {
+    if (isDocumentEmpty(doc)) {
+      throw new Error(`Document "${doc.name}" is empty (0 bytes) because an empty file was uploaded. Please delete it and upload a non-empty file.`);
+    }
+
+    const fileUrl = doc.file_url || '';
+    if (fileUrl.startsWith('data:')) {
+      const commaIdx = fileUrl.indexOf(',');
+      const header = fileUrl.slice(0, commaIdx);
+      const payload = fileUrl.slice(commaIdx + 1);
+      if (header.includes(';base64')) {
+        const binStr = atob(payload);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i += 1) bytes[i] = binStr.charCodeAt(i);
+        return bytes.buffer;
+      }
+      return new TextEncoder().encode(decodeURIComponent(payload)).buffer;
+    }
+
+    if ((fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) && !fileUrl.startsWith(`${API_BASE}/uploads/`) && !fileUrl.startsWith('http://localhost:5000/uploads/')) {
+      const extResp = await fetch(fileUrl, { cache: 'no-store' });
+      if (!extResp.ok) throw new Error('Failed to load external file for preview.');
+      return await extResp.arrayBuffer();
+    }
+
+    const token = localStorage.getItem('token');
+    const endpoint = `${API_BASE}/api/admin/projects/${projectId}/documents/${doc.id}/download?inline=1`;
+    const response = await fetch(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      let errMsg = 'Failed to load document preview.';
+      try {
+        const errBody = await response.json();
+        if (errBody?.error) errMsg = errBody.error;
+      } catch {
+        // ignore JSON parse failure
+      }
+      throw new Error(errMsg);
+    }
+
+    const buf = await response.arrayBuffer();
+    if (!buf || buf.byteLength === 0) {
+      throw new Error(`Document "${doc.name}" is empty (0 bytes). Please delete and re-upload a valid file.`);
+    }
+    return buf;
   };
 
   const fetchDocumentBlobUrl = async (doc, { inline = false } = {}) => {
@@ -241,17 +316,18 @@ export default function AdminProjectWorkspace() {
     return { url: URL.createObjectURL(blob), isBlob: true };
   };
 
-  const handleViewDocument = async (doc) => {
+  const handleViewDocument = (doc, docIdx = -1) => {
     setDocError('');
-    try {
-      if (previewDoc?.blobUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(previewDoc.blobUrl);
-      }
-      const { url } = await fetchDocumentBlobUrl(doc, { inline: true });
-      setPreviewDoc({ ...doc, blobUrl: url });
-    } catch (err) {
-      setDocError(err.message || 'Failed to preview document.');
+    if (previewDoc?.blobUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewDoc.blobUrl);
     }
+    const resolvedIdx = docIdx >= 0 ? docIdx : documents.findIndex((d) => d.id === doc.id);
+    setPreviewDocIndex(resolvedIdx);
+    setPreviewDoc({
+      ...doc,
+      loadArrayBuffer: () => fetchDocumentArrayBuffer(doc),
+      onDownload: () => handleDownloadDocument(doc)
+    });
   };
 
   const handleDownloadDocument = async (doc) => {
@@ -643,19 +719,20 @@ export default function AdminProjectWorkspace() {
 
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     if (!fileExt || !ALLOWED_DOCUMENT_EXTENSIONS.includes(fileExt)) {
-      setDocUploadModalError('Invalid file type. Allowed formats: PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG/JPEG, PPT/PPTX, APK.');
+      setDocUploadModalError('Invalid file type. Allowed formats: Images, Video, Audio, PDF, Word, Excel/CSV, PowerPoint, Text/Code, ZIP, and APK.');
       event.target.value = '';
       return;
     }
 
-    const maxSizeMb = fileExt === 'apk' ? 100 : 25;
+    const maxBytes = getDocumentMaxBytes(fileExt);
+    const maxSizeMb = Math.round(maxBytes / (1024 * 1024));
     if (file.size === 0) {
       setDocUploadModalError('Cannot upload an empty (0 B) file. Please select a valid non-empty file.');
       event.target.value = '';
       return;
     }
 
-    if (file.size > maxSizeMb * 1024 * 1024) {
+    if (file.size > maxBytes) {
       setDocUploadModalError(`File is too large. Maximum allowed size is ${maxSizeMb} MB.`);
       event.target.value = '';
       return;
@@ -1730,7 +1807,7 @@ export default function AdminProjectWorkspace() {
                       </tr>
                     </thead>
                     <tbody>
-                      {documents.map((doc) => {
+                      {documents.map((doc, docIdx) => {
                         const rowLocked = Boolean(linksMeta.documents_locked || doc.is_locked);
                         const docTitle = doc.title || doc.name;
                         const hasDistinctFilename = Boolean(doc.title && doc.title !== doc.name);
@@ -1738,7 +1815,7 @@ export default function AdminProjectWorkspace() {
                           <tr key={doc.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                <FileText size={18} color="#2563EB" />
+                                {renderDocCategoryIcon(doc)}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                                   <span style={{ fontWeight: 600, color: '#0F172A' }}>{docTitle}</span>
                                   {hasDistinctFilename && (
@@ -1780,9 +1857,9 @@ export default function AdminProjectWorkspace() {
                                 <button
                                   id={`pw-doc-view-btn-${doc.id}`}
                                   type="button"
-                                  onClick={() => handleViewDocument(doc)}
+                                  onClick={() => handleViewDocument(doc, docIdx)}
                                   className="pw-btn-doc-view"
-                                  title="View document"
+                                  title="View inside website"
                                 >
                                   <Eye size={13} />
                                   <span>View</span>
@@ -2166,7 +2243,7 @@ export default function AdminProjectWorkspace() {
                       <span>
                         {selectedDocFile
                           ? `${(selectedDocFile.size > 1024 * 1024 ? `${(selectedDocFile.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(selectedDocFile.size / 1024))} KB`)} • Click to replace`
-                          : 'PDF, DOC/DOCX, XLS/XLSX/CSV, TXT, PNG, JPG, PPT/PPTX (25MB) or APK (100MB)'}
+                          : 'Images, PDF, Word, Excel/CSV, PPT/PPTX, Text (25MB) or Video/ZIP/APK (100MB)'}
                       </span>
                     </div>
                     <input
@@ -2207,145 +2284,18 @@ export default function AdminProjectWorkspace() {
         </div>
       )}
 
-      {/* Modal: Document Preview / View */}
-      {previewDoc && (
-        <div id="pw-doc-preview-modal-overlay" className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closePreviewModal()}>
-          <div id="pw-doc-preview-modal" className="pw-modal-box" style={{ maxWidth: 860, width: '92%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="pw-modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                <FileText size={22} color="#2563EB" />
-                <div style={{ minWidth: 0 }}>
-                  <h3 id="pw-doc-preview-modal-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {previewDoc.title || previewDoc.name}
-                  </h3>
-                  <span style={{ fontSize: '12px', color: '#64748B' }}>
-                    {previewDoc.title && previewDoc.title !== previewDoc.name ? `${previewDoc.name} • ` : ''}
-                    {previewDoc.file_size} &bull; Uploaded by {previewDoc.uploaded_by || 'Admin'} on {formatIndianDate(previewDoc.uploaded_at, 'Recent')}
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <a
-                  id="pw-doc-preview-open-link"
-                  href={previewDoc.blobUrl || previewDoc.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                    background: '#EFF6FF',
-                    color: '#2563EB',
-                    textDecoration: 'none',
-                    border: '1px solid #BFDBFE'
-                  }}
-                  title="Open in new window"
-                >
-                  <ExternalLink size={14} />
-                  <span>Open in Tab</span>
-                </a>
-                <button
-                  id="pw-doc-preview-download-btn"
-                  type="button"
-                  onClick={() => handleDownloadDocument(previewDoc)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                    background: '#2563EB',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Download size={14} />
-                  <span>Download</span>
-                </button>
-                <button id="pw-doc-preview-close-btn" className="pw-modal-close" onClick={closePreviewModal} style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}>
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            <div className="pw-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC', minHeight: '360px' }}>
-              {isImage(previewDoc.name) ? (
-                <img
-                  src={previewDoc.blobUrl || previewDoc.file_url}
-                  alt={previewDoc.name}
-                  style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                />
-              ) : isPdf(previewDoc.name) ? (
-                <iframe
-                  src={previewDoc.blobUrl || previewDoc.file_url}
-                  title={previewDoc.name}
-                  style={{ width: '100%', height: '65vh', border: '1px solid #E2E8F0', borderRadius: '8px', background: '#FFFFFF' }}
-                />
-              ) : (
-                <div style={{ textAlign: 'center', padding: '36px 20px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', maxWidth: '480px', width: '100%' }}>
-                  <FileText size={48} color="#2563EB" style={{ margin: '0 auto 12px' }} />
-                  <h4 id="pw-doc-preview-fallback-heading" style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{previewDoc.name}</h4>
-                  <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B', lineHeight: 1.5 }}>
-                    This document format ({previewDoc.file_type || previewDoc.name.split('.').pop()?.toUpperCase()}) can be opened in a browser tab or downloaded to your device for viewing with compatible software.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                    <a
-                      id="pw-doc-preview-fallback-open-link"
-                      href={previewDoc.blobUrl || previewDoc.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 16px',
-                        background: '#EFF6FF',
-                        color: '#2563EB',
-                        borderRadius: '6px',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        textDecoration: 'none',
-                        border: '1px solid #BFDBFE'
-                      }}
-                    >
-                      <ExternalLink size={15} />
-                      <span>Open in Browser Tab</span>
-                    </a>
-                    <button
-                      id="pw-doc-preview-fallback-download-btn"
-                      type="button"
-                      onClick={() => handleDownloadDocument(previewDoc)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 16px',
-                        background: '#2563EB',
-                        color: '#FFFFFF',
-                        borderRadius: '6px',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        border: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Download size={15} />
-                      <span>Download File</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* In-App Universal File Viewer (Image, PDF, Excel, PPT, Word, Video, Audio, Text, Archive) */}
+      <UniversalFileViewer
+        isOpen={Boolean(previewDoc)}
+        file={previewDoc}
+        files={documents}
+        activeIndex={previewDocIndex}
+        onSelectIndex={(nextIdx) => {
+          const target = documents[nextIdx];
+          if (target) handleViewDocument(target, nextIdx);
+        }}
+        onClose={closePreviewModal}
+      />
 
       {/* Ticket Detail Modal */}
       {selectedTicketId && (

@@ -31,6 +31,7 @@ import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
+import UniversalFileViewer from '../../components/UniversalFileViewer/UniversalFileViewer';
 import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
 import { getRolePath } from '../../utils/roleRoutes';
 import { API_BASE } from '../../utils/apiConfig';
@@ -1550,46 +1551,11 @@ function AdminTickets() {
         </div>
       )}
 
-      {previewAttachment && (
-        <div
-          id="raise-ticket-media-lightbox"
-          className="ticket-media-lightbox"
-          onClick={() => setPreviewAttachment(null)}
-        >
-          <div className="ticket-media-lightbox-box" onClick={(e) => e.stopPropagation()}>
-            <div className="ticket-media-lightbox-header">
-              <span title={previewAttachment.name}>{previewAttachment.name}</span>
-              <button
-                id="raise-ticket-media-lightbox-close"
-                type="button"
-                className="ticket-media-lightbox-close"
-                onClick={() => setPreviewAttachment(null)}
-                aria-label="Close preview"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="ticket-media-lightbox-body">
-              {previewAttachment.mediaType === 'video' ? (
-                <video
-                  key={previewAttachment.url}
-                  src={previewAttachment.url}
-                  controls
-                  autoPlay
-                  playsInline
-                  className="ticket-media-lightbox-content"
-                />
-              ) : (
-                <img
-                  src={previewAttachment.url}
-                  alt={previewAttachment.name}
-                  className="ticket-media-lightbox-content"
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <UniversalFileViewer
+        isOpen={Boolean(previewAttachment)}
+        file={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </div>
   );
 }
