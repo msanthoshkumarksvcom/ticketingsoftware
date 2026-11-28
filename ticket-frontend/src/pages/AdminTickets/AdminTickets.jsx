@@ -14,6 +14,7 @@ import {
   ImageIcon,
   LayoutGrid,
   List,
+  Lock,
   LogOut,
   Maximize2,
   Play,
@@ -38,6 +39,10 @@ import {
   validateMediaFile,
   readFileAsDataUrl
 } from '../../utils/mediaPreview';
+import {
+  isTicketLockActive,
+  getTicketLockRemainingLabel
+} from '../../utils/ticketLock';
 import FolderEmblem from '../AdminProjects/FolderEmblem';
 import { getValidToken, clearAuthSession } from '../../utils/auth';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -1244,6 +1249,26 @@ function AdminTickets() {
                               {(t.attachments || []).length > 0 && (
                                 <span className="ticket-attachment-summary">
                                   <Upload size={12} /> {t.attachments.length} attachment{t.attachments.length > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {isTicketLockActive(t) && t.locked_by && (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    marginTop: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    color: '#B45309',
+                                    background: '#FFFBEB',
+                                    border: '1px solid #FDE68A',
+                                    borderRadius: '6px',
+                                    padding: '2px 7px',
+                                    width: 'fit-content'
+                                  }}
+                                >
+                                  <Lock size={11} /> Working: {t.locked_by} ({getTicketLockRemainingLabel(t)})
                                 </span>
                               )}
                             </div>

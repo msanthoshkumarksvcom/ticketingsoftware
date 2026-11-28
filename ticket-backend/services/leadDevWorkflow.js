@@ -20,6 +20,39 @@ const ticketsUploadsDir = path.join(uploadsDir, 'tickets');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 if (!fs.existsSync(ticketsUploadsDir)) fs.mkdirSync(ticketsUploadsDir, { recursive: true });
 
+// Exclusive developer work-lock window (defaults to 2 hours; configurable 1-24h via TICKET_WORK_LOCK_HOURS)
+const parsedLockHours = Number(process.env.TICKET_WORK_LOCK_HOURS);
+export const TICKET_WORK_LOCK_HOURS =
+  Number.isFinite(parsedLockHours) && parsedLockHours >= 1 && parsedLockHours <= 24
+    ? parsedLockHours
+    : 2;
+export const TICKET_WORK_LOCK_MS = TICKET_WORK_LOCK_HOURS * 60 * 60 * 1000;
+
+export const getTicketLockState = (ticket, requesterId, requesterName = '') => {
+  if (!ticket || ticket.status === 'Resolved' || ticket.status === 'Closed') {
+    return { isLocked: false, isLockedByMe: false, isLockedByOther: false, isExpired: false, expiresAt: null };
+  }
+  if (!ticket.locked_by && !ticket.locked_by_id) {
+    return { isLocked: false, isLockedByMe: false, isLockedByOther: false, isExpired: false, expiresAt: null };
+  }
+  const lockedAtMs = ticket.locked_at ? new Date(ticket.locked_at).getTime() : 0;
+  const expiresAtMs = lockedAtMs ? lockedAtMs + TICKET_WORK_LOCK_MS : 0;
+  const isExpired = !lockedAtMs || Date.now() >= expiresAtMs;
+  const isLocked = !isExpired;
+  const isLockedByMe = Boolean(
+    isLocked &&
+    ((ticket.locked_by_id && requesterId && Number(ticket.locked_by_id) === Number(requesterId)) ||
+      (requesterName && ticket.locked_by && ticket.locked_by.trim().toLowerCase() === requesterName.trim().toLowerCase()))
+  );
+  return {
+    isLocked,
+    isLockedByMe,
+    isLockedByOther: Boolean(isLocked && !isLockedByMe),
+    isExpired,
+    expiresAt: expiresAtMs ? new Date(expiresAtMs).toISOString() : null
+  };
+};
+
 // Short-TTL auth user cache avoids hitting remote Neon DB on every single API request
 const USER_AUTH_CACHE_TTL_MS = 15000;
 const userAuthCache = new Map();
@@ -1230,39 +1263,72 @@ export function registerWorkflowRoutes(app, io) {
       if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
       const ticket = ticketRes.rows[0];
 
+      const lockState = getTicketLockState(ticket, user.id, user.full_name);
+      if (lockState.isLockedByOther) {
+        return res.status(423).json({
+          error: `Ticket is currently being worked on by ${ticket.locked_by}. Another developer cannot start work on it until resolved or the ${TICKET_WORK_LOCK_HOURS}-hour claim expires.`,
+          locked_by: ticket.locked_by,
+          locked_by_id: ticket.locked_by_id,
+          locked_at: ticket.locked_at,
+          lock_expires_at: lockState.expiresAt
+        });
+      }
+
       const prevStatus = ticket.status;
       const updateRes = await pool.query(
         `UPDATE tickets 
          SET status = 'In Progress',
-             assigned_to = COALESCE(NULLIF(assigned_to, 'Unassigned'), $2::varchar),
-             assigned_developer_id = COALESCE(assigned_developer_id, $3),
-             assigned_developer_name = COALESCE(assigned_developer_name, $2::varchar),
-             assigned_developer_email = COALESCE(assigned_developer_email, $4::varchar),
+             locked_by = $2::varchar,
+             locked_by_id = $3,
+             locked_at = CASE
+               WHEN locked_by_id = $3 AND locked_at IS NOT NULL AND locked_at > (CURRENT_TIMESTAMP - ($5 * INTERVAL '1 hour'))
+               THEN locked_at
+               ELSE CURRENT_TIMESTAMP
+             END,
+             assigned_to = $2::varchar,
+             assigned_developer_id = $3,
+             assigned_developer_name = $2::varchar,
+             assigned_developer_email = $4::varchar,
              assigned_by = COALESCE(assigned_by, $2::varchar),
              assigned_at = COALESCE(assigned_at, CURRENT_TIMESTAMP)
          WHERE id = $1 
          RETURNING *`,
-        [ticketId, user.full_name, user.id, user.email]
+        [ticketId, user.full_name, user.id, user.email, TICKET_WORK_LOCK_HOURS]
       );
+
+      const updatedTicket = updateRes.rows[0];
 
       await logTicketHistory(
         ticketId,
-        'Status Changed',
+        lockState.isExpired && ticket.locked_by ? 'Work Reclaimed After Timeout' : 'Work Started & Locked',
         prevStatus,
         'In Progress',
         user.full_name,
         user.id,
-        'Developer marked ticket as In Progress.'
+        lockState.isExpired && ticket.locked_by
+          ? `${user.full_name} took over after ${ticket.locked_by}'s ${TICKET_WORK_LOCK_HOURS}-hour claim expired.`
+          : `${user.full_name} claimed exclusive work lock (${TICKET_WORK_LOCK_HOURS}h window) and marked ticket In Progress.`
       );
 
-      res.json({ message: 'Ticket moved to In Progress.', ticket: updateRes.rows[0] });
+      if (io) {
+        io.emit('ticket_lock_changed', {
+          ticketId,
+          locked_by: updatedTicket.locked_by,
+          locked_by_id: updatedTicket.locked_by_id,
+          locked_at: updatedTicket.locked_at,
+          status: updatedTicket.status
+        });
+        io.emit('ticket_updated', updatedTicket);
+      }
+
+      res.json({ message: 'Ticket moved to In Progress and locked for you.', ticket: updatedTicket });
     } catch (err) {
       console.error('Error updating ticket progress:', err);
       res.status(500).json({ error: 'Failed to start ticket progress.' });
     }
   });
 
-  // Developer claims real-time exclusive lock to resolve ticket (Intimates & locks out other developers)
+  // Developer claims exclusive lock to work on & resolve ticket (Prevents collision for 2 hours)
   app.post('/api/admin/tickets/:id/lock', async (req, res) => {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
@@ -1276,6 +1342,10 @@ export function registerWorkflowRoutes(app, io) {
       // Strict RBAC: Only members of the Development team can claim locks to resolve bugs
       if (user.role !== 'Developer') {
         return res.status(403).json({ error: 'Access denied: Only members of the Development team can lock and resolve defect tickets.' });
+      }
+
+      if (ticket.status === 'Resolved' || ticket.status === 'Closed') {
+        return res.status(400).json({ error: `Ticket is already ${ticket.status} and cannot be locked.` });
       }
 
       const isDirect = ticket.assigned_developer_id === user.id ||
@@ -1295,45 +1365,61 @@ export function registerWorkflowRoutes(app, io) {
         return res.status(403).json({ error: 'You are only authorized to lock tickets in your assigned projects.' });
       }
 
-      // If already locked by ANOTHER developer within the last 15 minutes, prevent collision
-      const isLockedByOther = ticket.locked_by_id && 
-                              Number(ticket.locked_by_id) !== Number(user.id) && 
-                              ticket.locked_at && 
-                              (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000);
+      // Prevent collision if another developer holds an active lock within the 2-hour window
+      const lockState = getTicketLockState(ticket, user.id, user.full_name);
 
-      if (isLockedByOther) {
+      if (lockState.isLockedByOther) {
         return res.status(423).json({
-          error: `Ticket is currently being resolved by ${ticket.locked_by}. Please wait or coordinate with them.`,
+          error: `Ticket is currently being worked on by ${ticket.locked_by}. Another developer cannot work on or resolve it until resolved or the ${TICKET_WORK_LOCK_HOURS}-hour window expires.`,
           locked_by: ticket.locked_by,
           locked_by_id: ticket.locked_by_id,
-          locked_at: ticket.locked_at
+          locked_at: ticket.locked_at,
+          lock_expires_at: lockState.expiresAt
         });
       }
 
-      // Lock ticket for this developer and move to In Progress if currently Open
+      // Claim or take over after timeout: preserve current developer's locked_at if already holding active lock
       const updateRes = await pool.query(
         `UPDATE tickets 
          SET locked_by = $1::varchar, 
              locked_by_id = $2, 
-             locked_at = CURRENT_TIMESTAMP,
-             assigned_to = COALESCE(NULLIF(assigned_to, 'Project Team'), $1::varchar),
-             assigned_developer_id = COALESCE(assigned_developer_id, $2),
-             assigned_developer_name = COALESCE(assigned_developer_name, $1::varchar),
-             assigned_developer_email = COALESCE(assigned_developer_email, $3::varchar),
-             status = CASE WHEN status = 'Open' THEN 'In Progress' ELSE status END
+             locked_at = CASE
+               WHEN locked_by_id = $2 AND locked_at IS NOT NULL AND locked_at > (CURRENT_TIMESTAMP - ($5 * INTERVAL '1 hour'))
+               THEN locked_at
+               ELSE CURRENT_TIMESTAMP
+             END,
+             assigned_to = $1::varchar,
+             assigned_developer_id = $2,
+             assigned_developer_name = $1::varchar,
+             assigned_developer_email = $3::varchar,
+             status = CASE WHEN status IN ('Open', 'Reopened') THEN 'In Progress' ELSE status END
          WHERE id = $4
          RETURNING *`,
-        [user.full_name, user.id, user.email, ticketId]
+        [user.full_name, user.id, user.email, ticketId, TICKET_WORK_LOCK_HOURS]
       );
 
       const lockedTicket = updateRes.rows[0];
+
+      if (!lockState.isLockedByMe) {
+        await logTicketHistory(
+          ticketId,
+          lockState.isExpired && ticket.locked_by ? 'Ticket Reclaimed After Timeout' : 'Ticket Claimed',
+          ticket.status,
+          lockedTicket.status,
+          user.full_name,
+          user.id,
+          lockState.isExpired && ticket.locked_by
+            ? `${user.full_name} took over after ${ticket.locked_by} did not resolve within ${TICKET_WORK_LOCK_HOURS} hours.`
+            : `${user.full_name} claimed this ticket (${TICKET_WORK_LOCK_HOURS}-hour exclusive work window).`
+        );
+      }
 
       // Broadcast real-time lock across WebSocket
       if (io) {
         io.emit('ticket_lock_changed', {
           ticketId,
-          locked_by: user.full_name,
-          locked_by_id: user.id,
+          locked_by: lockedTicket.locked_by,
+          locked_by_id: lockedTicket.locked_by_id,
           locked_at: lockedTicket.locked_at,
           status: lockedTicket.status
         });
@@ -1341,7 +1427,7 @@ export function registerWorkflowRoutes(app, io) {
       }
 
       res.json({
-        message: `Ticket locked by ${user.full_name}.`,
+        message: `Ticket claimed by ${user.full_name} (exclusive for ${TICKET_WORK_LOCK_HOURS} hours).`,
         ticket: lockedTicket
       });
     } catch (err) {
@@ -1350,13 +1436,25 @@ export function registerWorkflowRoutes(app, io) {
     }
   });
 
-  // Release lock on ticket (e.g. developer cancelled or closed resolution form)
+  // Release lock on ticket (Only current lock holder, Project Lead, QA Lead, or Manager/Admin)
   app.post('/api/admin/tickets/:id/unlock', async (req, res) => {
     const user = await getUserFromReq(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
     const ticketId = req.params.id;
     try {
+      const existingRes = await pool.query('SELECT * FROM tickets WHERE id = $1', [ticketId]);
+      if (existingRes.rows.length === 0) return res.status(404).json({ error: 'Ticket not found.' });
+      const ticket = existingRes.rows[0];
+
+      const lockState = getTicketLockState(ticket, user.id, user.full_name);
+      const isSupervisor = ['Project Lead', 'QA Lead', 'Manager', 'Admin', 'Super Admin'].includes(user.role);
+      if (lockState.isLockedByOther && !isSupervisor) {
+        return res.status(403).json({
+          error: `Only ${ticket.locked_by} or a Project Lead/Manager can release an active work lock before the ${TICKET_WORK_LOCK_HOURS}-hour window expires.`
+        });
+      }
+
       const updateRes = await pool.query(
         `UPDATE tickets 
          SET locked_by = NULL, locked_by_id = NULL, locked_at = NULL 
@@ -1365,16 +1463,29 @@ export function registerWorkflowRoutes(app, io) {
         [ticketId]
       );
 
+      const releasedTicket = updateRes.rows[0];
+      await logTicketHistory(
+        ticketId,
+        'Work Lock Released',
+        ticket.status,
+        releasedTicket.status,
+        user.full_name,
+        user.id,
+        `${user.full_name} released the active work lock so any project developer can work on this ticket.`
+      );
+
       if (io) {
         io.emit('ticket_lock_changed', {
           ticketId,
           locked_by: null,
           locked_by_id: null,
-          locked_at: null
+          locked_at: null,
+          status: releasedTicket.status
         });
+        io.emit('ticket_updated', releasedTicket);
       }
 
-      res.json({ message: 'Ticket lock released.', ticket: updateRes.rows[0] });
+      res.json({ message: 'Ticket lock released.', ticket: releasedTicket });
     } catch (err) {
       console.error('Error unlocking ticket:', err);
       res.status(500).json({ error: 'Failed to release ticket lock.' });
@@ -1437,14 +1548,15 @@ export function registerWorkflowRoutes(app, io) {
         return res.status(403).json({ error: 'You are only authorized to resolve tickets in your assigned projects.' });
       }
 
-      // If locked by another developer, prevent collision
-      const isLockedByOther = ticket.locked_by_id && 
-                              Number(ticket.locked_by_id) !== Number(user.id) && 
-                              ticket.locked_at && 
-                              (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000);
-      if (isLockedByOther) {
+      // If actively locked by another developer within the 2-hour window, block collision
+      const lockState = getTicketLockState(ticket, user.id, user.full_name);
+      if (lockState.isLockedByOther) {
         return res.status(423).json({
-          error: `Ticket is currently being resolved by ${ticket.locked_by}. You cannot submit resolution while locked by another developer.`
+          error: `Ticket is currently being worked on by ${ticket.locked_by}. You cannot submit resolution until they release it or the ${TICKET_WORK_LOCK_HOURS}-hour window expires.`,
+          locked_by: ticket.locked_by,
+          locked_by_id: ticket.locked_by_id,
+          locked_at: ticket.locked_at,
+          lock_expires_at: lockState.expiresAt
         });
       }
 

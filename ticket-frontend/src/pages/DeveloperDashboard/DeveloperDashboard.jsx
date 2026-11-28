@@ -28,6 +28,11 @@ import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
+import {
+  isTicketLockedByOther,
+  isTicketLockExpired,
+  getTicketLockRemainingLabel
+} from '../../utils/ticketLock';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
 import '../../styles/admin.css';
@@ -551,6 +556,10 @@ export default function DeveloperDashboard() {
                   <tbody>
                     {filteredTickets.map((ticket) => {
                       const isPendingFix = ticket.status === 'Open' || ticket.status === 'In Progress' || ticket.status === 'Reopened';
+                      const currentUserId = localStorage.getItem('userId');
+                      const lockedOther = isTicketLockedByOther(ticket, currentUserId, displayName);
+                      const lockExpired = isTicketLockExpired(ticket);
+                      const lockRemaining = getTicketLockRemainingLabel(ticket);
                       return (
                         <tr key={ticket.id}>
                           <td>
@@ -583,7 +592,7 @@ export default function DeveloperDashboard() {
                               <span className={`dev-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
                                 {ticket.status}
                               </span>
-                              {ticket.locked_by && ticket.status !== 'Resolved' && ticket.status !== 'Closed' && (
+                              {lockedOther && ticket.locked_by && (
                                 <span
                                   style={{
                                     display: 'inline-flex',
@@ -598,9 +607,9 @@ export default function DeveloperDashboard() {
                                     padding: '1px 6px',
                                     width: 'fit-content'
                                   }}
-                                  title={`Locked by ${ticket.locked_by}`}
+                                  title={`Locked by ${ticket.locked_by} (${lockRemaining})`}
                                 >
-                                  <Lock size={10} /> {ticket.locked_by}
+                                  <Lock size={10} /> {ticket.locked_by} ({lockRemaining})
                                 </span>
                               )}
                             </div>
@@ -618,8 +627,10 @@ export default function DeveloperDashboard() {
                               <Eye size={13} />
                               <span>
                                 {isPendingFix
-                                  ? ticket.locked_by && ticket.locked_by.toLowerCase() !== displayName.toLowerCase()
+                                  ? lockedOther
                                     ? `Locked (${ticket.locked_by.split(' ')[0]})`
+                                    : lockExpired
+                                    ? 'Take Over Defect'
                                     : 'Work on Defect'
                                   : 'View Report'}
                               </span>

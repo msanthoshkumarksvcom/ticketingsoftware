@@ -37,6 +37,13 @@ import {
   validateMediaFile,
   readFileAsDataUrl
 } from '../../utils/mediaPreview';
+import {
+  TICKET_WORK_LOCK_HOURS,
+  isTicketLockedByMe,
+  isTicketLockedByOther,
+  isTicketLockExpired,
+  getTicketLockRemainingLabel
+} from '../../utils/ticketLock';
 import SkeletonLoader from '../SkeletonLoader/SkeletonLoader';
 import './TicketDetailModal.css';
 import { API_BASE, SOCKET_URL } from '../../utils/apiConfig';
@@ -98,18 +105,10 @@ export default function TicketDetailModal({
   const isQAMember = currentUserRole.toLowerCase() === 'qa member';
   const [deletingTicket, setDeletingTicket] = useState(false);
 
-  const isLockedByMe = Boolean(
-    ticket?.locked_by &&
-    ((ticket.locked_by_id && currentUserId && Number(ticket.locked_by_id) === Number(currentUserId)) ||
-     (currentUserName && ticket.locked_by?.trim().toLowerCase() === currentUserName?.trim().toLowerCase()))
-  );
-
-  const isLockedByOther = Boolean(
-    ticket?.locked_by &&
-    !isLockedByMe &&
-    ticket?.locked_at &&
-    (Date.now() - new Date(ticket.locked_at).getTime() < 15 * 60 * 1000)
-  );
+  const isLockedByMe = isTicketLockedByMe(ticket, currentUserId, currentUserName);
+  const isLockedByOther = isTicketLockedByOther(ticket, currentUserId, currentUserName);
+  const isExpiredLock = isTicketLockExpired(ticket);
+  const lockRemainingLabel = getTicketLockRemainingLabel(ticket);
 
   useEffect(() => {
     if (isOpen && ticketId) {
@@ -460,22 +459,8 @@ export default function TicketDetailModal({
     }
   };
 
-  const handleSafeClose = async () => {
-    if (showResolutionForm && isLockedByMe) {
-      try {
-        const token = localStorage.getItem('token');
-        await axios.post(
-          `http://localhost:5000/api/admin/tickets/${ticketId}/unlock`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (socketRef.current && socketRef.current.connected) {
-          socketRef.current.emit('ticket_resolving_release', { ticketId });
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
+  const handleSafeClose = () => {
+    // Keep the developer's 2-hour exclusive work claim active when closing the modal so they can fix the code in their IDE.
     onClose();
   };
 
@@ -526,15 +511,24 @@ export default function TicketDetailModal({
                       <div>
                         <span className="tdm-lock-alert-title">Locked by {ticket.locked_by}</span>
                         <p className="tdm-lock-alert-desc">
-                          {ticket.locked_by} is currently resolving this defect. Another developer cannot resolve while work is in progress.
+                          {ticket.locked_by} is currently working on this defect. Another developer cannot work on or resolve it until finished or the {TICKET_WORK_LOCK_HOURS}-hour claim expires.
                         </p>
                       </div>
                     </div>
                     {ticket.locked_at && (
                       <span className="tdm-lock-time-tag">
-                        Active since {formatIndianTime(ticket.locked_at)}
+                        {lockRemainingLabel || `Since ${formatIndianTime(ticket.locked_at)}`}
                       </span>
                     )}
+                  </div>
+                )}
+
+                {!isLockedByOther && !isLockedByMe && isExpiredLock && isDeveloper && (
+                  <div className="tdm-alert-box" style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E3A8A' }}>
+                    <Clock size={16} color="#2563EB" />
+                    <span>
+                      Previous {TICKET_WORK_LOCK_HOURS}-hour work claim by <strong>{ticket.locked_by}</strong> expired without resolution. You can now claim and resolve this ticket.
+                    </span>
                   </div>
                 )}
 
@@ -1093,13 +1087,13 @@ export default function TicketDetailModal({
                           type="button"
                           className="tdm-btn-locked"
                           disabled
-                          title={`Locked by ${ticket.locked_by} who is currently resolving this defect`}
+                          title={`Locked by ${ticket.locked_by} (${lockRemainingLabel})`}
                         >
                           <Lock size={15} />
                           <span>Locked by {ticket.locked_by}</span>
                         </button>
                         <p className="tdm-lock-note">
-                          {ticket.locked_by} is currently actively resolving this ticket. Work is locked to prevent conflicts.
+                          {ticket.locked_by} holds an active claim ({lockRemainingLabel}). If unresolved after {TICKET_WORK_LOCK_HOURS} hours, any project developer can resolve it.
                         </p>
                       </div>
                     ) : ticket.status === 'Open' || ticket.status === 'Reopened' ? (
@@ -1110,19 +1104,43 @@ export default function TicketDetailModal({
                         onClick={handleStartResolving}
                       >
                         <Clock size={16} />
-                        <span>Start Working &amp; Claim Ticket</span>
+                        <span>{isExpiredLock ? 'Take Over & Claim Ticket' : 'Start Working & Claim Ticket'}</span>
                       </button>
                     ) : ticket.status === 'In Progress' ? (
                       !showResolutionForm && (
-                        <button
-                          id="tdm-mark-resolved-btn"
-                          type="button"
-                          className="tdm-btn-action-resolve"
-                          onClick={handleStartResolving}
-                        >
-                          <CheckCircle2 size={16} />
-                          <span>{isLockedByMe ? 'Continue Resolution' : 'Mark as Resolved'}</span>
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {isLockedByMe && (
+                            <div className="tdm-status-notice" style={{ fontSize: '12px' }}>
+                              <Clock size={14} color="#2563EB" />
+                              <span>Claimed by you ({lockRemainingLabel}). Stay locked while coding.</span>
+                            </div>
+                          )}
+                          <button
+                            id="tdm-mark-resolved-btn"
+                            type="button"
+                            className="tdm-btn-action-resolve"
+                            onClick={handleStartResolving}
+                          >
+                            <CheckCircle2 size={16} />
+                            <span>
+                              {isLockedByMe
+                                ? 'Continue Resolution'
+                                : isExpiredLock
+                                ? 'Take Over & Resolve Ticket'
+                                : 'Start Working & Resolve'}
+                            </span>
+                          </button>
+                          {isLockedByMe && (
+                            <button
+                              id="tdm-side-release-lock-btn"
+                              type="button"
+                              className="tdm-btn-secondary"
+                              onClick={handleCancelResolution}
+                            >
+                              Release Claim
+                            </button>
+                          )}
+                        </div>
                       )
                     ) : ticket.status === 'Resolved' ? (
                       <div className="tdm-status-notice">
