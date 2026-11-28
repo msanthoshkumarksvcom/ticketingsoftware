@@ -101,6 +101,7 @@ export default function TicketDetailModal({
   const currentUserName = localStorage.getItem('userName') || 'Developer';
   const isDeveloper = currentUserRole.toLowerCase() === 'developer';
   const isProjectLead = currentUserRole.toLowerCase() === 'project lead';
+  const canResolveTicket = isDeveloper || isProjectLead;
   const isQA = ['qa member', 'qa lead', 'manager', 'super admin', 'admin', 'administrator'].includes(currentUserRole.toLowerCase());
   const isQAMember = currentUserRole.toLowerCase() === 'qa member';
   const [deletingTicket, setDeletingTicket] = useState(false);
@@ -523,7 +524,7 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {!isLockedByOther && !isLockedByMe && isExpiredLock && isDeveloper && (
+                {!isLockedByOther && !isLockedByMe && isExpiredLock && canResolveTicket && (
                   <div className="tdm-alert-box" style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E3A8A' }}>
                     <Clock size={16} color="#2563EB" />
                     <span>
@@ -796,8 +797,8 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {/* DEVELOPER ACTION: Resolution Form */}
-                {isDeveloper && (ticket.status === 'In Progress' || ticket.status === 'Reopened') && showResolutionForm && (
+                {/* DEVELOPER / PROJECT LEAD ACTION: Resolution Form */}
+                {canResolveTicket && (ticket.status === 'In Progress' || ticket.status === 'Reopened') && showResolutionForm && (
                   <div className="tdm-section-card tdm-form-card">
                     <div className="tdm-section-title">
                       <Code2 size={15} color="#2563EB" />
@@ -1076,10 +1077,12 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {/* 2. Actions Card for Developer */}
-                {isDeveloper && (
+                {/* 2. Resolution Actions Card for Developer & Project Lead */}
+                {canResolveTicket && (
                   <div id="tdm-dev-actions-card" className="tdm-side-card">
-                    <h3 id="tdm-dev-actions-heading">Developer Actions</h3>
+                    <h3 id="tdm-dev-actions-heading">
+                      {isProjectLead ? 'Resolve Bug (Project Lead)' : 'Developer Actions'}
+                    </h3>
                     {isLockedByOther ? (
                       <div>
                         <button
@@ -1093,7 +1096,7 @@ export default function TicketDetailModal({
                           <span>Locked by {ticket.locked_by}</span>
                         </button>
                         <p className="tdm-lock-note">
-                          {ticket.locked_by} holds an active claim ({lockRemainingLabel}). If unresolved after {TICKET_WORK_LOCK_HOURS} hours, any project developer can resolve it.
+                          {ticket.locked_by} holds an active claim ({lockRemainingLabel}). If unresolved after {TICKET_WORK_LOCK_HOURS} hours, any assigned developer or lead can resolve it.
                         </p>
                       </div>
                     ) : ticket.status === 'Open' || ticket.status === 'Reopened' ? (
@@ -1104,7 +1107,13 @@ export default function TicketDetailModal({
                         onClick={handleStartResolving}
                       >
                         <Clock size={16} />
-                        <span>{isExpiredLock ? 'Take Over & Claim Ticket' : 'Start Working & Claim Ticket'}</span>
+                        <span>
+                          {isExpiredLock
+                            ? 'Take Over & Resolve Ticket'
+                            : isProjectLead
+                            ? 'Start Working & Resolve'
+                            : 'Start Working & Claim Ticket'}
+                        </span>
                       </button>
                     ) : ticket.status === 'In Progress' ? (
                       !showResolutionForm && (
@@ -1112,7 +1121,7 @@ export default function TicketDetailModal({
                           {isLockedByMe && (
                             <div className="tdm-status-notice" style={{ fontSize: '12px' }}>
                               <Clock size={14} color="#2563EB" />
-                              <span>Claimed by you ({lockRemainingLabel}). Stay locked while coding.</span>
+                              <span>Claimed by you ({lockRemainingLabel}). Auto-assigned to you on resolve.</span>
                             </div>
                           )}
                           <button
@@ -1156,8 +1165,8 @@ export default function TicketDetailModal({
                   </div>
                 )}
 
-                {/* 2b. Non-Developer View: Read-only Defect Status Notice */}
-                {!isDeveloper && (
+                {/* 2b. QA / Manager Read-only Defect Status Notice */}
+                {!canResolveTicket && (
                   <div id="tdm-defect-status-card" className="tdm-side-card">
                     <h3 id="tdm-defect-status-heading">Defect Status</h3>
                     {ticket.status === 'Open' ? (

@@ -30,6 +30,7 @@ import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import { formatIndianDate } from '../../utils/dateFormat';
+import { isTicketLockActive, getTicketLockRemainingLabel } from '../../utils/ticketLock';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
 import '../../styles/admin.css';
@@ -595,9 +596,16 @@ export default function ProjectLeadDashboard() {
                           </span>
                         </td>
                         <td>
-                          <span className={`pld-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                            {ticket.status}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span className={`pld-status-badge ${(ticket.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
+                              {ticket.status}
+                            </span>
+                            {isTicketLockActive(ticket) && ticket.locked_by && (
+                              <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#B45309' }}>
+                                Locked: {ticket.locked_by} ({getTicketLockRemainingLabel(ticket)})
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td>
                           <span className="pld-dev-name-pill">
@@ -612,10 +620,12 @@ export default function ProjectLeadDashboard() {
                             type="button"
                             className="pld-btn-preview-ticket"
                             onClick={() => setSelectedTicketId(ticket.id)}
-                            title="Preview complete bug report, assign developer, or inspect resolution"
+                            title="Open ticket to resolve directly, assign a developer, or inspect resolution"
                           >
                             <Eye size={13} />
-                            <span>Preview</span>
+                            <span>
+                              {['Open', 'In Progress', 'Reopened'].includes(ticket.status) ? 'View / Resolve' : 'View Report'}
+                            </span>
                           </button>
                         </td>
                       </tr>
