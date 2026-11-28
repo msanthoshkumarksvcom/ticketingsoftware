@@ -1718,6 +1718,9 @@ app.get('/api/admin/projects/:id/sheets', async (req, res) => {
   }
 });
 
+const SHEET_EDIT_ROLES = ['QA Lead', 'QA Member', 'Manager', 'Admin', 'Super Admin'];
+const canEditProjectSheets = (user) => Boolean(user && SHEET_EDIT_ROLES.includes(user.role));
+
 // POST /api/admin/projects/:id/sheets - Create a new sheet tab
 app.post('/api/admin/projects/:id/sheets', async (req, res) => {
   const authorization = req.headers.authorization;
@@ -1733,8 +1736,8 @@ app.post('/api/admin/projects/:id/sheets', async (req, res) => {
 
   const user = await getUserFromReq(req);
   if (!user) return res.status(401).json({ error: 'Authentication required' });
-  if (user.role === 'Developer') {
-    return res.status(403).json({ error: 'Developers have read-only access to project sheets.' });
+  if (!canEditProjectSheets(user)) {
+    return res.status(403).json({ error: 'Read-only access: only the QA team can edit or manage project sheets.' });
   }
 
   const { id } = req.params;
@@ -1783,8 +1786,8 @@ app.put('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
 
   const user = await getUserFromReq(req);
   if (!user) return res.status(401).json({ error: 'Authentication required' });
-  if (user.role === 'Developer') {
-    return res.status(403).json({ error: 'Developers have read-only access to project sheets.' });
+  if (!canEditProjectSheets(user)) {
+    return res.status(403).json({ error: 'Read-only access: only the QA team can edit or manage project sheets.' });
   }
 
   const { id, sheetId } = req.params;
@@ -1920,8 +1923,8 @@ app.delete('/api/admin/projects/:id/sheets/:sheetId', async (req, res) => {
 
   const user = await getUserFromReq(req);
   if (!user) return res.status(401).json({ error: 'Authentication required' });
-  if (user.role === 'Developer') {
-    return res.status(403).json({ error: 'Developers have read-only access to project sheets.' });
+  if (!canEditProjectSheets(user)) {
+    return res.status(403).json({ error: 'Read-only access: only the QA team can edit or manage project sheets.' });
   }
 
   const { id, sheetId } = req.params;

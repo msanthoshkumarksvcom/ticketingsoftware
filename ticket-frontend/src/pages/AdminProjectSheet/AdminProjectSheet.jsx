@@ -169,8 +169,10 @@ export default function AdminProjectSheet() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const isDeveloper = (localStorage.getItem('userRole') || '').trim().toLowerCase() === 'developer';
   const currentUserRole = localStorage.getItem('userRole') || 'QA Member';
+  const normalizedUserRole = currentUserRole.trim().toLowerCase();
+  const canManageSheets = ['qa lead', 'qa member', 'manager', 'admin', 'super admin'].includes(normalizedUserRole);
+  const isDeveloper = !canManageSheets; // Read-only mode for Developer, Project Lead, and non-QA roles
 
   // Project metadata
   const [project, setProject] = useState(() => location.state?.project || {

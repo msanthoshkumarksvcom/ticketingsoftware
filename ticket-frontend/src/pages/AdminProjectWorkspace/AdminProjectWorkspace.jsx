@@ -1080,39 +1080,33 @@ export default function AdminProjectWorkspace() {
           {activeFolder === 'sheet' && (
             <section id="pw-sheet-section" className="project-workspace-content">
               <div className="project-content-heading">
-                <div><span>PROJECT CONTENTS</span><h2 id="pw-sheet-heading">Test Execution & Sheets</h2></div>
-                {!isDeveloper && (
-                  <button
-                    id="pw-open-sheets-header-btn"
-                    className="pj-btn-primary"
-                    onClick={() => navigate(getRolePath(`/projects/${projectId}/sheet`), { state: { project: activeProject } })}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#0F9D58', color: '#fff', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
-                  >
-                    <FileSpreadsheet size={16} />
-                    <span>Open Google Sheets Workspace</span>
-                  </button>
-                )}
+                <div><span>PROJECT CONTENTS</span><h2 id="pw-sheet-heading">Test Execution &amp; Sheets</h2></div>
+                <button
+                  id="pw-open-sheets-header-btn"
+                  className="pj-btn-primary"
+                  onClick={() => navigate(getRolePath(`/projects/${projectId}/sheet`), { state: { project: activeProject } })}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#0F9D58', color: '#fff', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                >
+                  <FileSpreadsheet size={16} />
+                  <span>{(isDeveloper || isProjectLead) ? 'View Test Sheet (Read Only)' : 'Open Google Sheets Workspace'}</span>
+                </button>
               </div>
               <div style={{ background: '#fff', border: '1px solid #dce5e7', borderRadius: '8px', padding: '32px 24px', textAlign: 'center', margin: '16px 0' }}>
                 <FileSpreadsheet size={46} color="#0F9D58" style={{ margin: '0 auto 12px' }} />
                 <h3 id="pw-sheet-card-heading" style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 8px' }}>Google Sheets-Style Test Workbook</h3>
                 <p style={{ color: '#52717b', fontSize: '14px', maxWidth: '580px', margin: '0 auto 20px', lineHeight: 1.5 }}>
-                  Access multiple sheet tabs, test case execution matrix, screenshot proof column, copy-paste across rows & columns, and automated status calculations.
+                  {(isDeveloper || isProjectLead)
+                    ? 'Inspect test case sheets, execution statuses, and screenshot evidence in read-only view. Only the QA team can edit or manage sheet records.'
+                    : 'Access multiple sheet tabs, test case execution matrix, screenshot proof column, copy-paste across rows & columns, and automated status calculations.'}
                 </p>
-                {!isDeveloper ? (
-                  <button
-                    id="pw-launch-sheets-btn"
-                    onClick={() => navigate(getRolePath(`/projects/${projectId}/sheet`), { state: { project: activeProject } })}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', background: '#0F9D58', color: '#fff', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '14px' }}
-                  >
-                    <ExternalLink size={16} />
-                    <span>Launch Full Sheet Workspace</span>
-                  </button>
-                ) : (
-                  <span style={{ color: '#DC2626', fontWeight: 600, fontSize: '13px' }}>
-                    Sheet matrix view is restricted to QA Members and Project Leads.
-                  </span>
-                )}
+                <button
+                  id="pw-launch-sheets-btn"
+                  onClick={() => navigate(getRolePath(`/projects/${projectId}/sheet`), { state: { project: activeProject } })}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', background: '#0F9D58', color: '#fff', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '14px' }}
+                >
+                  <ExternalLink size={16} />
+                  <span>{(isDeveloper || isProjectLead) ? 'View Test Sheet (Read Only)' : 'Launch Full Sheet Workspace'}</span>
+                </button>
               </div>
             </section>
           )}
