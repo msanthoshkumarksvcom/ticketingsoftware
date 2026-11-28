@@ -3582,12 +3582,6 @@ html[data-theme='dark'] .tdm-reopen-card {
   color: #fde68a;
 }
 
-html[data-theme='dark'] .tdm-assigned-info {
-  background: #162033;
-  border-color: #334155;
-  color: #cbd5e1;
-}
-
 html[data-theme='dark'] .tdm-status-notice {
   background: rgba(59, 130, 246, 0.12);
   border-color: rgba(59, 130, 246, 0.3);

@@ -766,38 +766,6 @@
   margin: 0;
 }
 
-.tdm-assign-box {
-  display: flex;
-  gap: 6px;
-}
-
-.tdm-btn-assign {
-  padding: 0 12px;
-  border-radius: 7px;
-  border: none;
-  background: #2563EB;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.tdm-btn-assign:hover {
-  background: #1D4ED8;
-}
-
-.tdm-assigned-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  color: #334155;
-  background: #F8FAFC;
-  padding: 6px 10px;
-  border-radius: 6px;
-}
-
 .tdm-btn-action-primary,
 .tdm-btn-action-resolve {
   width: 100%;

@@ -5,7 +5,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  User,
   FolderKanban,
   FileSpreadsheet,
   Upload,
@@ -28,7 +27,6 @@ import {
   Trash2
 } from 'lucide-react';
 import { io } from 'socket.io-client';
-import CustomSelect from '../CustomSelect/CustomSelect';
 import { INPUT_LIMITS, validateFields, validateMeaningfulText } from '../../utils/inputValidation';
 import { formatIndianDate, formatIndianDateTime, formatIndianTime } from '../../utils/dateFormat';
 import {
@@ -64,11 +62,6 @@ export default function TicketDetailModal({
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
-
-  // Available developers for assignment (for Project Lead / Admin)
-  const [availableDevelopers, setAvailableDevelopers] = useState([]);
-  const [selectedDevId, setSelectedDevId] = useState('');
-  const [assigningDev, setAssigningDev] = useState(false);
 
   // Developer Resolution Form
   const [showResolutionForm, setShowResolutionForm] = useState(false);
@@ -114,9 +107,6 @@ export default function TicketDetailModal({
   useEffect(() => {
     if (isOpen && ticketId) {
       fetchTicketDetails();
-      if (!isDeveloper) {
-        fetchDevelopers();
-      }
 
       // Connect to Socket.IO for real-time developer lock & intimation
       const socket = io(SOCKET_URL, {
@@ -187,9 +177,6 @@ export default function TicketDetailModal({
         headers: { Authorization: `Bearer ${token}` }
       });
       setTicket(res.data);
-      if (res.data.assigned_developer_id) {
-        setSelectedDevId(String(res.data.assigned_developer_id));
-      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load ticket details.');
     } finally {
@@ -197,43 +184,7 @@ export default function TicketDetailModal({
     }
   };
 
-  const fetchDevelopers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/admin/developers', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setAvailableDevelopers(res.data || []);
-    } catch (err) {
-      // quiet fallback
-    }
-  };
-
-  // 1. Assign Developer
-  const handleAssignDeveloper = async () => {
-    if (!selectedDevId) return;
-    setAssigningDev(true);
-    setActionError('');
-    setActionSuccess('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.put(
-        `http://localhost:5000/api/admin/tickets/${ticketId}/assign-developer`,
-        { developer_id: Number(selectedDevId) },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setActionSuccess(res.data.message || 'Developer assigned successfully.');
-      fetchTicketDetails();
-      if (onTicketUpdated) onTicketUpdated(res.data.ticket);
-    } catch (err) {
-      setActionError(err.response?.data?.error || 'Failed to assign developer.');
-    } finally {
-      setAssigningDev(false);
-    }
-  };
-
-  // 2. Developer starts resolving & claims exclusive lock
+  // Developer starts resolving & claims exclusive lock
   const handleStartResolving = async () => {
     setActionError('');
     setActionSuccess('');
@@ -1035,49 +986,9 @@ export default function TicketDetailModal({
                 )}
               </div>
 
-              {/* Right Sidebar: Assignment & Status Actions */}
+              {/* Right Sidebar: Status & Resolution Actions */}
               <div className="tdm-side-col">
-                {/* 1. Developer Assignment Panel (Project Lead / Manager) */}
-                {!isDeveloper && (
-                  <div id="tdm-assign-card" className="tdm-side-card">
-                    <h3 id="tdm-assign-heading">Assigned Developer</h3>
-                    <div className="tdm-assign-box">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <CustomSelect
-                          id="tdm-assign-developer"
-                          value={selectedDevId}
-                          onChange={setSelectedDevId}
-                          options={[
-                            { value: '', label: 'Unassigned' },
-                            ...availableDevelopers.map((dev) => ({
-                              value: String(dev.id),
-                              label: `${dev.full_name} (${dev.email})`
-                            }))
-                          ]}
-                          variant="form"
-                          placeholder="Unassigned"
-                        />
-                      </div>
-                      <button
-                        id="tdm-assign-btn"
-                        type="button"
-                        className="tdm-btn-assign"
-                        onClick={handleAssignDeveloper}
-                        disabled={assigningDev || !selectedDevId || selectedDevId === String(ticket.assigned_developer_id)}
-                      >
-                        {assigningDev ? 'Saving...' : 'Assign'}
-                      </button>
-                    </div>
-                    {ticket.assigned_to && ticket.assigned_to !== 'Unassigned' && (
-                      <div className="tdm-assigned-info">
-                        <User size={13} />
-                        <span>Currently: <strong>{ticket.assigned_to}</strong></span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 2. Resolution Actions Card for Developer & Project Lead */}
+                {/* 1. Resolution Actions Card for Developer & Project Lead */}
                 {canResolveTicket && (
                   <div id="tdm-dev-actions-card" className="tdm-side-card">
                     <h3 id="tdm-dev-actions-heading">
