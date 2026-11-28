@@ -26,7 +26,10 @@ axios.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       clearAuthSession();
-      if (!isRedirecting && window.location.pathname !== '/') {
+      const isAtLogin =
+        window.location.pathname === '/' &&
+        (!window.location.hash || window.location.hash === '#/' || window.location.hash.startsWith('#/?'));
+      if (!isRedirecting && !isAtLogin) {
         isRedirecting = true;
         window.location.replace('/?sessionExpired=true');
       }

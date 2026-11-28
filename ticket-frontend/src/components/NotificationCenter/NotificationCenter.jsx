@@ -7,6 +7,7 @@ import { formatIndianDateTime } from '../../utils/dateFormat';
 import './NotificationCenter.css';
 import { SOCKET_URL } from '../../utils/apiConfig';
 import { getValidToken } from '../../utils/auth';
+import { getRolePath } from '../../utils/roleRoutes';
 
 function NotificationDrawerPortal({ isOpen, onClose, children }) {
   const onCloseRef = useRef(onClose);
@@ -91,7 +92,7 @@ function NotificationCenter({ collapsed = false, hideTrigger = false }) {
       osNotif.onclick = () => {
         window.focus();
         if (incoming.link) {
-          window.location.href = incoming.link;
+          window.location.hash = `#${getRolePath(incoming.link)}`;
         }
       };
     } catch (err) {

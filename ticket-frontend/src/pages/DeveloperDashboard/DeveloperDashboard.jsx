@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import { SOCKET_URL } from '../../utils/apiConfig';
+import { getRolePath } from '../../utils/roleRoutes';
 import {
   Code2,
   Folder,
@@ -409,7 +410,7 @@ export default function DeveloperDashboard() {
                           className="dev-proj-open-folder-btn"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/admin/tickets?projectId=${proj.id}`);
+                            navigate(getRolePath(`/tickets?projectId=${proj.id}`));
                           }}
                         >
                           <FolderOpen size={12} />

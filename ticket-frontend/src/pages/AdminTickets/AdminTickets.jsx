@@ -29,6 +29,7 @@ import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import CustomSelect from '../../components/CustomSelect/CustomSelect';
 import TicketDetailModal from '../../components/TicketDetailModal/TicketDetailModal';
 import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
+import { getRolePath } from '../../utils/roleRoutes';
 import FolderEmblem from '../AdminProjects/FolderEmblem';
 import { getValidToken, clearAuthSession } from '../../utils/auth';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -733,7 +734,7 @@ function AdminTickets() {
       <main id="tickets-main-content" className="main-content">
         <TopNavbar
           pageTitle={isDeveloper ? 'Assigned Defects & Tickets' : isProjectLead ? 'Project Defect Tickets' : 'Defect Tickets'}
-          breadcrumbs={activeFolder ? [{ label: 'Tickets', to: '/admin/tickets' }] : []}
+          breadcrumbs={activeFolder ? [{ label: 'Tickets', to: getRolePath('/tickets') }] : []}
         />
         <div className="dashboard-container">
           <div className="users-page-layout tickets-workspace-layout">

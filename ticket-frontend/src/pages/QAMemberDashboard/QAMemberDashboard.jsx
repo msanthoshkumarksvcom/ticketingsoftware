@@ -20,6 +20,7 @@ import {
 import RoleSidebar from '../../components/RoleSidebar/RoleSidebar';
 import TopNavbar from '../../components/TopNavbar/TopNavbar';
 import { formatIndianDate } from '../../utils/dateFormat';
+import { getRolePath } from '../../utils/roleRoutes';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import SkeletonLoader from '../../components/SkeletonLoader/SkeletonLoader';
 import '../../styles/admin.css';
@@ -216,7 +217,7 @@ export default function QAMemberDashboard() {
 
             {/* 4 Metric KPI Cards */}
             <section id="qa-stats-section" className="qa-stats-grid">
-              <div id="qa-stat-card-projects" className="qa-stat-card" onClick={() => navigate('/admin/projects')}>
+              <div id="qa-stat-card-projects" className="qa-stat-card" onClick={() => navigate(getRolePath('/projects'))}>
                 <div className="qa-stat-icon-wrap qa-icon-blue">
                   <FolderKanban size={22} />
                 </div>
@@ -226,7 +227,7 @@ export default function QAMemberDashboard() {
                 </div>
               </div>
 
-              <div id="qa-stat-card-tickets" className="qa-stat-card" onClick={() => navigate('/admin/tickets')}>
+              <div id="qa-stat-card-tickets" className="qa-stat-card" onClick={() => navigate(getRolePath('/tickets'))}>
                 <div className="qa-stat-icon-wrap qa-icon-emerald">
                   <Ticket size={22} />
                 </div>
@@ -236,7 +237,7 @@ export default function QAMemberDashboard() {
                 </div>
               </div>
 
-              <div id="qa-stat-card-open-defects" className="qa-stat-card" onClick={() => navigate('/admin/tickets')}>
+              <div id="qa-stat-card-open-defects" className="qa-stat-card" onClick={() => navigate(getRolePath('/tickets'))}>
                 <div className="qa-stat-icon-wrap qa-icon-amber">
                   <AlertCircle size={22} />
                 </div>
@@ -246,7 +247,7 @@ export default function QAMemberDashboard() {
                 </div>
               </div>
 
-              <div id="qa-stat-card-users" className="qa-stat-card" onClick={() => navigate('/admin/users')}>
+              <div id="qa-stat-card-users" className="qa-stat-card" onClick={() => navigate(getRolePath('/users'))}>
                 <div className="qa-stat-icon-wrap qa-icon-purple">
                   <UsersRound size={22} />
                 </div>
@@ -278,7 +279,7 @@ export default function QAMemberDashboard() {
                   </div>
                   <h3 id="qa-hub-projects-heading">Projects &amp; Test Suites</h3>
                   <p>Inspect project details, test execution suites, and view spreadsheet sheets.</p>
-                  <button id="qa-hub-projects-btn" className="qa-action-btn" onClick={() => navigate('/admin/projects')}>
+                  <button id="qa-hub-projects-btn" className="qa-action-btn" onClick={() => navigate(getRolePath('/projects'))}>
                     <span>Open Projects</span>
                     <ArrowRight size={14} />
                   </button>
@@ -294,7 +295,7 @@ export default function QAMemberDashboard() {
                   </div>
                   <h3 id="qa-hub-tickets-heading">Defects &amp; Tickets</h3>
                   <p>Log bug reports, update ticket test verification statuses, and triage defects.</p>
-                  <button id="qa-hub-tickets-btn" className="qa-action-btn" onClick={() => navigate('/admin/tickets')}>
+                  <button id="qa-hub-tickets-btn" className="qa-action-btn" onClick={() => navigate(getRolePath('/tickets'))}>
                     <span>Manage Tickets</span>
                     <ArrowRight size={14} />
                   </button>
@@ -310,7 +311,7 @@ export default function QAMemberDashboard() {
                   </div>
                   <h3 id="qa-hub-reports-heading">Quality Reports</h3>
                   <p>Analyze test coverage, defect distribution by priority, and project health.</p>
-                  <button id="qa-hub-reports-btn" className="qa-action-btn" onClick={() => navigate('/admin/reports')}>
+                  <button id="qa-hub-reports-btn" className="qa-action-btn" onClick={() => navigate(getRolePath('/reports'))}>
                     <span>View Reports</span>
                     <ArrowRight size={14} />
                   </button>
@@ -326,7 +327,7 @@ export default function QAMemberDashboard() {
                   </div>
                   <h3 id="qa-hub-users-heading">Team Directory</h3>
                   <p>View team member details, assigned developers, project leads, and departments.</p>
-                  <button id="qa-hub-users-btn" className="qa-action-btn" onClick={() => navigate('/admin/users')}>
+                  <button id="qa-hub-users-btn" className="qa-action-btn" onClick={() => navigate(getRolePath('/users'))}>
                     <span>Open Directory</span>
                     <ArrowRight size={14} />
                   </button>
@@ -375,7 +376,7 @@ export default function QAMemberDashboard() {
                     id="qa-full-tickets-btn"
                     className="qa-action-btn"
                     style={{ width: 'auto', padding: '6px 12px' }}
-                    onClick={() => navigate('/admin/tickets')}
+                    onClick={() => navigate(getRolePath('/tickets'))}
                   >
                     <span>Full Tickets View</span>
                     <ExternalLink size={13} />
@@ -449,7 +450,7 @@ export default function QAMemberDashboard() {
                                 id={`qa-ticket-view-btn-${ticket.id}`}
                                 className="qa-action-btn"
                                 style={{ width: 'auto', padding: '4px 10px', fontSize: '0.75rem' }}
-                                onClick={() => navigate('/admin/tickets')}
+                                onClick={() => navigate(getRolePath('/tickets'))}
                               >
                                 View
                               </button>

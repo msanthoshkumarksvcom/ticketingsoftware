@@ -34,25 +34,9 @@ const CubeLogo = () => (
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getValidToken } from '../../utils/auth';
-
-// Helper to route each role to its dedicated dashboard
-export const getRoleHomeRoute = (role) => {
-  switch (role) {
-    case 'Admin':
-    case 'Super Admin':
-      return '/admin/users';
-    case 'Developer':
-      return '/developer';
-    case 'Project Lead':
-      return '/project-lead';
-    case 'QA Member':
-      return '/qa-member';
-    case 'Manager':
-    case 'QA Lead':
-    default:
-      return '/admin';
-  }
-};
+import { getRoleHomeRoute } from '../../utils/roleRoutes';
+import { validateStrongPassword } from '../../utils/inputValidation';
+export { getRoleHomeRoute };
 
 function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -173,12 +157,9 @@ function Login() {
       setForgotError('Verification code must be exactly 6 digits.');
       return;
     }
-    if (!newPassword) {
-      setForgotError('Please enter your new password.');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setForgotError('New password must be at least 6 characters long.');
+    const pwdErr = validateStrongPassword(newPassword, 'New password');
+    if (pwdErr) {
+      setForgotError(pwdErr);
       return;
     }
     if (!confirmPassword) {
@@ -637,7 +618,8 @@ function Login() {
                       <input
                         type={showNewPassword ? "text" : "password"}
                         className="input-field"
-                        placeholder="Enter new password (min. 6 characters)"
+                        placeholder="Min 8 chars: upper, lower, number & special char"
+                        maxLength={128}
                         value={newPassword}
                         onChange={(e) => {
                           setNewPassword(e.target.value);
@@ -662,6 +644,7 @@ function Login() {
                         type={showConfirmPassword ? "text" : "password"}
                         className="input-field"
                         placeholder="Re-enter your new password"
+                        maxLength={128}
                         value={confirmPassword}
                         onChange={(e) => {
                           setConfirmPassword(e.target.value);

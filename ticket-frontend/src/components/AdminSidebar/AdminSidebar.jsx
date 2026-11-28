@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE } from '../../utils/apiConfig';
+import { getRoleHomeRoute, getRolePath } from '../../utils/roleRoutes';
 import {
   BarChart3,
   CheckSquare,
@@ -83,32 +84,32 @@ function AdminSidebar({
   const isProjectLead = currentRole === 'Project Lead';
   const isDeveloper = currentRole === 'Developer';
 
-  let roleHomeRoute = '/admin';
-  let roleWorkspaceRole = 'Admin console';
+  let roleHomeRoute = getRoleHomeRoute(currentRole);
+  let roleWorkspaceRole = `${currentRole || 'Admin'} console`;
   let roleNavItems = mainMenuNav;
 
   if (isAdmin) {
-    roleHomeRoute = '/admin/users';
     roleWorkspaceRole = 'Admin console';
     roleNavItems = ADMIN_NAV;
   } else if (isProjectLead) {
-    roleHomeRoute = '/project-lead';
     roleWorkspaceRole = 'Project Lead console';
     roleNavItems = PROJECT_LEAD_NAV;
   } else if (isDeveloper) {
-    roleHomeRoute = '/developer';
     roleWorkspaceRole = 'Developer console';
     roleNavItems = DEVELOPER_NAV;
   } else if (isQAMember) {
-    roleHomeRoute = '/qa-member';
     roleWorkspaceRole = 'QA Member console';
     roleNavItems = QA_MEMBER_NAV;
   }
 
   const effectiveHomeRoute = homeRoute || roleHomeRoute;
-  const effectiveNavItems = (navItems && navItems !== mainMenuNav)
+  const rawNavItems = (navItems && navItems !== mainMenuNav)
     ? navItems
     : roleNavItems;
+  const effectiveNavItems = rawNavItems.map((item) => ({
+    ...item,
+    to: getRolePath(item.to, currentRole),
+  }));
 
   const [collapsed, setCollapsed] = useState(() => {
     const savedState = window.localStorage.getItem('workspaceSidebarCollapsed');

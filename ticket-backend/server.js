@@ -276,6 +276,31 @@ app.post(['/api/forgot-password/send-code', '/api/auth/forgot-password/send-code
   }
 });
 
+function validateStrongPassword(password, label = 'New password') {
+  if (!password || typeof password !== 'string') {
+    return `${label} is required.`;
+  }
+  if (password.length < 8) {
+    return `${label} must be at least 8 characters long.`;
+  }
+  if (password.length > 128) {
+    return `${label} must be 128 characters or fewer.`;
+  }
+  if (!/[A-Z]/.test(password)) {
+    return `${label} must include at least one uppercase letter (A-Z).`;
+  }
+  if (!/[a-z]/.test(password)) {
+    return `${label} must include at least one lowercase letter (a-z).`;
+  }
+  if (!/[0-9]/.test(password)) {
+    return `${label} must include at least one number (0-9).`;
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return `${label} must include at least one special character (e.g. !@#$%^&*).`;
+  }
+  return '';
+}
+
 // 2. Verify Code & Change Password Endpoint
 app.post(['/api/forgot-password/verify', '/api/auth/forgot-password/verify'], async (req, res) => {
   const { email, code, new_password, confirm_password } = req.body || {};
@@ -291,16 +316,9 @@ app.post(['/api/forgot-password/verify', '/api/auth/forgot-password/verify'], as
     return res.status(400).json({ error: 'Please enter the 6-digit verification code.' });
   }
 
-  if (!new_password || typeof new_password !== 'string') {
-    return res.status(400).json({ error: 'Please enter your new password.' });
-  }
-
-  if (new_password.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
-  }
-
-  if (new_password.length > 128) {
-    return res.status(400).json({ error: 'New password must be 128 characters or fewer.' });
+  const pwdErr = validateStrongPassword(new_password, 'New password');
+  if (pwdErr) {
+    return res.status(400).json({ error: pwdErr });
   }
 
   if (confirm_password !== undefined && new_password !== String(confirm_password)) {
@@ -536,14 +554,9 @@ app.put('/api/auth/change-password', async (req, res) => {
     if (!current_password || typeof current_password !== 'string') {
       return res.status(400).json({ error: 'Current password is required.' });
     }
-    if (!new_password || typeof new_password !== 'string') {
-      return res.status(400).json({ error: 'New password is required.' });
-    }
-    if (new_password.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
-    }
-    if (new_password.length > 128) {
-      return res.status(400).json({ error: 'New password must be 128 characters or fewer.' });
+    const pwdErr = validateStrongPassword(new_password, 'New password');
+    if (pwdErr) {
+      return res.status(400).json({ error: pwdErr });
     }
     if (confirm_password !== undefined && new_password !== String(confirm_password)) {
       return res.status(400).json({ error: 'New password and confirm password do not match.' });
@@ -712,6 +725,12 @@ app.post('/api/admin/users', async (req, res) => {
       return res.status(400).json({ error: 'A user with this Employee ID already exists.' });
     }
 
+    if (password !== undefined && password !== null && String(password).length > 0) {
+      const pwdErr = validateStrongPassword(String(password), 'Password');
+      if (pwdErr) {
+        return res.status(400).json({ error: pwdErr });
+      }
+    }
     const generatedPlainPassword = password || generateTemporaryPassword();
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(generatedPlainPassword, salt);

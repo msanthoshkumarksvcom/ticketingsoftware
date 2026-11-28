@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { INPUT_LIMITS, validateFields } from '../../utils/inputValidation';
+import { INPUT_LIMITS, validateFields, validateStrongPassword } from '../../utils/inputValidation';
 import {
   BarChart3,
   Bell,
@@ -371,8 +371,9 @@ function SettingsContent() {
       setPasswordFeedback({ text: 'Please fill in all password fields.', type: 'error' });
       return;
     }
-    if (new_password.length < 6) {
-      setPasswordFeedback({ text: 'New password must be at least 6 characters long.', type: 'error' });
+    const pwdErr = validateStrongPassword(new_password, 'New password');
+    if (pwdErr) {
+      setPasswordFeedback({ text: pwdErr, type: 'error' });
       return;
     }
     if (new_password !== confirm_password) {
@@ -800,7 +801,7 @@ function SettingsContent() {
                         field: 'new_password',
                         id: 'ws-new-password',
                         label: 'New Password',
-                        placeholder: 'Minimum 6 characters',
+                        placeholder: 'Min 8 chars: upper, lower, number & special char',
                         autoComplete: 'new-password'
                       },
                       {

@@ -106,3 +106,23 @@ export function validateFields(checks) {
   }
   return '';
 }
+
+/**
+ * Validates that a newly created or reset password meets complexity requirements:
+ * - Minimum 8 characters (max 128)
+ * - At least 1 uppercase letter (A-Z)
+ * - At least 1 lowercase letter (a-z)
+ * - At least 1 number (0-9)
+ * - At least 1 special character
+ */
+export function validateStrongPassword(value, label = 'New password') {
+  const pwd = String(value ?? '');
+  if (!pwd) return `${label} is required.`;
+  if (pwd.length < 8) return `${label} must be at least 8 characters long.`;
+  if (pwd.length > 128) return `${label} must be 128 characters or fewer.`;
+  if (!/[A-Z]/.test(pwd)) return `${label} must include at least one uppercase letter (A-Z).`;
+  if (!/[a-z]/.test(pwd)) return `${label} must include at least one lowercase letter (a-z).`;
+  if (!/[0-9]/.test(pwd)) return `${label} must include at least one number (0-9).`;
+  if (!/[^A-Za-z0-9]/.test(pwd)) return `${label} must include at least one special character (e.g. !@#$%^&*).`;
+  return '';
+}
