@@ -324,7 +324,7 @@ export default function ProjectLeadDashboard() {
             <div className="pld-metric-card primary">
               <div className="pld-mc-top">
                 <span className="pld-mc-label">Assigned Projects</span>
-                <div className="pld-mc-icon"><FolderKanban size={18} /></div>
+                <div className="pld-mc-icon"><FolderKanban size={18} color="#2563EB" /></div>
               </div>
               <div className="pld-mc-val">{summary.totalAssignedProjects}</div>
               <div className="pld-mc-sub">{summary.totalSheets} Test Case Sheets</div>
