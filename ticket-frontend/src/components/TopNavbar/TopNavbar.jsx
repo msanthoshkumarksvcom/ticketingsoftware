@@ -9,7 +9,8 @@ import {
   Bell,
   ChevronDown,
   Settings,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 import { getSavedTheme, applyTheme } from '../../utils/theme';
 import NotificationCenter from '../NotificationCenter/NotificationCenter';
@@ -377,23 +378,62 @@ export default function TopNavbar({
           aria-modal="true"
           aria-labelledby="top-nav-logout-title"
         >
-          <div className="topnav-logout-icon">
-            <LogOut size={22} />
+          <header className="topnav-logout-header">
+            <div className="topnav-logout-header-left">
+              <div className="topnav-logout-icon">
+                <LogOut size={19} />
+              </div>
+              <div className="topnav-logout-titles">
+                <h3 id="top-nav-logout-title" className="topnav-logout-title">
+                  Confirm Sign Out
+                </h3>
+                <p className="topnav-logout-subtitle">
+                  End your active workspace session
+                </p>
+              </div>
+            </div>
+            <button
+              id="top-nav-logout-close-btn"
+              type="button"
+              className="topnav-logout-close"
+              onClick={() => setShowLogoutModal(false)}
+              aria-label="Close sign out confirmation"
+            >
+              <X size={18} />
+            </button>
+          </header>
+
+          <div className="topnav-logout-body">
+            <p className="topnav-logout-text">
+              Are you sure you want to sign out of <strong>QA Software</strong>? Any unsaved changes on this page may be lost.
+            </p>
+
+            <div className="topnav-logout-account-card">
+              <div className="topnav-logout-avatar">
+                {profile.avatar && !avatarFailed ? (
+                  <img src={profile.avatar} alt={displayName} />
+                ) : (
+                  <span>{initials}</span>
+                )}
+              </div>
+              <div className="topnav-logout-account-meta">
+                <strong>{displayName}</strong>
+                <span>{profile.email || 'Signed-in workspace account'}</span>
+              </div>
+              {profile.role && (
+                <span className="topnav-logout-role-pill">{profile.role}</span>
+              )}
+            </div>
           </div>
-          <h2 id="top-nav-logout-title" className="topnav-logout-title">
-            Sign out of your workspace?
-          </h2>
-          <p className="topnav-logout-text">
-            You will be returned to the login screen and can sign back in at any time with your credentials.
-          </p>
-          <div className="topnav-logout-actions">
+
+          <footer className="topnav-logout-footer">
             <button
               id="top-nav-logout-cancel-btn"
               type="button"
               className="topnav-logout-btn cancel"
               onClick={() => setShowLogoutModal(false)}
             >
-              Stay signed in
+              Cancel
             </button>
             <button
               id="top-nav-logout-confirm-btn"
@@ -401,9 +441,10 @@ export default function TopNavbar({
               className="topnav-logout-btn confirm"
               onClick={confirmLogout}
             >
-              Sign out
+              <LogOut size={15} />
+              <span>Sign Out</span>
             </button>
-          </div>
+          </footer>
         </section>
       </div>,
       document.body
