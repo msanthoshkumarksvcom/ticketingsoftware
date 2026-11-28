@@ -3915,3 +3915,18 @@ html[data-theme='dark'] .ufv-word-html h2,
 html[data-theme='dark'] .ufv-word-html h3 {
   color: #f8fafc;
 }
+
+html[data-theme='dark'] .pjs-main.is-fullscreen {
+  background: #0f172a;
+}
+html[data-theme='dark'] .pjs-fullscreen-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+html[data-theme='dark'] .pjs-fullscreen-btn:hover,
+html[data-theme='dark'] .pjs-fullscreen-btn.active {
+  background: rgba(37, 99, 235, 0.22);
+  border-color: #3b82f6;
+  color: #93c5fd;
+}

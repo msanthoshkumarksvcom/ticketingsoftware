@@ -47,6 +47,7 @@ import {
   Image,
   Upload,
   Maximize2,
+  Minimize2,
   Folder,
   Radio,
   Users,
@@ -173,6 +174,42 @@ export default function AdminProjectSheet() {
   const normalizedUserRole = currentUserRole.trim().toLowerCase();
   const canManageSheets = ['qa lead', 'qa member', 'manager', 'admin', 'super admin'].includes(normalizedUserRole);
   const isDeveloper = !canManageSheets; // Read-only mode for Developer, Project Lead, and non-QA roles
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const toggleFullScreen = useCallback(() => {
+    setIsFullScreen((prev) => {
+      const next = !prev;
+      try {
+        if (next && !document.fullscreenElement && document.documentElement?.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else if (!next && document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      } catch {
+        // Fallback to full-viewport CSS mode if browser blocks fullscreen API
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullScreen(false);
+      }
+    };
+    const onEscapeFullScreen = (e) => {
+      if (e.key === 'Escape' && isFullScreen && !document.fullscreenElement) {
+        setIsFullScreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    window.addEventListener('keydown', onEscapeFullScreen);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      window.removeEventListener('keydown', onEscapeFullScreen);
+    };
+  }, [isFullScreen]);
 
   // Project metadata
   const [project, setProject] = useState(() => location.state?.project || {
@@ -2058,18 +2095,22 @@ export default function AdminProjectSheet() {
         </div>
       )}
 
-      {/* Main Left App Sidebar (collapsed for maximum sheet area) */}
-      <RoleSidebar roleName={currentUserRole} defaultCollapsed onLogout={() => setShowLogoutModal(true)} />
+      {/* Main Left App Sidebar (hidden in Full Screen mode) */}
+      {!isFullScreen && (
+        <RoleSidebar roleName={currentUserRole} defaultCollapsed onLogout={() => setShowLogoutModal(true)} />
+      )}
 
       {/* Main Google Sheets Application Viewport */}
-      <main id="pjs-main-content" className="pjs-main" onKeyDown={handleKeyDown} tabIndex={0} ref={tableRef}>
-        <TopNavbar
-          pageTitle={project?.name ? `${project.name} - Test Execution Matrix` : 'Test Execution Matrix'}
-          breadcrumbs={[
-            { label: 'Projects', to: getRolePath('/projects') },
-            ...(projectId ? [{ label: project?.name || 'Project Workspace', to: `/admin/projects/${projectId}` }] : [])
-          ]}
-        />
+      <main id="pjs-main-content" className={`pjs-main ${isFullScreen ? 'is-fullscreen' : ''}`} onKeyDown={handleKeyDown} tabIndex={0} ref={tableRef}>
+        {!isFullScreen && (
+          <TopNavbar
+            pageTitle={project?.name ? `${project.name} - Test Execution Matrix` : 'Test Execution Matrix'}
+            breadcrumbs={[
+              { label: 'Projects', to: getRolePath('/projects') },
+              ...(projectId ? [{ label: project?.name || 'Project Workspace', to: `/admin/projects/${projectId}` }] : [])
+            ]}
+          />
+        )}
         
         {/* 1. Google Sheets App Header Bar */}
         <header id="pjs-header" className="pjs-header">
@@ -2216,6 +2257,11 @@ export default function AdminProjectSheet() {
                       </button>
                       <button id="pjs-menu-view-zoom-75-btn" className="pjs-dropdown-opt" onClick={() => { setZoomLevel(75); setActiveMenu(null); }}>
                         Zoom: 75% {zoomLevel === 75 && <Check size={14} />}
+                      </button>
+                      <div className="pjs-dropdown-divider" />
+                      <button id="pjs-menu-view-fullscreen-btn" className="pjs-dropdown-opt" onClick={() => { toggleFullScreen(); setActiveMenu(null); }}>
+                        {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                        <span>{isFullScreen ? 'Exit Full Screen' : 'Full Screen View'}</span>
                       </button>
                     </div>
                   )}
@@ -2425,6 +2471,17 @@ export default function AdminProjectSheet() {
                 )}
               </button>
             )}
+
+            <button
+              id="pjs-fullscreen-btn"
+              type="button"
+              className={`pjs-fullscreen-btn ${isFullScreen ? 'active' : ''}`}
+              onClick={toggleFullScreen}
+              title={isFullScreen ? 'Exit Full Screen (Esc)' : 'Expand Sheet to Full Screen'}
+            >
+              {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              <span>{isFullScreen ? 'Exit Full Screen' : 'Full Screen'}</span>
+            </button>
 
             <button id="pjs-export-csv-btn" className="pjs-share-btn" onClick={handleExportCSV} title="Export CSV Spreadsheet">
               <Download size={14} />
