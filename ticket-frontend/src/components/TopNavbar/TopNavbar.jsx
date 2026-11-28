@@ -8,6 +8,7 @@ import {
   Moon,
   Bell,
   ChevronDown,
+  Settings,
   LogOut,
   X
 } from 'lucide-react';
@@ -96,11 +97,6 @@ export default function TopNavbar({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showLogoutModal]);
 
-  const handleRequestLogout = () => {
-    setDropdownOpen(false);
-    setShowLogoutModal(true);
-  };
-
   const confirmLogout = () => {
     setShowLogoutModal(false);
     setDropdownOpen(false);
@@ -113,6 +109,10 @@ export default function TopNavbar({
     localStorage.removeItem('userBio');
     localStorage.removeItem('userAvatar');
     navigate('/', { replace: true });
+  };
+
+  const handleRequestLogout = () => {
+    confirmLogout();
   };
 
   // Sync theme changes
