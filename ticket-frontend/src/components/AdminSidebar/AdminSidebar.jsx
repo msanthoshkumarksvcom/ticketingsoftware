@@ -79,7 +79,8 @@ function AdminSidebar({
   navItems
 }) {
   const currentRole = typeof window !== 'undefined' ? (window.localStorage.getItem('userRole') || '') : '';
-  const isAdmin = currentRole === 'Admin' || currentRole === 'Super Admin';
+  const roleLower = currentRole.trim().toLowerCase();
+  const isAdmin = ['admin', 'super admin', 'system admin', 'administrator'].includes(roleLower);
   const isQAMember = currentRole === 'QA Member';
   const isProjectLead = currentRole === 'Project Lead';
   const isDeveloper = currentRole === 'Developer';

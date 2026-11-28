@@ -295,6 +295,8 @@ export const initDatabase = async () => {
       ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE;
       ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_by VARCHAR(150);
       ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP;
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS file_data BYTEA;
+      ALTER TABLE project_documents ADD COLUMN IF NOT EXISTS byte_size BIGINT;
     `);
 
     // ========================
